@@ -1,0 +1,318 @@
+.root {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: rgb(250, 243, 230);
+}
+
+.top-bar {
+    position: relative;
+    padding: 12px 64px 12px 64px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.growth-stage-label {
+    font-size: 26px;
+    -unity-font-style: bold;
+    color: rgb(90, 62, 40);
+}
+
+.gauge-track {
+    width: 100%;
+    height: 14px;
+    margin-top: 6px;
+    background-color: rgba(90, 62, 40, 0.15);
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+.gauge-fill {
+    height: 100%;
+    width: 0%;
+    background-color: rgb(255, 167, 38);
+}
+
+.terrarium-view {
+    flex-grow: 1;
+    position: relative;
+    background-image: url("/Assets/Art/terrarium_background.png");
+    -unity-background-scale-mode: scale-and-crop;
+}
+
+.decor-image {
+    position: absolute;
+    left: 12%;
+    bottom: 6%;
+    width: 30%;
+    height: 20%;
+}
+
+.pet-image {
+    position: absolute;
+    right: 10%;
+    bottom: 8%;
+    width: 45%;
+    height: 30%;
+    background-image: url("/Assets/Art/gecko_placeholder_256.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.status-section {
+    padding: 12px 20px 4px;
+    flex-direction: column;
+    background-color: rgb(250, 243, 230);
+}
+
+.status-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.status-label {
+    width: 64px;
+    font-size: 16px;
+    color: rgb(90, 62, 40);
+}
+
+.status-bar-track {
+    flex-grow: 1;
+    height: 14px;
+    margin: 0 10px;
+    background-color: rgba(90, 62, 40, 0.15);
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+.status-bar-fill {
+    height: 100%;
+    width: 0%;
+}
+
+.status-value {
+    width: 40px;
+    font-size: 16px;
+    -unity-text-align: middle-right;
+    color: rgb(90, 62, 40);
+}
+
+.feedback-label {
+    align-self: center;
+    margin-bottom: 4px;
+    font-size: 15px;
+    color: rgb(90, 62, 40);
+    -unity-text-align: middle-center;
+}
+
+.bottom-bar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 4px 16px 12px;
+}
+
+.care-button {
+    width: 48.5%;
+    margin: 0 0 8px 0;
+    height: 56px;
+    border-radius: 12px;
+    border-width: 0;
+    background-color: rgb(255, 167, 38);
+    color: rgb(255, 255, 255);
+    font-size: 18px;
+    -unity-font-style: bold;
+}
+
+.milestone-modal-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.milestone-modal-card {
+    width: 88%;
+    max-height: 90%;
+    padding: 20px;
+    background-color: rgb(250, 243, 230);
+    border-radius: 16px;
+    align-items: center;
+}
+
+.milestone-stage-label {
+    font-size: 28px;
+    -unity-font-style: bold;
+    color: rgb(90, 62, 40);
+    margin-bottom: 10px;
+}
+
+.milestone-message-label {
+    font-size: 18px;
+    color: rgb(90, 62, 40);
+    margin-bottom: 20px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.milestone-continue-button {
+    width: 70%;
+    height: 48px;
+    border-radius: 12px;
+    border-width: 0;
+    background-color: rgb(255, 167, 38);
+    color: rgb(255, 255, 255);
+    font-size: 18px;
+    -unity-font-style: bold;
+}
+
+.decor-icon-rock_01 {
+    background-image: url("/Assets/Art/decor_rock_01.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.decor-icon-plant_01 {
+    background-image: url("/Assets/Art/decor_plant_01.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.decor-icon-water_dish_01 {
+    background-image: url("/Assets/Art/decor_water_dish_01.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.decor-icon-heat_lamp_01 {
+    background-image: url("/Assets/Art/decor_heat_lamp_01.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.decor-icon-driftwood_01 {
+    background-image: url("/Assets/Art/decor_driftwood_01.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.decor-drawer-title {
+    font-size: 22px;
+    -unity-font-style: bold;
+    color: rgb(90, 62, 40);
+    margin-bottom: 12px;
+}
+
+.decor-list {
+    width: 100%;
+}
+
+.decor-row {
+    flex-direction: row;
+    align-items: center;
+    height: 56px;
+    margin-bottom: 8px;
+    padding: 0 10px;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgba(90, 62, 40, 0.08);
+}
+
+.decor-row:disabled {
+    opacity: 0.45;
+}
+
+.decor-icon {
+    width: 40px;
+    height: 40px;
+    margin-right: 12px;
+}
+
+.decor-name-label {
+    flex-grow: 1;
+    font-size: 16px;
+    color: rgb(90, 62, 40);
+    -unity-text-align: middle-left;
+}
+
+.decor-status-label {
+    font-size: 13px;
+    color: rgb(90, 62, 40);
+    -unity-text-align: middle-right;
+}
+
+.debug-button {
+    position: absolute;
+    top: 12px;
+    right: 8px;
+    width: 64px;
+    height: 44px;
+    font-size: 13px;
+    border-radius: 8px;
+    border-width: 0;
+    background-color: rgba(90, 62, 40, 0.6);
+    color: rgb(255, 255, 255);
+}
+
+.debug-multiplier-row {
+    flex-direction: row;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.debug-small-button {
+    width: 72px;
+    height: 44px;
+    margin: 0 6px;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgb(255, 167, 38);
+    color: rgb(255, 255, 255);
+    font-size: 14px;
+    -unity-font-style: bold;
+}
+
+.debug-slider-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.debug-slider-label {
+    width: 64px;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+}
+
+.debug-slider {
+    flex-grow: 1;
+}
+
+.debug-applied-elapsed-label {
+    font-size: 13px;
+    color: rgb(90, 62, 40);
+    margin: 8px 0;
+    -unity-text-align: middle-center;
+}
+
+.debug-clear-save-button {
+    height: 44px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+    border-width: 0;
+    background-color: rgb(229, 57, 53);
+    color: rgb(255, 255, 255);
+    font-size: 15px;
+    -unity-font-style: bold;
+}
+
+.status-good {
+    background-color: rgb(67, 160, 71);
+}
+
+.status-warning {
+    background-color: rgb(253, 216, 53);
+}
+
+.status-critical {
+    background-color: rgb(229, 57, 53);
+}

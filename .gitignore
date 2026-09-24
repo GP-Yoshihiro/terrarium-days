@@ -1,0 +1,25 @@
+# Unity-generated content
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+work/
+
+# IDE and local configuration
+.vs/
+.vscode/
+.idea/
+.claude/settings.local.json
+
+# Android outputs and signing secrets
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Native build caches and OS metadata
+.utmp/
+.DS_Store

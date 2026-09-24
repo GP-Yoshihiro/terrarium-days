@@ -1,0 +1,19 @@
+{
+  "name": "TerrariumDays.PlayModeTests",
+  "rootNamespace": "TerrariumDays.Tests",
+  "references": [
+    "TerrariumDays.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
