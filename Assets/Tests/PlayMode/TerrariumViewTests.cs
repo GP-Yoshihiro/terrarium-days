@@ -52,6 +52,19 @@ namespace TerrariumDays.Tests
             return path;
         }
 
+        private string SaveColonyWith(PetState pet, DateTimeOffset nowUtc)
+        {
+            var path = CreateTempSavePath();
+            var colony = Colony.CreateNew(nowUtc, new EconomyTuning(), new CareTuning(), new System.Random(1));
+            var cage = colony.Cages[0];
+            colony.Animals.Clear();
+            cage.AnimalId = -1;
+            colony.NextAnimalId = 1;
+            colony.AddAnimal(pet, cage);
+            new ColonySaveService(new CareTuning(), new EconomyTuning()).Save(path, colony);
+            return path;
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -159,7 +172,7 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void Render_SetsGrowthStageTextAndStageRelativeGaugeWidth()
+        public void Render_ShowsTheJapaneseStageWithWeightAndTheProgressToTheNextStage()
         {
             var state = new PetState { Stage = GrowthStage.Baby, WeightGrams = 9d };
 
@@ -268,33 +281,33 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void LoadStateAndApplyOfflineProgress_WhenNoSaveFileExists_LoadsDefaultsAndKeepsTheModalHidden()
+        public void LoadColony_WhenNoSaveFileExists_LoadsDefaultsAndKeepsTheModalHidden()
         {
             var path = CreateTempSavePath();
 
-            view.LoadStateAndApplyOfflineProgress(path, DateTimeOffset.UtcNow);
+            view.LoadColony(path, DateTimeOffset.UtcNow);
 
             Assert.That(view.State.Hunger, Is.EqualTo(80d));
             Assert.That(milestoneModal.style.display.value, Is.EqualTo(DisplayStyle.None));
         }
 
         [Test]
-        [Ignore("Re-enabled in Task 8: needs the colony save to persist weight")]
-        public void LoadStateAndApplyOfflineProgress_WhenElapsedTimeCrossesAStageBoundary_ShowsTheMilestoneModal()
+        public void LoadColony_WhenElapsedTimeCrossesAStageBoundary_ShowsTheMilestoneModal()
         {
-            var path = CreateTempSavePath();
+            var care = new CareTuning();
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
             var savedState = new PetState
             {
                 Hunger = 90d,
                 Hydration = 90d,
                 Cleanliness = 90d,
-                WeightGrams = 14.9d,
-                LastSavedAtUtc = nowUtc - TimeSpan.FromHours(1)
+                WeightGrams = 15.5d,
+                NextShedAtUtc = nowUtc.AddDays(3),
+                LastSavedAtUtc = nowUtc - GameCalendar.RealTimeFor(care.PreGrowthFastGameDays) - TimeSpan.FromMinutes(5)
             };
-            new SaveService().Save(path, savedState);
+            var path = SaveColonyWith(savedState, nowUtc);
 
-            view.LoadStateAndApplyOfflineProgress(path, nowUtc);
+            view.LoadColony(path, nowUtc);
 
             Assert.That(view.State.GrowthStage, Is.EqualTo(GrowthStage.Juvenile));
             Assert.That(milestoneModal.style.display.value, Is.EqualTo(DisplayStyle.Flex));
@@ -312,14 +325,15 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void OnFeedClicked_AfterLoadStateAndApplyOfflineProgress_PersistsTheUpdatedValue()
+        public void OnFeedClicked_AfterLoadColony_PersistsTheUpdatedValue()
         {
             var path = CreateTempSavePath();
-            view.LoadStateAndApplyOfflineProgress(path, DateTimeOffset.UtcNow);
+            view.LoadColony(path, DateTimeOffset.UtcNow);
 
             view.OnFeedClicked();
 
-            var reloaded = new SaveService().LoadOrCreateDefault(path, DateTimeOffset.UtcNow);
+            var reloaded = new ColonySaveService(new CareTuning(), new EconomyTuning())
+                .LoadOrCreate(path, DateTimeOffset.UtcNow, new System.Random(1)).Animals[0];
             Assert.That(reloaded.Hunger, Is.EqualTo(100d));
         }
 
@@ -386,7 +400,7 @@ namespace TerrariumDays.Tests
         {
             var path = CreateTempSavePath();
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
-            view.LoadStateAndApplyOfflineProgress(path, nowUtc);
+            view.LoadColony(path, nowUtc);
             view.OnDebugMultiplierClicked(60d);
 
             view.ApplyLiveTickDelta(TimeSpan.FromMinutes(1));
@@ -401,7 +415,7 @@ namespace TerrariumDays.Tests
         {
             var path = CreateTempSavePath();
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
-            view.LoadStateAndApplyOfflineProgress(path, nowUtc);
+            view.LoadColony(path, nowUtc);
             view.OnDebugMultiplierClicked(40d);
 
             view.ApplyLiveTickDelta(TimeSpan.FromSeconds(1));
@@ -419,7 +433,7 @@ namespace TerrariumDays.Tests
         {
             var path = CreateTempSavePath();
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
-            view.LoadStateAndApplyOfflineProgress(path, nowUtc);
+            view.LoadColony(path, nowUtc);
 
             view.OnDebugSimulate12HoursClicked();
 
@@ -436,7 +450,7 @@ namespace TerrariumDays.Tests
             // whole gap and immediately decayed the stat the player had just restored.
             var path = CreateTempSavePath();
             var realNow = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
-            view.LoadStateAndApplyOfflineProgress(path, realNow, new TimeService(() => realNow));
+            view.LoadColony(path, realNow, new TimeService(() => realNow));
             view.OnDebugMultiplierClicked(600d);
             view.ApplyLiveTickDelta(TimeSpan.FromSeconds(6)); // one virtual hour ahead
 
@@ -454,7 +468,7 @@ namespace TerrariumDays.Tests
         {
             var path = CreateTempSavePath();
             var realNow = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
-            view.LoadStateAndApplyOfflineProgress(path, realNow, new TimeService(() => realNow));
+            view.LoadColony(path, realNow, new TimeService(() => realNow));
 
             view.OnApplicationPause(true);
             realNow += TimeSpan.FromHours(2);
@@ -478,15 +492,14 @@ namespace TerrariumDays.Tests
         [Test]
         public void OnFeedClicked_RightBeforeAShed_IsRefusedAndExplained()
         {
-            var path = CreateTempSavePath();
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
-            new SaveService().Save(path, new PetState
+            var path = SaveColonyWith(new PetState
             {
                 Hunger = 50d,
                 LastSavedAtUtc = nowUtc,
                 NextShedAtUtc = nowUtc + TimeSpan.FromMinutes(30),
-            });
-            view.LoadStateAndApplyOfflineProgress(path, nowUtc, new TimeService(() => nowUtc));
+            }, nowUtc);
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
 
             view.OnFeedClicked();
 
@@ -495,17 +508,16 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void LoadStateAndApplyOfflineProgress_WhenAShedHappenedWhileAway_SaysSo()
+        public void LoadColony_WhenAShedHappenedWhileAway_SaysSo()
         {
-            var path = CreateTempSavePath();
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
-            new SaveService().Save(path, new PetState
+            var path = SaveColonyWith(new PetState
             {
                 LastSavedAtUtc = nowUtc - TimeSpan.FromHours(3),
                 NextShedAtUtc = nowUtc - TimeSpan.FromHours(1),
-            });
+            }, nowUtc);
 
-            view.LoadStateAndApplyOfflineProgress(path, nowUtc, new TimeService(() => nowUtc));
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
 
             StringAssert.Contains("脱皮した", feedbackLabel.text);
             Assert.That(view.State.NextShedAtUtc, Is.GreaterThan(nowUtc));
@@ -537,11 +549,10 @@ namespace TerrariumDays.Tests
         [Test]
         public void OnDebugClearSaveClicked_ResetsStateToDefaultsAndOverwritesTheSaveFile()
         {
-            var path = CreateTempSavePath();
             var nowUtc = DateTimeOffset.UtcNow;
             var nonDefaultState = new PetState { Hunger = 12d, WeightGrams = 60d };
-            new SaveService().Save(path, nonDefaultState);
-            view.LoadStateAndApplyOfflineProgress(path, nowUtc);
+            var path = SaveColonyWith(nonDefaultState, nowUtc);
+            view.LoadColony(path, nowUtc);
             Assert.That(view.State.Hunger, Is.EqualTo(12d));
 
             view.OnDebugClearSaveClicked();
@@ -549,8 +560,39 @@ namespace TerrariumDays.Tests
             Assert.That(view.State.Hunger, Is.EqualTo(80d));
             Assert.That(view.State.WeightGrams, Is.EqualTo(3d));
 
-            var reloaded = new SaveService().LoadOrCreateDefault(path, nowUtc);
+            var reloaded = new ColonySaveService(new CareTuning(), new EconomyTuning())
+                .LoadOrCreate(path, nowUtc, new System.Random(1)).Animals[0];
             Assert.That(reloaded.Hunger, Is.EqualTo(80d));
+        }
+
+        [Test]
+        public void OnFeedAllClicked_FeedsEveryPetAndSaysHowMany()
+        {
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var path = SaveColonyWith(new PetState { Hunger = 20d, LastSavedAtUtc = nowUtc, NextShedAtUtc = nowUtc.AddDays(3) }, nowUtc);
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+            view.Session.Colony.AddAnimal(new PetState { Hunger = 20d, LastSavedAtUtc = nowUtc, NextShedAtUtc = nowUtc.AddDays(3) },
+                view.Session.Colony.AddCage(CageSize.Standard));
+
+            view.OnFeedAllClicked();
+
+            Assert.That(feedbackLabel.text, Is.EqualTo("2匹が食べました"));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(50000 - 60));
+        }
+
+        [Test]
+        public void ShowCageStep_WrapsAroundAndSelectsThatCagesPet()
+        {
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var path = SaveColonyWith(new PetState { LastSavedAtUtc = nowUtc, NextShedAtUtc = nowUtc.AddDays(3) }, nowUtc);
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
+
+            view.ShowCageStep(1);
+            Assert.That(view.State, Is.SameAs(second));
+
+            view.ShowCageStep(1);
+            Assert.That(view.State, Is.SameAs(view.Session.Colony.Animals[0]));
         }
     }
 }

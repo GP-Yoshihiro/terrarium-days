@@ -31,10 +31,17 @@ namespace TerrariumDays.UI
         private PetState state;
         private CareTuning tuning;
         private CareService careService;
-        private SaveService saveService;
-        private OfflineProgressCalculator offlineProgressCalculator;
         private TimeService timeService;
-        private string savePath;
+        private readonly EconomyTuning economyTuning = new EconomyTuning();
+        private ColonySession session;
+        private ColonyCareService colonyCare;
+        private Cage currentCage;
+
+        public ColonySession Session => session;
+
+        public Cage CurrentCage => currentCage;
+
+        public event Action ColonyChanged;
 
         private Label growthStageLabel;
         private VisualElement growthGaugeFill;
@@ -83,7 +90,6 @@ namespace TerrariumDays.UI
         private Slider debugHealthSlider;
         private Slider debugWeightSlider;
         private Coroutine liveTickCoroutine;
-        private DateTimeOffset virtualNow;
         private TimeSpan lastAppliedElapsed;
         private EventCallback<ChangeEvent<float>> debugHungerSliderCallback;
         private EventCallback<ChangeEvent<float>> debugHydrationSliderCallback;
@@ -216,7 +222,7 @@ namespace TerrariumDays.UI
             ApplyDebugVisibility(Debug.isDebugBuild);
 
             var resolvedSavePath = Path.Combine(Application.persistentDataPath, SaveFileName);
-            LoadStateAndApplyOfflineProgress(resolvedSavePath, new TimeService().UtcNow());
+            LoadColony(resolvedSavePath, DateTimeOffset.UtcNow, new TimeService());
 
             // Status keeps changing while the app is open, not only across launches.
             StartLiveTickIfNeeded();
@@ -234,7 +240,6 @@ namespace TerrariumDays.UI
             state = initialState;
             tuning = initialTuning;
             careService = new CareService(tuning);
-            virtualNow = state.LastSavedAtUtc;
 
             if (feedbackLabel != null)
             {
@@ -262,59 +267,126 @@ namespace TerrariumDays.UI
         }
 
         /// <summary>
-        /// Loads (or creates) the save at savePath, applies capped offline progress up to
-        /// nowUtc, initializes the view with the result, and shows the milestone modal if
-        /// that crossed a growth-stage boundary. Public so tests can drive it directly
-        /// without a real UIDocument, mirroring Initialize/BindElements.
+        /// Loads (or creates/migrates) the colony, applies the time away to every animal and
+        /// shows the first occupied cage. Public so tests can drive it without a UIDocument.
         /// </summary>
-        public void LoadStateAndApplyOfflineProgress(string atSavePath, DateTimeOffset nowUtc, TimeService clock = null)
+        public void LoadColony(string atSavePath, DateTimeOffset nowUtc, TimeService clock = null)
         {
-            savePath = atSavePath;
-            var loadTuning = new CareTuning();
-            saveService = new SaveService();
-            offlineProgressCalculator = new OfflineProgressCalculator(loadTuning);
-            timeService = clock ?? new TimeService();
-
-            var loadedState = saveService.LoadOrCreateDefault(savePath, nowUtc);
-            var result = offlineProgressCalculator.Apply(loadedState, loadedState.LastSavedAtUtc, nowUtc);
-
-            Initialize(loadedState, loadTuning);
-            ApplyCalculatorResult(result);
-
-            // Start live progression from "now", not from the old save time.
-            virtualNow = nowUtc;
-            ResyncClock(nowUtc);
+            tuning = new CareTuning();
+            timeService = clock ?? new TimeService(() => nowUtc);
+            session = new ColonySession(atSavePath, timeService, tuning, economyTuning, new System.Random());
+            colonyCare = new ColonyCareService(tuning, economyTuning);
+            careService = new CareService(tuning);
+            var report = session.Load();
+            var first = session.Colony.OccupiedCages();
+            SelectCage(first.Count > 0 ? first[0].Id : session.Colony.Cages[0].Id);
+            HandleReport(report);
+            if (session.Migrated)
+            {
+                ShowFeedback("データを新しい形式に移しました（ケージ1）");
+            }
         }
 
-        /// <summary>
-        /// Advances state.LastSavedAtUtc by exactly what the calculator applied (not to
-        /// the raw target time) so any sub-minute remainder survives for next time, then
-        /// renders and handles a growth-stage crossing if one occurred. Shared by the
-        /// initial load, the live debug tick, and the one-shot debug simulate action.
-        /// </summary>
-        private void ApplyCalculatorResult(OfflineProgressResult result)
+        public void SelectCage(int cageId)
         {
-            state.LastSavedAtUtc += result.AppliedElapsed;
-
-            if (result.AppliedElapsed <= TimeSpan.Zero)
+            currentCage = session.Colony.Cages.Find(c => c.Id == cageId);
+            var pet = session.Colony.AnimalIn(currentCage);
+            if (pet == null)
             {
                 return;
             }
 
-            lastAppliedElapsed = result.AppliedElapsed;
-            Render(state, tuning);
-            UpdateDebugAppliedElapsedLabel();
+            Initialize(pet, tuning);
+            RebuildPetActor();
+            ColonyChanged?.Invoke();
+        }
 
-            if (result.NewGrowthStage.HasValue)
+        public void ShowCageStep(int delta)
+        {
+            var occupied = session.Colony.OccupiedCages();
+            if (occupied.Count == 0)
             {
-                DecorUnlockService.GrantUnlocksForStage(state, result.NewGrowthStage.Value);
-                ShowMilestoneModal(result.NewGrowthStage.Value);
+                return;
             }
 
-            if (result.ShedCount > 0)
+            var index = Math.Max(0, occupied.IndexOf(currentCage));
+            var next = ((index + delta) % occupied.Count + occupied.Count) % occupied.Count;
+            SelectCage(occupied[next].Id);
+        }
+
+        private void HandleReport(ColonyTickReport report)
+        {
+            if (report.AppliedElapsed > TimeSpan.Zero)
+            {
+                lastAppliedElapsed = report.AppliedElapsed;
+                UpdateDebugAppliedElapsedLabel();
+            }
+
+            foreach (var (pet, stage) in report.StageUps)
+            {
+                DecorUnlockService.GrantUnlocksForStage(pet, stage);
+                if (pet == state)
+                {
+                    ShowMilestoneModal(stage);
+                }
+            }
+
+            if (report.Sheds.Contains(state))
             {
                 ShowFeedback(ShedMessage);
             }
+
+            if (state != null)
+            {
+                Render(state, tuning);
+            }
+
+            if (report.HasEvents)
+            {
+                ColonyChanged?.Invoke();
+            }
+        }
+
+        public void OnFeedAllClicked() => OnBulkCare(() => colonyCare.FeedAll(session.Colony, GameNowUtc()).ToMessage());
+
+        public void OnWaterAllClicked() => OnBulkCare(() => $"{colonyCare.RefreshWaterAll(session.Colony)}匹の水を替えました");
+
+        public void OnCleanAllClicked() => OnBulkCare(() => $"{colonyCare.CleanAll(session.Colony)}ケージを掃除しました");
+
+        private void OnBulkCare(Func<string> action)
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            ShowFeedback(action());
+            Render(state, tuning);
+            SaveCurrentState();
+            ColonyChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Rebuilds the pet actor (walk position, mood, etc.) for the currently selected
+        /// cage's animal. Extracted from BindElements so switching cages gets a fresh actor
+        /// without rebuilding the rest of the visual tree.
+        /// </summary>
+        private void RebuildPetActor()
+        {
+            petActor?.Effects.Clear();
+            petActor = null;
+            if (petElement != null)
+            {
+                petActor = new PetActor(petElement, petBehaviourTuning, artLayout, new System.Random(),
+                    PetSpriteLibrary.LoadFromResources(), effectsLayerElement ?? terrariumViewElement);
+            }
+
+            if (terrariumProjection != null)
+            {
+                petActor?.SetViewSize(terrariumProjection.ViewWidth, terrariumProjection.ViewHeight);
+            }
+
+            PlaceDecor();
         }
 
         private void Update()
@@ -486,16 +558,10 @@ namespace TerrariumDays.UI
                 return;
             }
 
-            if (state == null || offlineProgressCalculator == null || timeService == null)
+            if (session != null)
             {
-                return;
+                HandleReport(session.Resume());
             }
-
-            // Resume: apply the capped real time spent in the background, then re-anchor.
-            var nowUtc = timeService.UtcNow();
-            virtualNow = nowUtc;
-            ApplyCalculatorResult(offlineProgressCalculator.Apply(state, state.LastSavedAtUtc, nowUtc));
-            SaveCurrentState();
         }
 
         public void OnApplicationQuit()
@@ -505,37 +571,7 @@ namespace TerrariumDays.UI
 
         private void SaveCurrentState()
         {
-            if (state == null || saveService == null || string.IsNullOrEmpty(savePath))
-            {
-                return;
-            }
-
-            if (timeService != null)
-            {
-                ResyncClock(timeService.UtcNow());
-            }
-
-            saveService.Save(savePath, state);
-        }
-
-        /// <summary>
-        /// Re-anchors both progress clocks on the real clock. The debug multiplier lets
-        /// virtualNow run hours ahead of real time; moving only LastSavedAtUtc back to real
-        /// time made the next tick replay that whole gap and wipe out the care action just
-        /// taken. Keeps a sub-step remainder so no progress is lost, and drops anything
-        /// larger (the part beyond the offline cap).
-        /// </summary>
-        private void ResyncClock(DateTimeOffset nowUtc)
-        {
-            var pending = virtualNow - state.LastSavedAtUtc;
-            var step = TimeSpan.FromMinutes(tuning.OfflineProgressStepMinutes);
-            if (pending < TimeSpan.Zero || pending >= step)
-            {
-                pending = TimeSpan.Zero;
-            }
-
-            state.LastSavedAtUtc = nowUtc - pending;
-            virtualNow = nowUtc;
+            session?.Save();
         }
 
         public void BindElements(VisualElement root)
@@ -571,16 +607,14 @@ namespace TerrariumDays.UI
             dayPhaseLabel = root.Q<Label>("day-phase-label");
             weatherLabel = root.Q<Label>("weather-label");
 
-            petActor?.Effects.Clear();
             petElement?.UnregisterCallback<ClickEvent>(OnPetElementClicked);
             petElement = root.Q<VisualElement>("pet-image");
-            petActor = null;
             if (petElement != null)
             {
-                petActor = new PetActor(petElement, petBehaviourTuning, artLayout, new System.Random(),
-                    PetSpriteLibrary.LoadFromResources(), effectsLayerElement ?? terrariumViewElement);
                 petElement.RegisterCallback<ClickEvent>(OnPetElementClicked);
             }
+
+            RebuildPetActor();
 
             decorImageElement = root.Q<VisualElement>("decor-image");
             decorButton = root.Q<Button>("decor-button");
@@ -625,6 +659,32 @@ namespace TerrariumDays.UI
         public void OnFeedClicked()
         {
             var before = state.Hunger;
+
+            if (session != null)
+            {
+                var outcome = colonyCare.Feed(session.Colony, state, GameNowUtc());
+                if (outcome == FeedOutcome.NotEnoughMoney)
+                {
+                    ShowFeedback("お金が足りなくて餌を買えません");
+                    Render(state, tuning);
+                    SaveCurrentState();
+                    return;
+                }
+
+                if (outcome != FeedOutcome.Ate)
+                {
+                    // A fasting leopard gecko just turns away; nothing is wrong with it.
+                    petActor?.RefuseFood();
+                    ShowFeedback(outcome == FeedOutcome.RefusedPreShed ? RefusePreShedMessage : RefusePreGrowthMessage);
+                    Render(state, tuning);
+                    SaveCurrentState();
+                    return;
+                }
+
+                OnCareApplied(before, FeedSuccessMessage, actor => actor.Feed());
+                return;
+            }
+
             var appetite = careService.Feed(state, GameNowUtc());
             if (appetite != AppetiteState.Normal)
             {
@@ -642,12 +702,7 @@ namespace TerrariumDays.UI
         /// <summary>The game clock: real time, or the debug-accelerated clock while it runs ahead.</summary>
         private DateTimeOffset GameNowUtc()
         {
-            if (virtualNow != default)
-            {
-                return virtualNow;
-            }
-
-            return timeService != null ? timeService.UtcNow() : DateTimeOffset.UtcNow;
+            return session != null ? session.GameNowUtc : (timeService?.UtcNow() ?? DateTimeOffset.UtcNow);
         }
 
         /// <summary>
@@ -1025,55 +1080,41 @@ namespace TerrariumDays.UI
         /// <summary>
         /// One live-tick step. Public so tests can drive it directly with a controlled
         /// TimeSpan instead of waiting on real frames (see unity-playmode-integration-test
-        /// skill). Accumulates scaled real time into virtualNow every call regardless of
-        /// whether a whole minute-step actually completed, so sub-minute remainders are
-        /// never lost between calls — see ApplyCalculatorResult for the matching half.
+        /// skill).
         /// </summary>
         public void ApplyLiveTickDelta(TimeSpan realDelta)
         {
-            if (state == null || offlineProgressCalculator == null || timeService == null)
+            if (session != null)
             {
-                return;
+                HandleReport(session.Advance(realDelta));
             }
-
-            var scaledDelta = timeService.ScaleElapsed(realDelta);
-            if (scaledDelta <= TimeSpan.Zero)
-            {
-                return;
-            }
-
-            virtualNow += scaledDelta;
-            var result = offlineProgressCalculator.Apply(state, state.LastSavedAtUtc, virtualNow);
-            ApplyCalculatorResult(result);
         }
 
         public void OnDebugSimulate12HoursClicked()
         {
-            if (state == null || offlineProgressCalculator == null)
+            if (session == null)
             {
                 return;
             }
 
-            var target = state.LastSavedAtUtc + TimeSpan.FromHours(12);
-            var result = offlineProgressCalculator.Apply(state, state.LastSavedAtUtc, target);
-            ApplyCalculatorResult(result);
+            HandleReport(session.SimulateGameTime(TimeSpan.FromHours(12)));
             SaveCurrentState();
         }
 
         public void OnDebugClearSaveClicked()
         {
-            if (string.IsNullOrEmpty(savePath))
+            if (session == null || string.IsNullOrEmpty(session.SavePath))
             {
                 return;
             }
 
-            if (File.Exists(savePath))
+            var path = session.SavePath;
+            if (File.Exists(path))
             {
-                File.Delete(savePath);
+                File.Delete(path);
             }
 
-            var nowUtc = timeService != null ? timeService.UtcNow() : DateTimeOffset.UtcNow;
-            LoadStateAndApplyOfflineProgress(savePath, nowUtc);
+            LoadColony(path, timeService.UtcNow(), timeService);
             RefreshDebugPanel();
         }
 

@@ -51,6 +51,8 @@ namespace TerrariumDays.Core
 
         public TimeService Clock => clock;
 
+        public string SavePath => savePath;
+
         public void UseClock(TimeService newClock)
         {
             clock = newClock;
