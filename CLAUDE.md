@@ -31,7 +31,7 @@ iOS build notes:
 
 ## Pet life model
 - Daily rhythm follows the device's local clock (`Core/DayPhase.cs`): leopard geckos sleep long by day (next to floor decor, their hide) and are active at dusk/night. Tuning lives in `Core/PetBehaviourTuning.cs`.
-- Food refusal (拒食) and shedding (脱皮) are time-driven and deterministic (`Core/AppetiteModel.cs`, `Core/OfflineProgressCalculator.cs`): no appetite in the last `PreGrowthGaugePercent` of a stage and in the `PreShedDays` before a shed; a shed happens every `ShedIntervalDays` and on every stage-up. While fasting, hunger falls slower and does not count against health or growth.
+- Growth is by body weight and age (grams / game months, `Core/CareTuning.cs`), not a growth gauge. Food refusal (拒食) and shedding (脱皮) are time-driven and deterministic (`Core/AppetiteModel.cs`, `Core/OfflineProgressCalculator.cs`): once a stage's weight/age target is met the pet fasts for `PreGrowthFastGameDays` before the stage-up lands; a shed refuses food for `PreShedGameDays` beforehand and recurs every `YoungShedIntervalGameDays` (baby/juvenile) or `AdultShedIntervalGameDays` (adult), and on every stage-up. Game time runs at 1 real day = 1 game month. While fasting, hunger falls slower and does not count against health or growth.
 
 ## Scope limits for this prototype
 - Multiple animals across multiple cages, breeding, incubation, money, and shop purchases are in scope. Still no ads, accounts, push notifications, or real-money purchases. Adult animals never die (eggs can fail).

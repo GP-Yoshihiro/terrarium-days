@@ -128,7 +128,9 @@ namespace TerrariumDays.Core
             colony.Wallet.Money = economy.StartingMoney;
             var cage = colony.AddCage(CageSize.Standard);
             var stage = Enum.TryParse(data.growthStage, out GrowthStage parsed) ? parsed : GrowthStage.Baby;
-            var ageMonths = stage == GrowthStage.Adult ? 12d : stage == GrowthStage.Juvenile ? 5d : 1d;
+            // Game time runs 1 real day = 1 game month, so an age in game months is applied
+            // here as that many real days back from now.
+            var ageRealDays = stage == GrowthStage.Adult ? 12d : stage == GrowthStage.Juvenile ? 5d : 1d;
             var lastSaved = Parse(data.lastSavedAtUtc, nowUtc);
             var nextShed = Parse(data.nextShedAtUtc, nowUtc);
             var interval = SheddingModel.IntervalFor(stage, care);
@@ -143,7 +145,7 @@ namespace TerrariumDays.Core
                 Sex = random.NextDouble() < 0.5 ? Sex.Female : Sex.Male,
                 WeightGrams = WeightFromLegacyGrowth(data.growth),
                 Stage = stage,
-                HatchedAtUtc = nowUtc.AddDays(-ageMonths),
+                HatchedAtUtc = nowUtc.AddDays(-ageRealDays),
                 Hunger = data.hunger,
                 Hydration = data.hydration,
                 Cleanliness = data.cleanliness,

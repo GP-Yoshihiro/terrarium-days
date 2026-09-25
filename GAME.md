@@ -39,9 +39,9 @@ All status values are clamped to 0–100.
 | Hydration | 100 = hydrated, 0 = dehydrated | 80 |
 | Cleanliness | 100 = clean habitat | 80 |
 | Health | Overall condition calculated from care quality | 100 |
-| Growth | Progress toward the next growth stage | 0 |
+| Weight | Body weight in grams; growth stage advances by weight and age, not a gauge | 3 g |
 
-Growth stages: `Baby` → `Juvenile` → `Adult`.
+Growth stages: `Baby` → `Juvenile` → `Adult` (Adult at 40 g and 10 game months; exact thresholds live in the tuning data asset).
 
 Exact decay rates, action amounts, and stage thresholds must live in one tuning data asset. Do not hardcode them in UI code.
 
@@ -80,7 +80,7 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 ## 11. Definition of done
 - A new player can perform all three care actions and see their effect.
 - Closing and reopening the app applies capped offline progress correctly.
-- At 600× debug speed, the pet can reach Adult without errors.
+- At 600× debug speed, the pet can reach Adult (40 g, 10 game months) without errors.
 - EditMode tests pass from Unity CLI.
 - An iOS development build installs and reaches the Terrarium screen.
 
