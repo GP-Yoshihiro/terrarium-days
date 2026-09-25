@@ -84,4 +84,12 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 - EditMode tests pass from Unity CLI.
 - An iOS development build installs and reaches the Terrarium screen.
 
+## 12. Genetics, morphs, and personality (phase 2)
+- **Genetics**: 8 single-locus genes (the 3 albino strains are separate loci; mack snow is codominant — 2 copies is super snow; white & yellow is dominant) plus Hypo and Tangerine as polygenic 0–100 values (child = parents' mean ± random spread, clamped).
+- **Morph names**: visible genes are listed by name, with trade names for known combinations (Tremper albino + Blizzard = ブレイジングブリザード, Tremper albino + Eclipse = レイプター); Hypo/Tangerine are named once high enough (Hypo ≥ 70, Tangerine ≥ 60).
+- **Possible hets**: the true genotype stays hidden. The player only sees what an animal's known information implies — proven hets, and possible-het percentages (66% for het × het, 50% for het × normal) for a child whose visible morph doesn't rule the gene out.
+- **Personality**: one of 5 per animal, each with its own threat/walk/hide/fasting/weight-gain/price multipliers and a male×female compatibility table; a hatchling has a 20% chance each of taking a parent's personality, otherwise random. Shop-bought animals reveal personality after purchase; animals hatched by the player know it from birth.
+- **Sex reveal**: sex stays hidden until the animal is Young or older *and* has shed at least once since — not simply on reaching Young.
+- **Visual differentiation**: the base sprite is recoloured at runtime from each morph's palette (colour swap, pattern removal, eye colour); recoloured frames are cached per morph.
+
 Detailed spec: docs/superpowers/specs/2026-09-25-breeder-sim-design.md

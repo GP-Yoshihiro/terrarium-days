@@ -14,6 +14,7 @@ Draw the character from a **pose** (spine points with a thickness profile, legs 
 3. Colour variants are palette transforms of the same canvas (e.g. pale pre-shed skin) — never re-pose.
 4. Write `Resources/<Set>/<clip>_<nn>.png`; import with point filter, no mips, uncompressed (an `AssetPostprocessor` keyed on the folder).
 5. Re-measure the contact line and body span after changing proportions (REQUIRED: placing-sprites-on-painted-floor).
+6. If a runtime palette-recolour system reads these base colours by exact match (e.g. this project's `MorphAppearance`/`MorphRecolor`), changing a palette colour here means updating that palette source and its drift-guard test together (this project: `MorphAppearance.Normal` and `MorphRecolorTests.GeckoSprites_UseOnlyPaletteColours`).
 
 ## Walk cycles that don't slide
 - Use the animal's real gait: sprawling lizards trot in **diagonal couplets** (near-fore + far-hind), duty factor ≈ 0.7 (leopard gecko), trunk bends laterally (girdles swing in anti-phase), tail carried off the ground.
