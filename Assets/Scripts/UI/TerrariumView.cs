@@ -83,6 +83,8 @@ namespace TerrariumDays.UI
         private Button debug600xButton;
         private Button debugSimulate12hButton;
         private Button debugClearSaveButton;
+        private Button debugAddCageButton;
+        private Button debugAddPetButton;
         private Label debugAppliedElapsedLabel;
         private Slider debugHungerSlider;
         private Slider debugHydrationSlider;
@@ -251,6 +253,16 @@ namespace TerrariumDays.UI
             if (debugClearSaveButton != null)
             {
                 debugClearSaveButton.clicked += OnDebugClearSaveClicked;
+            }
+
+            if (debugAddCageButton != null)
+            {
+                debugAddCageButton.clicked += OnDebugAddCageClicked;
+            }
+
+            if (debugAddPetButton != null)
+            {
+                debugAddPetButton.clicked += OnDebugAddPetClicked;
             }
 
             debugHungerSliderCallback = evt => OnDebugHungerChanged(evt.newValue);
@@ -571,6 +583,16 @@ namespace TerrariumDays.UI
                 debugClearSaveButton.clicked -= OnDebugClearSaveClicked;
             }
 
+            if (debugAddCageButton != null)
+            {
+                debugAddCageButton.clicked -= OnDebugAddCageClicked;
+            }
+
+            if (debugAddPetButton != null)
+            {
+                debugAddPetButton.clicked -= OnDebugAddPetClicked;
+            }
+
             if (debugHungerSliderCallback != null)
             {
                 debugHungerSlider?.UnregisterValueChangedCallback(debugHungerSliderCallback);
@@ -693,6 +715,8 @@ namespace TerrariumDays.UI
             debug600xButton = root.Q<Button>("debug-600x-button");
             debugSimulate12hButton = root.Q<Button>("debug-simulate-12h-button");
             debugClearSaveButton = root.Q<Button>("debug-clear-save-button");
+            debugAddCageButton = root.Q<Button>("debug-add-cage-button");
+            debugAddPetButton = root.Q<Button>("debug-add-pet-button");
             debugAppliedElapsedLabel = root.Q<Label>("debug-applied-elapsed-label");
             debugHungerSlider = root.Q<Slider>("debug-hunger-slider");
             debugHydrationSlider = root.Q<Slider>("debug-hydration-slider");
@@ -1270,6 +1294,41 @@ namespace TerrariumDays.UI
 
             LoadColony(path, timeService.UtcNow(), timeService);
             RefreshDebugPanel();
+        }
+
+        public void OnDebugAddCageClicked()
+        {
+            if (session?.Colony.AddCage(CageSize.Standard) == null)
+            {
+                ShowFeedback("ラックがいっぱいです");
+                return;
+            }
+
+            SaveCurrentState();
+            ColonyChanged?.Invoke();
+        }
+
+        public void OnDebugAddPetClicked()
+        {
+            var empty = session?.Colony.Cages.Find(c => c.IsEmpty);
+            if (empty == null)
+            {
+                ShowFeedback("空きケージがありません");
+                return;
+            }
+
+            var now = GameNowUtc();
+            session.Colony.AddAnimal(new PetState
+            {
+                Name = $"レオパ{session.Colony.NextAnimalId}",
+                Sex = UnityEngine.Random.value < 0.5f ? Sex.Female : Sex.Male,
+                HatchedAtUtc = now,
+                LastSavedAtUtc = now,
+                LastShedAtUtc = now,
+                NextShedAtUtc = now + SheddingModel.IntervalFor(GrowthStage.Baby, tuning),
+            }, empty);
+            SaveCurrentState();
+            ColonyChanged?.Invoke();
         }
 
         public void OnDebugHungerChanged(double value)

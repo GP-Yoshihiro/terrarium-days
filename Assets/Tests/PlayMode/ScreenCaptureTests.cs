@@ -43,6 +43,14 @@ namespace TerrariumDays.Tests
             Directory.CreateDirectory(outputDir);
 
             yield return new WaitForSeconds(1.5f);
+            yield return Capture(outputDir, "00-home");
+            var navigatorField = typeof(TerrariumView).GetField("navigator", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var navigator = (ShellNavigator)navigatorField.GetValue(view);
+            navigator.ShowCageList();
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "00-cage-list");
+            navigator.ShowCageDetail();
+            yield return new WaitForSeconds(1.2f);
             yield return Capture(outputDir, "01-idle");
 
             view.OnCleanClicked();

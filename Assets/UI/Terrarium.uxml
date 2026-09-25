@@ -165,6 +165,10 @@
                     <ui:Slider name="debug-weight-slider" low-value="0" high-value="80" value="3" class="debug-slider" />
                 </ui:VisualElement>
                 <ui:Label name="debug-applied-elapsed-label" text="" class="debug-applied-elapsed-label" />
+                <ui:VisualElement class="debug-multiplier-row">
+                    <ui:Button name="debug-add-cage-button" text="ケージ追加" class="debug-small-button" />
+                    <ui:Button name="debug-add-pet-button" text="個体追加" class="debug-small-button" />
+                </ui:VisualElement>
                 <ui:Button name="debug-clear-save-button" text="セーブデータ削除" class="debug-clear-save-button" />
                 <ui:Button name="debug-close-button" text="とじる" class="milestone-continue-button" />
             </ui:VisualElement>

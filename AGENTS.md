@@ -1,7 +1,7 @@
 # Terrarium Days — Codex project guide
 
 ## Project goal
-Create a small, offline-first iOS (iPhone/iPad) portrait prototype in Unity: nurture one leopard gecko in a terrarium. The playable scope and acceptance criteria are in `GAME.md`.
+Create an offline-first iOS (iPhone/iPad) portrait prototype in Unity: a leopard-gecko breeder simulation: care, breeding, incubation and event sales across multiple cages. The playable scope and acceptance criteria are in `GAME.md`.
 
 ## Current stage
 This repository is a Unity 6 project on **6000.5.10f1** (upgraded from 6000.5.3f1 on 2026-09-24), developed on **macOS** with Xcode 26. iOS Build Support and a Unity Personal license are active. Keep this Editor version fixed for the prototype unless an explicit upgrade is requested. The executable is `/Applications/Unity/Hub/Editor/6000.5.10f1/Unity.app/Contents/MacOS/Unity` (override with `UNITY_PATH`). The target platform is iOS only; Android support was removed on 2026-09-24.
@@ -37,6 +37,8 @@ iOS build notes:
 
 ## Expected Unity layout after project creation
 - `Assets/Scripts/Core/` — time, save, state, and offline progress
+- `Assets/Scripts/Core/Colony*.cs` — the multi-cage colony (cages, animals, wallet), its session/save service, and offline progress across the whole colony
+- `Assets/Scripts/Core/GameCalendar.cs` — the in-game calendar (real 1 day = 1 in-game month) used for age and growth display
 - `Assets/Scripts/Gameplay/` — care actions, status, and growth
 - `Assets/Scripts/UI/` — views and input adapters only
 - `Assets/Data/` — ScriptableObject tuning data

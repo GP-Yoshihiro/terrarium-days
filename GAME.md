@@ -1,7 +1,7 @@
 # Terrarium Days
 
 ## 1. One-line pitch
-スマホ縦画面で一匹のヒョウモントカゲモドキを世話し、現実時間で7日間かけて成体へ育てる、オフライン対応の2D放置育成プロトタイプ。
+スマホ縦画面で、ヒョウモントカゲモドキのブリーダーとして飼育・繁殖・孵化・イベント販売を回すシミュレーション。
 
 ## 2. Prototype goal
 - iOS(iPhone/iPad)で起動し、世話・放置進行・成長・セーブ／ロードを一通り体験できる。
@@ -75,7 +75,7 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 - [ ] iOS development build runs on a device
 
 ## 10. Explicitly out of scope
-- Multiple pets, breeding, diseases, death, combat, currencies, shops, achievements, cloud saves, login, ads, IAP, notifications, social features, localization, and analytics.
+- Diseases, death of adult animals, combat, achievements, cloud saves, login, ads, IAP, notifications, social features, localization, and analytics.
 
 ## 11. Definition of done
 - A new player can perform all three care actions and see their effect.
@@ -83,3 +83,5 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 - At 600× debug speed, the pet can reach Adult without errors.
 - EditMode tests pass from Unity CLI.
 - An iOS development build installs and reaches the Terrarium screen.
+
+Detailed spec: docs/superpowers/specs/2026-09-25-breeder-sim-design.md
