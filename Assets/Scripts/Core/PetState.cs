@@ -23,6 +23,11 @@ namespace TerrariumDays.Core
 
         public bool SexKnown => Stage != GrowthStage.Baby;
 
+        public Personality Personality { get; set; } = Personality.Calm;
+
+        /// <summary>False for a bought animal until it has been kept a while (§5.2); own hatchlings know it.</summary>
+        public bool PersonalityKnown { get; set; } = true;
+
         public double WeightGrams
         {
             get => weightGrams;

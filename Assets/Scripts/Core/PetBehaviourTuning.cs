@@ -115,5 +115,8 @@ namespace TerrariumDays.Core
         public float ZzzLifeSeconds { get; set; } = 2f;
         public float ZzzRisePixels { get; set; } = 26f;
         public float ZzzSizePixels { get; set; } = 13f;
+
+        /// <summary>A shallow copy (all members are value types) for per-animal adjustments.</summary>
+        public PetBehaviourTuning Clone() => (PetBehaviourTuning)MemberwiseClone();
     }
 }

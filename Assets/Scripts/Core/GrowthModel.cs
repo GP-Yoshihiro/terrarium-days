@@ -59,7 +59,8 @@ namespace TerrariumDays.Core
         }
 
         public static double FeedGain(PetState pet, CareTuning tuning) =>
-            tuning.FeedWeightGainGrams * Math.Max(0d, 1d - pet.WeightGrams / WeightCap(pet, tuning));
+            tuning.FeedWeightGainGrams * Math.Max(0d, 1d - pet.WeightGrams / WeightCap(pet, tuning))
+            * PersonalityTraits.WeightGainMultiplier(pet.Personality);
 
         public static double ProgressToNextStage(PetState pet, DateTimeOffset nowUtc, CareTuning tuning)
         {

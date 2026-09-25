@@ -20,7 +20,8 @@ namespace TerrariumDays.Core
     {
         public static AppetiteState Evaluate(PetState state, DateTimeOffset nowUtc, CareTuning tuning)
         {
-            if (nowUtc >= state.NextShedAtUtc - GameCalendar.RealTimeFor(tuning.PreShedGameDays))
+            var preShed = GameCalendar.RealTimeFor(tuning.PreShedGameDays * PersonalityTraits.FastMultiplier(state.Personality));
+            if (nowUtc >= state.NextShedAtUtc - preShed)
             {
                 return AppetiteState.PreShed;
             }

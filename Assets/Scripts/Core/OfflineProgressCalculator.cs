@@ -47,7 +47,8 @@ namespace TerrariumDays.Core
                 if (!state.StageUpDueAtUtc.HasValue && GrowthModel.MeetsNextStage(state, stepEndUtc, tuning))
                 {
                     // Pre-growth fast first; the stage goes up (with a shed) when it ends.
-                    state.StageUpDueAtUtc = stepEndUtc + GameCalendar.RealTimeFor(tuning.PreGrowthFastGameDays);
+                    state.StageUpDueAtUtc = stepEndUtc + GameCalendar.RealTimeFor(
+                        tuning.PreGrowthFastGameDays * PersonalityTraits.FastMultiplier(state.Personality));
                 }
                 else if (state.StageUpDueAtUtc.HasValue && stepEndUtc >= state.StageUpDueAtUtc.Value)
                 {
