@@ -1,6 +1,6 @@
 ---
 name: unity-uitoolkit-runtime-styling
-description: Patterns for driving UI Toolkit visuals from C# at runtime — dynamic USS class swapping, show/hide via DisplayStyle, referencing project assets from USS, and syncing a control's value without re-firing its own callback. Consult before writing a MonoBehaviour that mutates a UIDocument's visual tree in response to game state.
+description: Patterns for driving UI Toolkit visuals from C# at runtime — dynamic USS class swapping, show/hide via DisplayStyle (overlays) vs Visibility (reserved in-flow slots), referencing project assets from USS, and syncing a control's value without re-firing its own callback. Consult before writing a MonoBehaviour that mutates a UIDocument's visual tree in response to game state.
 ---
 
 # UI Toolkit runtime styling patterns
@@ -28,7 +28,7 @@ Reserve `element.style.width = new Length(...)` (an inline style) for genuinely 
 
 **Typo risk:** class names toggled this way are plain strings with no compile-time checking — a typo in either the C# string or the USS selector compiles fine and just silently fails to style anything. There is no built-in mitigation from Unity; for a class list large enough to matter, define the class-name strings as `const` fields near where they're used (as this project already does for its three status-tier names) rather than re-typing the literal at each call site, so a typo is a single edit away from being caught by "find usages" instead of hidden in scattered string literals.
 
-## Show/hide with `style.display`, not `style.visibility`
+## Show/hide: `style.display` for overlays, `style.visibility` for in-flow status text
 
 `DisplayStyle.None` removes the element from layout entirely (equivalent to CSS `display: none` — siblings reflow as if it isn't there); `Visibility.Hidden` keeps its layout space reserved but invisible. For modals, drawers, and panels that should not occupy space while closed — this project's milestone modal, decor drawer, and debug panel — `style.display` is the correct one:
 
@@ -36,6 +36,8 @@ Reserve `element.style.width = new Length(...)` (an inline style) for genuinely 
 milestoneModal.style.display = DisplayStyle.Flex; // show
 milestoneModal.style.display = DisplayStyle.None;  // hide, and stop reserving its layout space
 ```
+
+**Exception — anything in the normal layout flow that appears and disappears often** (a feedback/log line between the terrarium and the buttons, a weather/status row): toggling `display` makes every sibling reflow, so the terrarium and buttons jump each time a message shows. Give it a fixed height (`height` + `flex-shrink: 0`, `white-space: nowrap`, `text-overflow: ellipsis`) and toggle `style.visibility` instead; the slot stays reserved.
 
 Initialize every such overlay to `DisplayStyle.None` in your view's setup path (this project does it once in `Initialize()`, covering the milestone modal, decor drawer, and debug panel together) so the UXML's authored default (visible, for easy editing in the UI Builder / by eye in the raw markup) never leaks into a freshly-loaded screen.
 

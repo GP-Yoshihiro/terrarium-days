@@ -27,32 +27,49 @@ namespace TerrariumDays.Core
             var cappedElapsed = rawElapsed > maxElapsed ? maxElapsed : rawElapsed;
 
             var stepCount = (int)Math.Floor(cappedElapsed.TotalMinutes / tuning.OfflineProgressStepMinutes);
+            var step = TimeSpan.FromMinutes(tuning.OfflineProgressStepMinutes);
             var stageBefore = state.GrowthStage;
+            var sheds = 0;
 
-            for (var step = 0; step < stepCount; step++)
+            for (var i = 0; i < stepCount; i++)
             {
-                ApplyStep(state);
+                var stepEndUtc = previousUtc + TimeSpan.FromTicks(step.Ticks * (i + 1));
+                var stageAtStepStart = state.GrowthStage;
+                ApplyStep(state, AppetiteModel.IsRefusingFood(state, stepEndUtc, tuning));
+
+                // Growing into a new stage sheds the old skin; otherwise shed on schedule.
+                if (state.GrowthStage != stageAtStepStart || stepEndUtc >= state.NextShedAtUtc)
+                {
+                    state.LastShedAtUtc = stepEndUtc;
+                    state.NextShedAtUtc = stepEndUtc.AddDays(tuning.ShedIntervalDays);
+                    sheds++;
+                }
             }
 
             var appliedElapsed = TimeSpan.FromMinutes(stepCount * tuning.OfflineProgressStepMinutes);
             var stageAfter = state.GrowthStage;
 
-            return new OfflineProgressResult(appliedElapsed, stageAfter != stageBefore ? stageAfter : (GrowthStage?)null);
+            return new OfflineProgressResult(appliedElapsed, stageAfter != stageBefore ? stageAfter : (GrowthStage?)null, sheds);
         }
 
-        private void ApplyStep(PetState state)
+        private void ApplyStep(PetState state, bool refusingFood)
         {
             var stepHours = tuning.OfflineProgressStepMinutes / 60d;
 
-            state.Hunger -= tuning.HungerDecayPerHour * stepHours;
+            // A fasting gecko slows down: hunger falls slower and does not count against it.
+            var hungerDecay = tuning.HungerDecayPerHour * (refusingFood ? tuning.AnorexiaHungerDecayMultiplier : 1d);
+            state.Hunger -= hungerDecay * stepHours;
             state.Hydration -= tuning.HydrationDecayPerHour * stepHours;
             state.Cleanliness -= tuning.CleanlinessDecayPerHour * stepHours;
 
-            var allHealthy = state.Hunger >= tuning.HealthyCareThreshold
+            var hungerOk = refusingFood || state.Hunger >= tuning.HealthyCareThreshold;
+            var hungerLow = !refusingFood && state.Hunger < tuning.LowCareThreshold;
+
+            var allHealthy = hungerOk
                 && state.Hydration >= tuning.HealthyCareThreshold
                 && state.Cleanliness >= tuning.HealthyCareThreshold;
 
-            var anyLow = state.Hunger < tuning.LowCareThreshold
+            var anyLow = hungerLow
                 || state.Hydration < tuning.LowCareThreshold
                 || state.Cleanliness < tuning.LowCareThreshold;
 

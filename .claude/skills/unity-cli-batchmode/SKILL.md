@@ -31,6 +31,10 @@ Unity does not document a common exit-code contract across its subsystems for te
 2. After the process exits, check the file exists — its absence (regardless of exit code) means the run aborted before producing results (compile error, missing package, license failure, crash, or the `-quit` conflict above). Read the log for the actual reason.
 3. If it exists, parse the root `<test-run result="...">` attribute (`Passed`/`Failed`/etc.) rather than trusting the shell exit code.
 
+## macOS (current setup)
+
+The executable is `/Applications/Unity/Hub/Editor/<ver>/Unity.app/Contents/MacOS/Unity`; it blocks the shell until batchmode finishes (no `Start-Process` needed). Use `scripts/run-unity-tests.sh [EditMode|PlayMode|All]`, then `scripts/test-summary.py` to print only totals and failures. Explicit (`[Explicit]`) tests run only when named with `-testFilter <FullClassName>`. Unity Hub CLI: `"/Applications/Unity Hub.app/Contents/MacOS/Unity Hub" -- --headless install-modules --version <ver> -m ios`.
+
 ## Windows: Unity.exe does not block the shell
 
 On Windows, `Unity.exe` is a GUI application; invoking it directly from PowerShell returns immediately instead of waiting for batchmode to finish. Launch it via `Start-Process -FilePath $UnityPath -ArgumentList $arguments -Wait -PassThru` (as `scripts/Run-UnityTests.ps1` does) so the calling script actually blocks until the run completes, then inspect `$process.ExitCode` only as a secondary signal alongside the results file.

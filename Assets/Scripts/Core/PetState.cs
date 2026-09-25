@@ -55,6 +55,12 @@ namespace TerrariumDays.Core
 
         public DateTimeOffset LastSavedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
+        /// <summary>When the pet last shed (脱皮). Default: never, i.e. at creation.</summary>
+        public DateTimeOffset LastShedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+
+        /// <summary>When the next periodic shed is due; food is refused in the days before it.</summary>
+        public DateTimeOffset NextShedAtUtc { get; set; } = DateTimeOffset.UtcNow.AddDays(new CareTuning().ShedIntervalDays);
+
         public static GrowthStage GrowthStageFromGrowth(double growth)
         {
             if (growth >= 100d)

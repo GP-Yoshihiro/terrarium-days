@@ -8,9 +8,16 @@
             </ui:VisualElement>
             <ui:Button name="debug-button" text="デバッグ" class="debug-button" />
         </ui:VisualElement>
+        <ui:VisualElement name="environment-bar" class="environment-bar">
+            <ui:Label name="day-phase-label" text="--" class="environment-label day-phase-label" />
+            <ui:Label name="weather-label" text="天気を取得中…" class="environment-label weather-label" />
+        </ui:VisualElement>
         <ui:VisualElement name="terrarium-view" class="terrarium-view">
+            <ui:VisualElement name="terrarium-background" class="terrarium-background" picking-mode="Ignore" />
             <ui:VisualElement name="decor-image" class="decor-image" />
             <ui:VisualElement name="pet-image" class="pet-image" />
+            <ui:VisualElement name="terrarium-lighting" class="terrarium-lighting" picking-mode="Ignore" />
+            <ui:VisualElement name="terrarium-effects" class="terrarium-effects" picking-mode="Ignore" />
         </ui:VisualElement>
         <ui:VisualElement name="status-section" class="status-section">
             <ui:VisualElement name="hunger-row" class="status-row">

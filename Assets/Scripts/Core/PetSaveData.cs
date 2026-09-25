@@ -20,5 +20,8 @@ namespace TerrariumDays.Core
         public string growthStage;
         public string selectedDecorId;
         public List<string> unlockedDecorIds;
+        // Schema 2: shedding schedule. Missing in schema-1 saves.
+        public string lastShedAtUtc;
+        public string nextShedAtUtc;
     }
 }

@@ -239,7 +239,7 @@ namespace TerrariumDays.Tests
             Assert.That(view.State.Hunger, Is.EqualTo(80d));
             Assert.That(view.State.Hydration, Is.EqualTo(50d));
             Assert.That(feedbackLabel.text, Is.EqualTo("ごはんを食べた！"));
-            Assert.That(feedbackLabel.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(feedbackLabel.style.visibility.value, Is.EqualTo(Visibility.Visible));
             Assert.That(hungerValueLabel.text, Is.EqualTo("80"));
         }
 
@@ -425,6 +425,103 @@ namespace TerrariumDays.Tests
             var tuning = new CareTuning();
             Assert.That(view.State.Hunger, Is.EqualTo(80d - tuning.HungerDecayPerHour * 12d).Within(1e-6));
             Assert.That(debugAppliedElapsedLabel.text, Is.EqualTo("前回反映: 12時間0分"));
+        }
+
+        [Test]
+        public void OnCleanClicked_AfterTheDebugClockRanAhead_IsNotUndoneByTheNextTick()
+        {
+            // Regression: a care tap used to reset LastSavedAtUtc to the real clock while
+            // the debug-accelerated clock was hours ahead, so the next tick replayed that
+            // whole gap and immediately decayed the stat the player had just restored.
+            var path = CreateTempSavePath();
+            var realNow = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            view.LoadStateAndApplyOfflineProgress(path, realNow, new TimeService(() => realNow));
+            view.OnDebugMultiplierClicked(600d);
+            view.ApplyLiveTickDelta(TimeSpan.FromSeconds(6)); // one virtual hour ahead
+
+            view.OnCleanClicked();
+            Assert.That(view.State.Cleanliness, Is.EqualTo(100d));
+
+            view.ApplyLiveTickDelta(TimeSpan.FromSeconds(0.1)); // one virtual minute
+
+            var tuning = new CareTuning();
+            Assert.That(view.State.Cleanliness, Is.EqualTo(100d - tuning.CleanlinessDecayPerHour / 60d).Within(1e-6));
+        }
+
+        [Test]
+        public void OnApplicationPause_OnResume_AppliesTheRealTimeSpentInTheBackground()
+        {
+            var path = CreateTempSavePath();
+            var realNow = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            view.LoadStateAndApplyOfflineProgress(path, realNow, new TimeService(() => realNow));
+
+            view.OnApplicationPause(true);
+            realNow += TimeSpan.FromHours(2);
+            view.OnApplicationPause(false);
+
+            var tuning = new CareTuning();
+            Assert.That(view.State.Hunger, Is.EqualTo(80d - tuning.HungerDecayPerHour * 2d).Within(1e-6));
+        }
+
+        [Test]
+        public void OnPetTapped_ShowsAHintAboutTheMostPressingNeed()
+        {
+            view.OnDebugHydrationChanged(10d);
+
+            view.OnPetTapped();
+
+            Assert.That(feedbackLabel.text, Is.EqualTo(PetMoodMessage.Thirsty));
+            Assert.That(feedbackLabel.style.visibility.value, Is.EqualTo(Visibility.Visible));
+        }
+
+        [Test]
+        public void OnFeedClicked_RightBeforeAShed_IsRefusedAndExplained()
+        {
+            var path = CreateTempSavePath();
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            new SaveService().Save(path, new PetState
+            {
+                Hunger = 50d,
+                LastSavedAtUtc = nowUtc,
+                NextShedAtUtc = nowUtc + TimeSpan.FromDays(1),
+            });
+            view.LoadStateAndApplyOfflineProgress(path, nowUtc, new TimeService(() => nowUtc));
+
+            view.OnFeedClicked();
+
+            Assert.That(view.State.Hunger, Is.EqualTo(50d));
+            StringAssert.Contains("脱皮", feedbackLabel.text);
+        }
+
+        [Test]
+        public void LoadStateAndApplyOfflineProgress_WhenAShedHappenedWhileAway_SaysSo()
+        {
+            var path = CreateTempSavePath();
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            new SaveService().Save(path, new PetState
+            {
+                LastSavedAtUtc = nowUtc - TimeSpan.FromHours(3),
+                NextShedAtUtc = nowUtc - TimeSpan.FromHours(1),
+            });
+
+            view.LoadStateAndApplyOfflineProgress(path, nowUtc, new TimeService(() => nowUtc));
+
+            StringAssert.Contains("脱皮した", feedbackLabel.text);
+            Assert.That(view.State.NextShedAtUtc, Is.GreaterThan(nowUtc));
+        }
+
+        [Test]
+        public void FeedbackLabel_KeepsItsLayoutSpaceWhetherShownOrHidden()
+        {
+            // Toggling display used to collapse the label, so every message shoved the
+            // terrarium and buttons up and down. Only visibility may change.
+            Assert.That(feedbackLabel.style.display.value, Is.Not.EqualTo(DisplayStyle.None));
+            Assert.That(feedbackLabel.style.visibility.value, Is.EqualTo(Visibility.Hidden));
+
+            view.OnFeedClicked();
+
+            Assert.That(feedbackLabel.style.display.value, Is.Not.EqualTo(DisplayStyle.None));
+            Assert.That(feedbackLabel.style.visibility.value, Is.EqualTo(Visibility.Visible));
         }
 
         [Test]

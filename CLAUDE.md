@@ -4,7 +4,12 @@
 Create a small, offline-first iOS (iPhone/iPad) portrait prototype in Unity: nurture one leopard gecko in a terrarium. The playable scope and acceptance criteria are in `GAME.md`.
 
 ## Current stage
-This repository is a Unity 6 project created with **6000.5.3f1**. iOS Build Support and a Unity Personal license are active. Keep this Editor version fixed for the prototype unless an explicit upgrade is requested. The executable is `C:\\Program Files\\Unity\\Hub\\Editor\\6000.5.3f1\\Editor\\Unity.exe`. This project switched its target platform from Android to iOS on 2026-09-24; Android Build Support, `Build-Android.ps1`, and `BuildAutomation.BuildAndroidDevelopment` no longer exist in this repo. A CLI build from this Windows machine only produces an Xcode project (`scripts/Build-iOS.ps1`) — compiling, signing, and installing onto a real iPhone/iPad requires opening that project in Xcode on a Mac.
+This repository is a Unity 6 project on **6000.5.10f1** (upgraded from 6000.5.3f1 on 2026-09-24), developed on **macOS** with Xcode 26. iOS Build Support and a Unity Personal license are active. Keep this Editor version fixed for the prototype unless an explicit upgrade is requested. The executable is `/Applications/Unity/Hub/Editor/6000.5.10f1/Unity.app/Contents/MacOS/Unity` (override with `UNITY_PATH`). The target platform is iOS only; Android support was removed on 2026-09-24.
+
+iOS build notes:
+- `Assets/Editor/IosXcodePostProcess.cs` sets `ENABLE_USER_SCRIPT_SANDBOXING = NO` (IL2CPP's run script is blocked otherwise) and `ENABLE_MODULE_VERIFIER = NO` (Unity framework headers fail verification) on every export. Do not accept Xcode's "Update to recommended settings", which re-enables both.
+- Signing: automatic, team `JCS2DTL738`, bundle id `com.terrariumdays.prototype` (set in Player Settings).
+- The iPhone must have Developer Mode on and trust the developer certificate (Settings → General → VPN & Device Management) before an install can launch.
 
 ## Always do
 - Read `GAME.md` before changing gameplay behavior.
@@ -16,9 +21,18 @@ This repository is a Unity 6 project created with **6000.5.3f1**. iOS Build Supp
 - Use `double` or `DateTimeOffset` for elapsed-time calculations; clamp all player-facing values.
 - Report changed files, test command, result, and any remaining risk in four short bullets.
 
+## Terrarium coordinates
+- Everything in the terrarium is placed by `Core/TerrariumProjection.cs` from art measurements in `Core/TerrariumArtLayout.cs`: the background itself, the floor trapezoid, and each sprite's ground contact line (the base of its outline, not its drop shadow).
+- Floor positions are `X` 0–1 (left→right) and `Depth` 0–1 (back→front). Do not position pet/decor with USS; add or edit entries in `TerrariumArtLayout` instead.
+
+## Pet life model
+- Daily rhythm follows the device's local clock (`Core/DayPhase.cs`): leopard geckos sleep long by day (next to floor decor, their hide) and are active at dusk/night. Tuning lives in `Core/PetBehaviourTuning.cs`.
+- Food refusal (拒食) and shedding (脱皮) are time-driven and deterministic (`Core/AppetiteModel.cs`, `Core/OfflineProgressCalculator.cs`): no appetite in the last `PreGrowthGaugePercent` of a stage and in the `PreShedDays` before a shed; a shed happens every `ShedIntervalDays` and on every stage-up. While fasting, hunger falls slower and does not count against health or growth.
+
 ## Scope limits for this prototype
-- One pet only; no networking, ads, accounts, push notifications, breeding, or purchases.
-- Do not add a water shader, procedural animation system, or third-party package without explicit approval.
+- One pet only; no ads, accounts, push notifications, breeding, or purchases.
+- Networking: the only allowed use is the optional current-location weather (`UI/WeatherService.cs`, Open-Meteo, no API key, coordinates rounded to ~1 km), approved 2026-09-24. Everything else must work offline; never make gameplay depend on the network.
+- Do not add a water shader, procedural animation system, or third-party package without explicit approval. The pet's sprite-frame animation (idle, walk, eat, sleep, yawn, threat, happy + hearts/Zzz) was approved on 2026-09-24: behaviour lives in `Gameplay/PetBehaviour.cs`, rendering in `UI/PetActor.cs`, tuning in `Core/PetBehaviourTuning.cs`; extend these rather than adding another animation system.
 - Keep all tuning values in data assets or dedicated configuration classes, never scattered magic numbers.
 
 ## Expected Unity layout after project creation
@@ -29,10 +43,15 @@ This repository is a Unity 6 project created with **6000.5.3f1**. iOS Build Supp
 - `Assets/Tests/EditMode/` — deterministic logic tests
 - `Assets/Tests/PlayMode/` — minimal scene integration tests
 
-## Common commands
-- Verify Unity tests: `powershell -ExecutionPolicy Bypass -File scripts/Run-UnityTests.ps1 -UnityPath 'C:\\Program Files\\Unity\\Hub\\Editor\\6000.5.3f1\\Editor\\Unity.exe'`
-- iOS build (produces an Xcode project only; build/sign/install still needs Xcode on a Mac): `powershell -ExecutionPolicy Bypass -File scripts/Build-iOS.ps1 -UnityPath 'C:\\Program Files\\Unity\\Hub\\Editor\\6000.5.3f1\\Editor\\Unity.exe'`
+## Common commands (macOS)
+- Verify Unity tests: `scripts/run-unity-tests.sh` (or `scripts/run-unity-tests.sh EditMode`); results in `Logs/*-results.xml`
+- Summarise results/logs (totals + failures only — use this instead of reading XML/logs): `scripts/test-summary.py`
+- iOS build → Xcode build: `scripts/build-ios.sh`
+- iOS build → install and launch on the connected iPhone: `scripts/build-ios.sh --run`
+- Screenshot the real scene at iPhone 15 Pro size (idle / happy / eat / threat) into `Logs/Screens/`: `scripts/capture-screens.sh` — use it to check layout and art before a device build.
+- Regenerate the gecko animation frames and heart/Zzz effects into `Assets/Resources/`: `python3 tools/sprites/gecko_sprites.py` (then re-measure `TerrariumArtLayout.Pet` if the ground line moves).
 - Check repository state: `git status --short`
+- `scripts/*.ps1` are the older Windows entry points and are no longer maintained.
 
 ## Token-efficient working agreement
 - Before implementation, restate the single requested behavior and acceptance criteria in no more than five lines.

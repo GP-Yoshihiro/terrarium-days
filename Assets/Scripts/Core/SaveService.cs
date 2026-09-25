@@ -12,14 +12,14 @@ namespace TerrariumDays.Core
     /// </summary>
     public sealed class SaveService
     {
-        private const int CurrentSchemaVersion = 1;
+        private const int CurrentSchemaVersion = 2;
         private const string TimestampFormat = "o";
 
         public PetState LoadOrCreateDefault(string filePath, DateTimeOffset nowUtc)
         {
             if (!File.Exists(filePath))
             {
-                var createdState = new PetState { LastSavedAtUtc = nowUtc };
+                var createdState = NewState(nowUtc);
                 Save(filePath, createdState);
                 return createdState;
             }
@@ -33,8 +33,18 @@ namespace TerrariumDays.Core
             catch (Exception ex)
             {
                 Debug.LogError($"Save data at '{filePath}' could not be loaded ({ex.Message}); starting from a fresh state without overwriting the file.");
-                return new PetState { LastSavedAtUtc = nowUtc };
+                return NewState(nowUtc);
             }
+        }
+
+        private static PetState NewState(DateTimeOffset nowUtc)
+        {
+            return new PetState
+            {
+                LastSavedAtUtc = nowUtc,
+                LastShedAtUtc = nowUtc,
+                NextShedAtUtc = nowUtc.AddDays(new CareTuning().ShedIntervalDays),
+            };
         }
 
         public void Save(string filePath, PetState state)
@@ -56,6 +66,11 @@ namespace TerrariumDays.Core
                 throw new InvalidDataException("Save data deserialized to null.");
             }
 
+            var lastSaved = DateTimeOffset.ParseExact(data.lastSavedAtUtc, TimestampFormat, CultureInfo.InvariantCulture);
+            // Schema-1 saves have no shedding schedule: start one interval after the last save.
+            var lastShed = ParseOr(data.lastShedAtUtc, lastSaved);
+            var nextShed = ParseOr(data.nextShedAtUtc, lastSaved.AddDays(new CareTuning().ShedIntervalDays));
+
             return new PetState
             {
                 Hunger = data.hunger,
@@ -65,8 +80,17 @@ namespace TerrariumDays.Core
                 Growth = data.growth,
                 SelectedDecorId = string.IsNullOrEmpty(data.selectedDecorId) ? PetState.DefaultDecorId : data.selectedDecorId,
                 UnlockedDecorIds = data.unlockedDecorIds ?? new List<string> { PetState.DefaultDecorId },
-                LastSavedAtUtc = DateTimeOffset.ParseExact(data.lastSavedAtUtc, TimestampFormat, CultureInfo.InvariantCulture)
+                LastSavedAtUtc = lastSaved,
+                LastShedAtUtc = lastShed,
+                NextShedAtUtc = nextShed,
             };
+        }
+
+        private static DateTimeOffset ParseOr(string value, DateTimeOffset fallback)
+        {
+            return string.IsNullOrEmpty(value)
+                ? fallback
+                : DateTimeOffset.ParseExact(value, TimestampFormat, CultureInfo.InvariantCulture);
         }
 
         private static PetSaveData ToSaveData(PetState state)
@@ -82,7 +106,9 @@ namespace TerrariumDays.Core
                 growth = state.Growth,
                 growthStage = state.GrowthStage.ToString(),
                 selectedDecorId = state.SelectedDecorId,
-                unlockedDecorIds = state.UnlockedDecorIds
+                unlockedDecorIds = state.UnlockedDecorIds,
+                lastShedAtUtc = state.LastShedAtUtc.ToString(TimestampFormat, CultureInfo.InvariantCulture),
+                nextShedAtUtc = state.NextShedAtUtc.ToString(TimestampFormat, CultureInfo.InvariantCulture),
             };
         }
     }

@@ -36,25 +36,88 @@
 .terrarium-view {
     flex-grow: 1;
     position: relative;
-    background-image: url("/Assets/Art/terrarium_background.png");
-    -unity-background-scale-mode: scale-and-crop;
+    overflow: hidden;
+    background-color: rgb(120, 78, 52);
 }
 
+/* The art is sized and positioned from code by TerrariumProjection (cover, anchored to
+   the floor), the same mapping that stands the pet and decor on the floor, so the three
+   can never disagree. Its element always has the art's own aspect ratio. */
+.terrarium-background {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url("/Assets/Art/terrarium_background.png");
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+/* Local time of day and the weather at the player's location. Fixed height so updates
+   never shift the layout. */
+.environment-bar {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    height: 24px;
+    flex-shrink: 0;
+    padding: 0 16px;
+}
+
+.environment-label {
+    font-size: 13px;
+    color: rgb(90, 62, 40);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.day-phase-label {
+    -unity-font-style: bold;
+    flex-shrink: 0;
+    margin-right: 12px;
+}
+
+.weather-label {
+    flex-shrink: 1;
+    -unity-text-align: middle-right;
+}
+
+/* Time-of-day light (night darkness, dusk glow) over the pet and decor. */
+.terrarium-lighting {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* Hearts and Zzz float in this layer, always drawn above the pet and decor. */
+.terrarium-effects {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* Placed on the background's floor (or glass top) by TerrariumView.PlaceDecor. */
 .decor-image {
     position: absolute;
-    left: 12%;
-    bottom: 6%;
-    width: 30%;
-    height: 20%;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
 }
 
+/* Position, size, facing and bobbing are driven by PetActor. */
 .pet-image {
     position: absolute;
-    right: 10%;
-    bottom: 8%;
-    width: 45%;
-    height: 30%;
-    background-image: url("/Assets/Art/gecko_placeholder_256.png");
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    background-image: url("/Assets/Resources/Gecko/idle_00.png");
     -unity-background-scale-mode: scale-to-fit;
 }
 
@@ -97,12 +160,20 @@
     color: rgb(90, 62, 40);
 }
 
+/* Fixed-height slot reserved for messages: text appears/disappears via visibility only,
+   so showing a message never moves the terrarium or the buttons. */
 .feedback-label {
-    align-self: center;
-    margin-bottom: 4px;
+    height: 24px;
+    min-height: 24px;
+    flex-shrink: 0;
+    margin: 2px 16px 2px;
+    padding: 0;
     font-size: 15px;
     color: rgb(90, 62, 40);
     -unity-text-align: middle-center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .bottom-bar {

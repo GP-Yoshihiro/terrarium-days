@@ -519,7 +519,7 @@ PlayerSettings:
   logObjCUncaughtExceptions: 1
   enableCrashReportAPI: 0
   cameraUsageDescription: 
-  locationUsageDescription: 
+  locationUsageDescription: "\u73FE\u5728\u5730\u306E\u5929\u6C17\u30FB\u6C17\u6E29\u30FB\u6E7F\u5EA6\u3092\u8868\u793A\u3059\u308B\u305F\u3081\u306B\u4F7F\u7528\u3057\u307E\u3059"
   microphoneUsageDescription: 
   bluetoothUsageDescription: 
   macOSTargetOSVersion: 12.0
