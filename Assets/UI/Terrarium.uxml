@@ -1,60 +1,99 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <ui:Style src="Terrarium.uss" />
     <ui:VisualElement name="root" class="root">
-        <ui:VisualElement name="top-bar" class="top-bar">
-            <ui:Label name="growth-stage-label" text="Baby" class="growth-stage-label" />
-            <ui:VisualElement name="growth-gauge-track" class="gauge-track">
-                <ui:VisualElement name="growth-gauge-fill" class="gauge-fill" />
-            </ui:VisualElement>
-            <ui:Button name="debug-button" text="デバッグ" class="debug-button" />
+        <ui:VisualElement name="app-header" class="app-header">
+            <ui:Button name="home-button" text="ホーム" class="header-button" />
+            <ui:Label name="game-date-label" text="2026年4月1日" class="header-date" />
+            <ui:Label name="money-label" text="所持金 ¥50,000" class="header-money" />
         </ui:VisualElement>
         <ui:VisualElement name="environment-bar" class="environment-bar">
             <ui:Label name="day-phase-label" text="--" class="environment-label day-phase-label" />
             <ui:Label name="weather-label" text="天気を取得中…" class="environment-label weather-label" />
         </ui:VisualElement>
-        <ui:VisualElement name="terrarium-view" class="terrarium-view">
-            <ui:VisualElement name="terrarium-background" class="terrarium-background" picking-mode="Ignore" />
-            <ui:VisualElement name="decor-image" class="decor-image" />
-            <ui:VisualElement name="pet-image" class="pet-image" />
-            <ui:VisualElement name="terrarium-lighting" class="terrarium-lighting" picking-mode="Ignore" />
-            <ui:VisualElement name="terrarium-effects" class="terrarium-effects" picking-mode="Ignore" />
+        <ui:VisualElement name="home-screen" class="screen">
+            <ui:Label text="飼育部屋" class="screen-title" />
+            <ui:ScrollView name="rack-list" class="rack-list" />
+            <ui:Button name="home-incubator-button" text="孵卵器（段階5で使えるようになります）" class="home-incubator" />
         </ui:VisualElement>
-        <ui:VisualElement name="status-section" class="status-section">
-            <ui:VisualElement name="hunger-row" class="status-row">
-                <ui:Label text="空腹度" class="status-label" />
-                <ui:VisualElement name="hunger-bar-track" class="status-bar-track">
-                    <ui:VisualElement name="hunger-bar-fill" class="status-bar-fill" />
+        <ui:VisualElement name="main-screen" class="screen">
+            <ui:VisualElement name="tab-content" class="tab-content">
+                <ui:VisualElement name="cage-list-panel" class="panel">
+                    <ui:VisualElement class="bulk-bar">
+                        <ui:Button name="feed-all-button" text="全員に餌" class="bulk-button" />
+                        <ui:Button name="water-all-button" text="全ケージ水替え" class="bulk-button" />
+                        <ui:Button name="clean-all-button" text="全ケージ掃除" class="bulk-button" />
+                    </ui:VisualElement>
+                    <ui:ScrollView name="cage-list" class="cage-list" />
                 </ui:VisualElement>
-                <ui:Label name="hunger-value-label" text="80" class="status-value" />
-            </ui:VisualElement>
-            <ui:VisualElement name="hydration-row" class="status-row">
-                <ui:Label text="水分" class="status-label" />
-                <ui:VisualElement name="hydration-bar-track" class="status-bar-track">
-                    <ui:VisualElement name="hydration-bar-fill" class="status-bar-fill" />
+                <ui:VisualElement name="cage-detail-panel" class="panel">
+                    <ui:VisualElement name="top-bar" class="top-bar">
+                        <ui:VisualElement class="cage-nav">
+                            <ui:Button name="prev-cage-button" text="◀" class="cage-nav-button" />
+                            <ui:Label name="cage-title-label" text="ケージ1" class="cage-title-label" />
+                            <ui:Button name="next-cage-button" text="▶" class="cage-nav-button" />
+                        </ui:VisualElement>
+                        <ui:Label name="growth-stage-label" text="ベビー 3.0g" class="growth-stage-label" />
+                        <ui:VisualElement name="growth-gauge-track" class="gauge-track">
+                            <ui:VisualElement name="growth-gauge-fill" class="gauge-fill" />
+                        </ui:VisualElement>
+                        <ui:Button name="debug-button" text="デバッグ" class="debug-button" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="terrarium-view" class="terrarium-view">
+                        <ui:VisualElement name="terrarium-background" class="terrarium-background" picking-mode="Ignore" />
+                        <ui:VisualElement name="decor-image" class="decor-image" />
+                        <ui:VisualElement name="pet-image" class="pet-image" />
+                        <ui:VisualElement name="terrarium-lighting" class="terrarium-lighting" picking-mode="Ignore" />
+                        <ui:VisualElement name="terrarium-effects" class="terrarium-effects" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="status-section" class="status-section">
+                        <ui:VisualElement name="hunger-row" class="status-row">
+                            <ui:Label text="空腹度" class="status-label" />
+                            <ui:VisualElement name="hunger-bar-track" class="status-bar-track">
+                                <ui:VisualElement name="hunger-bar-fill" class="status-bar-fill" />
+                            </ui:VisualElement>
+                            <ui:Label name="hunger-value-label" text="80" class="status-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="hydration-row" class="status-row">
+                            <ui:Label text="水分" class="status-label" />
+                            <ui:VisualElement name="hydration-bar-track" class="status-bar-track">
+                                <ui:VisualElement name="hydration-bar-fill" class="status-bar-fill" />
+                            </ui:VisualElement>
+                            <ui:Label name="hydration-value-label" text="80" class="status-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="cleanliness-row" class="status-row">
+                            <ui:Label text="清潔度" class="status-label" />
+                            <ui:VisualElement name="cleanliness-bar-track" class="status-bar-track">
+                                <ui:VisualElement name="cleanliness-bar-fill" class="status-bar-fill" />
+                            </ui:VisualElement>
+                            <ui:Label name="cleanliness-value-label" text="80" class="status-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="health-row" class="status-row">
+                            <ui:Label text="健康" class="status-label" />
+                            <ui:VisualElement name="health-bar-track" class="status-bar-track">
+                                <ui:VisualElement name="health-bar-fill" class="status-bar-fill" />
+                            </ui:VisualElement>
+                            <ui:Label name="health-value-label" text="100" class="status-value" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:Label name="feedback-label" text="" class="feedback-label" />
+                    <ui:VisualElement name="bottom-bar" class="bottom-bar">
+                        <ui:Button name="feed-button" text="えさやり" class="care-button" />
+                        <ui:Button name="water-button" text="みずをかえる" class="care-button" />
+                        <ui:Button name="clean-button" text="そうじ" class="care-button" />
+                        <ui:Button name="decor-button" text="そうしょく" class="care-button" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:Label name="hydration-value-label" text="80" class="status-value" />
-            </ui:VisualElement>
-            <ui:VisualElement name="cleanliness-row" class="status-row">
-                <ui:Label text="清潔度" class="status-label" />
-                <ui:VisualElement name="cleanliness-bar-track" class="status-bar-track">
-                    <ui:VisualElement name="cleanliness-bar-fill" class="status-bar-fill" />
+                <ui:VisualElement name="placeholder-panel" class="panel">
+                    <ui:Label name="placeholder-label" text="" class="placeholder-label" />
                 </ui:VisualElement>
-                <ui:Label name="cleanliness-value-label" text="80" class="status-value" />
             </ui:VisualElement>
-            <ui:VisualElement name="health-row" class="status-row">
-                <ui:Label text="健康" class="status-label" />
-                <ui:VisualElement name="health-bar-track" class="status-bar-track">
-                    <ui:VisualElement name="health-bar-fill" class="status-bar-fill" />
-                </ui:VisualElement>
-                <ui:Label name="health-value-label" text="100" class="status-value" />
+            <ui:VisualElement name="tab-bar" class="tab-bar">
+                <ui:Button name="tab-cages" text="ケージ" class="tab-button" />
+                <ui:Button name="tab-incubator" text="孵卵器" class="tab-button" />
+                <ui:Button name="tab-shop" text="ショップ" class="tab-button" />
+                <ui:Button name="tab-events" text="イベント" class="tab-button" />
+                <ui:Button name="tab-ledger" text="台帳" class="tab-button" />
             </ui:VisualElement>
-        </ui:VisualElement>
-        <ui:Label name="feedback-label" text="" class="feedback-label" />
-        <ui:VisualElement name="bottom-bar" class="bottom-bar">
-            <ui:Button name="feed-button" text="えさやり" class="care-button" />
-            <ui:Button name="water-button" text="みずをかえる" class="care-button" />
-            <ui:Button name="clean-button" text="そうじ" class="care-button" />
-            <ui:Button name="decor-button" text="そうしょく" class="care-button" />
         </ui:VisualElement>
         <ui:VisualElement name="milestone-modal" class="milestone-modal-overlay">
             <ui:VisualElement class="milestone-modal-card">

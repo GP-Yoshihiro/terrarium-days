@@ -114,6 +114,15 @@ namespace TerrariumDays.UI
         private Rect appliedSafeArea;
         private Vector2 appliedPanelSize;
 
+        private ShellNavigator navigator;
+        private HomeView homeView;
+        private CageListView cageListView;
+        private Label moneyLabel;
+        private Label gameDateLabel;
+        private Label cageTitleLabel;
+        private const float SwipeThresholdPixels = 60f;
+        private Vector2? swipeStartPosition;
+
         public PetState State => state;
 
         public CareTuning Tuning => tuning;
@@ -131,6 +140,28 @@ namespace TerrariumDays.UI
 
             var document = GetComponent<UIDocument>();
             BindElements(document.rootVisualElement);
+
+            var root = document.rootVisualElement;
+            navigator = new ShellNavigator(root);
+            var sprites = PetSpriteLibrary.LoadFromResources();
+            homeView = new HomeView(root.Q("rack-list"), sprites);
+            cageListView = new CageListView(root.Q("cage-list"), sprites);
+            moneyLabel = root.Q<Label>("money-label");
+            gameDateLabel = root.Q<Label>("game-date-label");
+            cageTitleLabel = root.Q<Label>("cage-title-label");
+            homeView.CageSelected += id => { SelectCage(id); navigator.ShowCageDetail(); };
+            cageListView.CageSelected += id => { SelectCage(id); navigator.ShowCageDetail(); };
+            root.Q<Button>("home-button").clicked += navigator.ShowHome;
+            root.Q<Button>("prev-cage-button").clicked += () => ShowCageStep(-1);
+            root.Q<Button>("next-cage-button").clicked += () => ShowCageStep(1);
+            root.Q<Button>("feed-all-button").clicked += OnFeedAllClicked;
+            root.Q<Button>("water-all-button").clicked += OnWaterAllClicked;
+            root.Q<Button>("clean-all-button").clicked += OnCleanAllClicked;
+            ColonyChanged += RefreshShell;
+            navigator.TabChanged += _ => RefreshShell();
+
+            terrariumViewElement?.RegisterCallback<PointerDownEvent>(OnTerrariumPointerDown);
+            terrariumViewElement?.RegisterCallback<PointerUpEvent>(OnTerrariumPointerUp);
 
             safeAreaRoot = document.rootVisualElement.Q<VisualElement>("root");
             safeAreaRoot?.RegisterCallback<GeometryChangedEvent>(OnSafeAreaRootGeometryChanged);
@@ -450,6 +481,8 @@ namespace TerrariumDays.UI
             safeAreaRoot?.UnregisterCallback<GeometryChangedEvent>(OnSafeAreaRootGeometryChanged);
             petElement?.UnregisterCallback<ClickEvent>(OnPetElementClicked);
             terrariumViewElement?.UnregisterCallback<GeometryChangedEvent>(OnTerrariumGeometryChanged);
+            terrariumViewElement?.UnregisterCallback<PointerDownEvent>(OnTerrariumPointerDown);
+            terrariumViewElement?.UnregisterCallback<PointerUpEvent>(OnTerrariumPointerUp);
 
             if (feedButton != null)
             {
@@ -724,6 +757,54 @@ namespace TerrariumDays.UI
             }
 
             petActor?.SetPhase(phase);
+            RefreshShell();
+        }
+
+        private void RefreshShell()
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            var now = GameNowUtc();
+            if (moneyLabel != null)
+            {
+                moneyLabel.text = $"所持金 ¥{session.Colony.Wallet.Money:N0}";
+            }
+
+            if (gameDateLabel != null)
+            {
+                gameDateLabel.text = session.Calendar.DateAt(now).ToDisplayText();
+            }
+
+            if (cageTitleLabel != null && currentCage != null)
+            {
+                cageTitleLabel.text = CageStatusText.TitleFor(currentCage, state);
+            }
+
+            homeView?.Render(session.Colony, now, tuning);
+            cageListView?.Render(session.Colony, now, tuning);
+        }
+
+        private void OnTerrariumPointerDown(PointerDownEvent evt)
+        {
+            swipeStartPosition = evt.position;
+        }
+
+        private void OnTerrariumPointerUp(PointerUpEvent evt)
+        {
+            if (swipeStartPosition == null)
+            {
+                return;
+            }
+
+            var dx = evt.position.x - swipeStartPosition.Value.x;
+            swipeStartPosition = null;
+            if (Math.Abs(dx) >= SwipeThresholdPixels)
+            {
+                ShowCageStep(dx < 0 ? 1 : -1);
+            }
         }
 
         private void OnWeatherText(string text)
