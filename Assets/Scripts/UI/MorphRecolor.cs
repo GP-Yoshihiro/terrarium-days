@@ -11,8 +11,33 @@ namespace TerrariumDays.UI
 
         public static Texture2D Apply(Texture2D source, MorphPalette palette, bool preShed)
         {
-            var roles = RoleByColor();
             var pixels = source.GetPixels32();
+            RecolorPixels(pixels, palette, preShed);
+
+            var result = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false)
+            {
+                name = source.name,
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+            };
+            result.SetPixels32(pixels);
+            // Upload to the GPU and discard the CPU-side copy (markNoLongerReadable: true):
+            // a live actor's sprite library can hold ~124 recoloured frames, and a readable
+            // copy of each would double that texture memory for no further use (nothing
+            // reads pixels back off a texture after Apply). Pixel-level assertions belong on
+            // RecolorPixels below, which runs before this upload.
+            result.Apply(false, true);
+            return result;
+        }
+
+        /// <summary>
+        /// The pure pixel transform Apply uploads: recolours in place by palette role,
+        /// optionally applying the pre-shed whitening. Kept separate so tests can check
+        /// colours without reading pixels back from an uploaded (non-readable) texture.
+        /// </summary>
+        public static void RecolorPixels(Color32[] pixels, MorphPalette palette, bool preShed)
+        {
+            var roles = RoleByColor();
             for (var i = 0; i < pixels.Length; i++)
             {
                 var p = pixels[i];
@@ -41,16 +66,6 @@ namespace TerrariumDays.UI
 
                 pixels[i] = new Color32(color.R, color.G, color.B, p.a);
             }
-
-            var result = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false)
-            {
-                name = source.name,
-                filterMode = FilterMode.Point,
-                wrapMode = TextureWrapMode.Clamp,
-            };
-            result.SetPixels32(pixels);
-            result.Apply(false, false);
-            return result;
         }
 
         private static Dictionary<int, PaletteRole> RoleByColor()

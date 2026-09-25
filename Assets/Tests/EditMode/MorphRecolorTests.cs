@@ -18,40 +18,56 @@ namespace TerrariumDays.Tests
         private static Color32 C(Rgb c, byte a = 255) => new Color32(c.R, c.G, c.B, a);
 
         [Test]
-        public void Apply_ReplacesPaletteColoursByRole()
+        public void RecolorPixels_ReplacesPaletteColoursByRole()
         {
             var normal = MorphAppearance.Normal;
             var albino = MorphAppearance.PaletteFor(Genotype.Normal().Set(GeneId.TremperAlbino, 2), GrowthStage.Adult);
-            var source = Pixels(C(normal[PaletteRole.Eye]), C(normal[PaletteRole.Spot]), C(normal[PaletteRole.Base]));
+            var pixels = new[] { C(normal[PaletteRole.Eye]), C(normal[PaletteRole.Spot]), C(normal[PaletteRole.Base]) };
 
-            var result = MorphRecolor.Apply(source, albino, preShed: false).GetPixels32();
+            MorphRecolor.RecolorPixels(pixels, albino, preShed: false);
 
-            Assert.That(result[0], Is.EqualTo(C(albino[PaletteRole.Eye])));
-            Assert.That(result[1], Is.EqualTo(C(albino[PaletteRole.Spot])));
-            Assert.That(result[2], Is.EqualTo(C(albino[PaletteRole.Base])));
+            Assert.That(pixels[0], Is.EqualTo(C(albino[PaletteRole.Eye])));
+            Assert.That(pixels[1], Is.EqualTo(C(albino[PaletteRole.Spot])));
+            Assert.That(pixels[2], Is.EqualTo(C(albino[PaletteRole.Base])));
         }
 
         [Test]
-        public void Apply_KeepsTransparentAndUnknownPixels()
+        public void RecolorPixels_KeepsTransparentAndUnknownPixels()
         {
             var unknown = new Color32(1, 2, 3, 255);
-            var source = Pixels(new Color32(0, 0, 0, 0), unknown);
+            var pixels = new[] { new Color32(0, 0, 0, 0), unknown };
 
-            var result = MorphRecolor.Apply(source, MorphAppearance.Normal, preShed: false).GetPixels32();
+            MorphRecolor.RecolorPixels(pixels, MorphAppearance.Normal, preShed: false);
 
-            Assert.That(result[0].a, Is.EqualTo(0));
-            Assert.That(result[1], Is.EqualTo(unknown));
+            Assert.That(pixels[0].a, Is.EqualTo(0));
+            Assert.That(pixels[1], Is.EqualTo(unknown));
         }
 
         [Test]
-        public void Apply_PreShed_WhitensTheRecolouredPixel()
+        public void RecolorPixels_PreShed_WhitensTheRecolouredPixel()
         {
             var normal = MorphAppearance.Normal;
-            var source = Pixels(C(normal[PaletteRole.Outline]));
+            var pixels = new[] { C(normal[PaletteRole.Outline]) };
 
-            var result = MorphRecolor.Apply(source, normal, preShed: true).GetPixels32();
+            MorphRecolor.RecolorPixels(pixels, normal, preShed: true);
 
-            Assert.That(result[0], Is.EqualTo(C(new Rgb(111, 96, 91))));
+            Assert.That(pixels[0], Is.EqualTo(C(new Rgb(111, 96, 91))));
+        }
+
+        [Test]
+        public void Apply_ReturnsATextureOfTheRightSizeNameAndFilterMode()
+        {
+            var normal = MorphAppearance.Normal;
+            var source = Pixels(C(normal[PaletteRole.Base]), C(normal[PaletteRole.Eye]));
+            source.name = "idle_00";
+            var albino = MorphAppearance.PaletteFor(Genotype.Normal().Set(GeneId.TremperAlbino, 2), GrowthStage.Adult);
+
+            var result = MorphRecolor.Apply(source, albino, preShed: false);
+
+            Assert.That(result.width, Is.EqualTo(source.width));
+            Assert.That(result.height, Is.EqualTo(source.height));
+            Assert.That(result.name, Is.EqualTo("idle_00"));
+            Assert.That(result.filterMode, Is.EqualTo(FilterMode.Point));
         }
 
         [Test]
@@ -91,7 +107,10 @@ namespace TerrariumDays.Tests
 
             Assert.That(library.Frame(TerrariumDays.Gameplay.PetClip.Idle, 0), Is.SameAs(frame));
             var first = recoloured.Frame(TerrariumDays.Gameplay.PetClip.Idle, 0);
-            Assert.That(first.GetPixel(0, 0), Is.EqualTo((Color)C(blizzard[PaletteRole.Base])));
+            // The recoloured texture is uploaded non-readable (MorphRecolor.Apply(false, true)),
+            // so pixel colours are checked separately via RecolorPixels above; this test only
+            // guards the lazy-recolour-and-cache behaviour.
+            Assert.That(first, Is.Not.SameAs(frame));
             Assert.That(recoloured.Frame(TerrariumDays.Gameplay.PetClip.Idle, 0), Is.SameAs(first));
             Assert.That(recoloured.Frame(TerrariumDays.Gameplay.PetClip.Idle, 0, preShed: true), Is.Not.SameAs(first));
         }
