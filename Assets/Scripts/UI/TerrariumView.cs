@@ -44,6 +44,7 @@ namespace TerrariumDays.UI
         public event Action ColonyChanged;
 
         private Label growthStageLabel;
+        private Label profileLabel;
         private VisualElement growthGaugeFill;
 
         private VisualElement hungerBarFill;
@@ -147,9 +148,8 @@ namespace TerrariumDays.UI
 
             var root = document.rootVisualElement;
             navigator = new ShellNavigator(root);
-            var sprites = PetSpriteLibrary.LoadFromResources();
-            homeView = new HomeView(root.Q("rack-list"), sprites);
-            cageListView = new CageListView(root.Q("cage-list"), sprites);
+            homeView = new HomeView(root.Q("rack-list"));
+            cageListView = new CageListView(root.Q("cage-list"));
             moneyLabel = root.Q<Label>("money-label");
             gameDateLabel = root.Q<Label>("game-date-label");
             cageTitleLabel = root.Q<Label>("cage-title-label");
@@ -392,6 +392,9 @@ namespace TerrariumDays.UI
                 DecorUnlockService.GrantUnlocksForStage(pet, stage);
                 if (pet == state)
                 {
+                    // The morph's look can change at this stage (e.g. Murphy patternless
+                    // spots fade), so rebuild the actor with the current sprite frames.
+                    RebuildPetActor();
                     ShowMilestoneModal(stage);
                 }
             }
@@ -399,6 +402,12 @@ namespace TerrariumDays.UI
             if (report.Sheds.Contains(state))
             {
                 ShowFeedback(ShedMessage);
+            }
+
+            if (state != null && report.SexReveals.Contains(state))
+            {
+                // Overrides the shed feedback above when both happen on the same tick.
+                ShowFeedback(CageStatusText.SexRevealMessage(state));
             }
 
             if (state != null && (report.AppliedElapsed > TimeSpan.Zero || report.HasEvents))
@@ -442,8 +451,12 @@ namespace TerrariumDays.UI
             petActor = null;
             if (petElement != null)
             {
-                petActor = new PetActor(petElement, petBehaviourTuning, artLayout, new System.Random(),
-                    PetSpriteLibrary.LoadFromResources(), effectsLayerElement ?? terrariumViewElement);
+                var behaviourTuning = state != null
+                    ? PersonalityTraits.BehaviourTuningFor(petBehaviourTuning, state.Personality)
+                    : petBehaviourTuning;
+                var petSprites = state != null ? MorphSprites.For(state) : MorphSprites.Base;
+                petActor = new PetActor(petElement, behaviourTuning, artLayout, new System.Random(),
+                    petSprites, effectsLayerElement ?? terrariumViewElement);
             }
 
             if (terrariumProjection != null)
@@ -654,6 +667,7 @@ namespace TerrariumDays.UI
         public void BindElements(VisualElement root)
         {
             growthStageLabel = root.Q<Label>("growth-stage-label");
+            profileLabel = root.Q<Label>("profile-label");
             growthGaugeFill = root.Q<VisualElement>("growth-gauge-fill");
 
             hungerBarFill = root.Q<VisualElement>("hunger-bar-fill");
@@ -1474,6 +1488,11 @@ namespace TerrariumDays.UI
         public void Render(PetState petState, CareTuning careTuning)
         {
             growthStageLabel.text = $"{GrowthModel.StageLabel(petState.Stage)} {petState.WeightGrams:0.0}g";
+            if (profileLabel != null)
+            {
+                profileLabel.text = CageStatusText.ProfileFor(petState);
+            }
+
             growthGaugeFill.style.width = new Length((float)(GrowthModel.ProgressToNextStage(petState, GameNowUtc(), careTuning) * 100d), LengthUnit.Percent);
 
             RenderStatusRow(hungerBarFill, hungerValueLabel, petState.Hunger, careTuning);

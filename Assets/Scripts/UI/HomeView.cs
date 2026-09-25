@@ -10,13 +10,11 @@ namespace TerrariumDays.UI
     public sealed class HomeView
     {
         private readonly VisualElement rackList;
-        private readonly PetSpriteLibrary sprites;
         private string lastSignature;
 
-        public HomeView(VisualElement rackList, PetSpriteLibrary sprites)
+        public HomeView(VisualElement rackList)
         {
             this.rackList = rackList;
-            this.sprites = sprites;
         }
 
         public event Action<int> CageSelected;
@@ -41,7 +39,9 @@ namespace TerrariumDays.UI
                     signature.Append(pet.Name).Append(':')
                         .Append(CageStatusText.TitleFor(cage, pet)).Append(':')
                         .Append(pet.WeightGrams.ToString("0.0")).Append(':')
-                        .Append(CageStatusText.AlertsFor(pet, nowUtc, tuning));
+                        .Append(CageStatusText.AlertsFor(pet, nowUtc, tuning)).Append(':')
+                        .Append(MorphAppearance.PaletteFor(pet.Genotype, pet.Stage).Key).Append(':')
+                        .Append(pet.SexKnown);
                 }
             }
 
@@ -89,7 +89,7 @@ namespace TerrariumDays.UI
             slot.SetEnabled(pet != null);
             var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
             thumb.AddToClassList("rack-thumb");
-            var frame = pet != null ? sprites?.Frame(PetClip.Idle, 0) : null;
+            var frame = pet != null ? MorphSprites.For(pet).Frame(PetClip.Idle, 0) : null;
             if (frame != null)
             {
                 thumb.style.backgroundImage = new StyleBackground(frame);
@@ -123,13 +123,11 @@ namespace TerrariumDays.UI
     public sealed class CageListView
     {
         private readonly VisualElement list;
-        private readonly PetSpriteLibrary sprites;
         private string lastSignature;
 
-        public CageListView(VisualElement list, PetSpriteLibrary sprites)
+        public CageListView(VisualElement list)
         {
             this.list = list;
-            this.sprites = sprites;
         }
 
         public event Action<int> CageSelected;
@@ -159,7 +157,7 @@ namespace TerrariumDays.UI
                 row.SetEnabled(pet != null);
                 var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
                 thumb.AddToClassList("cage-row-thumb");
-                var frame = pet != null ? sprites?.Frame(PetClip.Idle, 0) : null;
+                var frame = pet != null ? MorphSprites.For(pet).Frame(PetClip.Idle, 0) : null;
                 if (frame != null)
                 {
                     thumb.style.backgroundImage = new StyleBackground(frame);

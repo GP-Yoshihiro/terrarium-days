@@ -88,11 +88,39 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void ProfileFor_ShowsMorphAndPersonality()
+        {
+            var pet = new PetState
+            {
+                Genotype = Genotype.Normal().Set(GeneId.Eclipse, 2),
+                Known = new KnownGenetics().SetHet(GeneId.TremperAlbino, 1d),
+                Personality = Personality.Curious,
+            };
+
+            Assert.That(CageStatusText.ProfileFor(pet), Is.EqualTo("エクリプス ヘテロトレンパーアルビノ・好奇心旺盛"));
+        }
+
+        [Test]
+        public void ProfileFor_HidesAnUnknownPersonality()
+        {
+            var pet = new PetState { Known = KnownGenetics.Unknown(), PersonalityKnown = false };
+
+            Assert.That(CageStatusText.ProfileFor(pet), Is.EqualTo("ノーマル（ヘテロ不明）・性格不明"));
+        }
+
+        [Test]
+        public void SexRevealMessage()
+        {
+            Assert.That(CageStatusText.SexRevealMessage(new PetState { Name = "レオパ2", Sex = Sex.Male }), Is.EqualTo("レオパ2は♂オスでした"));
+            Assert.That(CageStatusText.SexRevealMessage(new PetState { Name = "レオパ3", Sex = Sex.Female }), Is.EqualTo("レオパ3は♀メスでした"));
+        }
+
+        [Test]
         public void HomeView_ShowsFourSlotsPerRackAndReportsTheTappedCage()
         {
             var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
             var rackList = new VisualElement();
-            var home = new HomeView(rackList, null);
+            var home = new HomeView(rackList);
             var selected = -1;
             home.CageSelected += id => selected = id;
 
@@ -122,7 +150,7 @@ namespace TerrariumDays.Tests
             var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
             colony.AddCage(CageSize.Standard); // bought but no animal placed in it
             var rackList = new VisualElement();
-            var home = new HomeView(rackList, null);
+            var home = new HomeView(rackList);
 
             home.Render(colony, Now, new CareTuning());
 
@@ -158,7 +186,7 @@ namespace TerrariumDays.Tests
             var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
             var tuning = new CareTuning();
             var rackList = new VisualElement();
-            var home = new HomeView(rackList, null);
+            var home = new HomeView(rackList);
 
             home.Render(colony, Now, tuning);
             var firstRow = rackList.Query<Button>(className: "rack-slot").ToList()[0];

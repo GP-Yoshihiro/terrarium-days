@@ -16,6 +16,7 @@ namespace TerrariumDays.Tests
         private TerrariumView view;
 
         private Label growthStageLabel;
+        private Label profileLabel;
         private VisualElement growthGaugeFill;
         private VisualElement hungerBarFill;
         private Label hungerValueLabel;
@@ -44,6 +45,7 @@ namespace TerrariumDays.Tests
         private VisualElement debugPanel;
         private Label debugAppliedElapsedLabel;
         private Slider debugWeightSlider;
+        private VisualElement petElement;
         private readonly List<string> tempSavePaths = new List<string>();
 
         private string CreateTempSavePath()
@@ -80,6 +82,7 @@ namespace TerrariumDays.Tests
             var root = new VisualElement();
 
             growthStageLabel = new Label { name = "growth-stage-label" };
+            profileLabel = new Label { name = "profile-label" };
             growthGaugeFill = new VisualElement { name = "growth-gauge-fill" };
             hungerBarFill = new VisualElement { name = "hunger-bar-fill" };
             hungerValueLabel = new Label { name = "hunger-value-label" };
@@ -126,7 +129,10 @@ namespace TerrariumDays.Tests
             debugPanel.Add(debugAppliedElapsedLabel);
             debugPanel.Add(debugWeightSlider);
 
+            petElement = new VisualElement { name = "pet-image" };
+
             root.Add(growthStageLabel);
+            root.Add(profileLabel);
             root.Add(growthGaugeFill);
             root.Add(hungerBarFill);
             root.Add(hungerValueLabel);
@@ -147,6 +153,7 @@ namespace TerrariumDays.Tests
             root.Add(topBar);
             root.Add(debugButton);
             root.Add(debugPanel);
+            root.Add(petElement);
 
             view.BindElements(root);
 
@@ -759,6 +766,60 @@ namespace TerrariumDays.Tests
 
             view.ShowCageStep(1);
             Assert.That(view.State, Is.SameAs(view.Session.Colony.Animals[0]));
+        }
+
+        [Test]
+        public void LoadColony_ForANewGame_ShowsTheStarterProfileOnTheProfileLabel()
+        {
+            var path = CreateTempSavePath();
+
+            view.LoadColony(path, DateTimeOffset.UtcNow);
+
+            StringAssert.StartsWith("ノーマル（ヘテロ不明）・", profileLabel.text);
+        }
+
+        [Test]
+        public void SelectingACageWithADifferentMorph_ShowsItsNameAndADifferentSprite()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, DateTimeOffset.UtcNow);
+            var firstFrame = petElement.style.backgroundImage.value.texture;
+
+            // Debug-adds a second animal into a freshly-bought cage; StarterGenetics.Showcase[1]
+            // ("トレンパーアルビノ") lands on the second animal (NextAnimalId 2 - 1 = index 1).
+            view.OnDebugAddCageClicked();
+            view.OnDebugAddPetClicked();
+            var secondCage = view.Session.Colony.Cages[1];
+
+            var selected = view.SelectCage(secondCage.Id);
+
+            Assert.That(selected, Is.True);
+            StringAssert.StartsWith("トレンパーアルビノ", profileLabel.text);
+            Assert.That(petElement.style.backgroundImage.value.texture, Is.Not.SameAs(firstFrame),
+                "a different morph must render with a different recoloured texture");
+        }
+
+        [Test]
+        public void ASheddingRevealsTheSexOfAYoungUnrevealedAnimal()
+        {
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var pet = new PetState
+            {
+                Name = "レオパ1",
+                Sex = Sex.Male,
+                Stage = GrowthStage.Juvenile,
+                SexRevealed = false,
+                LastSavedAtUtc = nowUtc,
+                NextShedAtUtc = nowUtc.AddHours(1),
+            };
+            var path = SaveColonyWith(pet, nowUtc);
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+
+            view.OnDebugSimulate12HoursClicked();
+
+            Assert.That(feedbackLabel.text, Is.EqualTo(CageStatusText.SexRevealMessage(view.State)));
+            Assert.That(view.State.SexKnown, Is.True);
+            StringAssert.DoesNotContain("性別不明", CageStatusText.TitleFor(view.CurrentCage, view.State));
         }
     }
 }

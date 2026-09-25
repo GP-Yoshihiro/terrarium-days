@@ -1,6 +1,7 @@
 using System.Collections;
 using System.IO;
 using NUnit.Framework;
+using TerrariumDays.Core;
 using TerrariumDays.UI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -28,24 +29,13 @@ namespace TerrariumDays.Tests
         [UnityTest]
         public IEnumerator CaptureTerrariumScreens()
         {
-            SceneManager.LoadScene("Terrarium");
-            yield return null;
-
-            var document = Object.FindFirstObjectByType<UIDocument>();
-            Assert.That(document, Is.Not.Null);
-            var view = document.GetComponent<TerrariumView>();
-
-            target = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32);
-            panelSettings = document.panelSettings;
-            panelSettings.targetTexture = target;
-
-            var outputDir = Path.Combine(Application.dataPath, "..", "Logs", "Screens");
-            Directory.CreateDirectory(outputDir);
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
 
             yield return new WaitForSeconds(1.5f);
             yield return Capture(outputDir, "00-home");
-            var navigatorField = typeof(TerrariumView).GetField("navigator", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var navigator = (ShellNavigator)navigatorField.GetValue(view);
+            var navigator = NavigatorOf(view);
             navigator.ShowCageList();
             yield return new WaitForSeconds(0.3f);
             yield return Capture(outputDir, "00-cage-list");
@@ -73,6 +63,42 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "04-threat");
         }
 
+        /// <summary>One detail screen per showcase morph (grown, so murphy shows) into Logs/Screens/morph-*.png.</summary>
+        [UnityTest]
+        public IEnumerator CaptureMorphGallery()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var colony = view.Session.Colony;
+            var neededCages = colony.Cages.Count + StarterGenetics.Showcase.Count;
+            colony.RackCount = Mathf.Max(colony.RackCount, Mathf.CeilToInt(neededCages / (float)Colony.CagesPerRack));
+
+            var navigator = NavigatorOf(view);
+            for (var i = 0; i < StarterGenetics.Showcase.Count; i++)
+            {
+                var showcase = StarterGenetics.Showcase[i];
+                var cage = colony.AddCage(CageSize.Standard);
+                var pet = new PetState
+                {
+                    Name = showcase.Label,
+                    Stage = GrowthStage.Adult,
+                    WeightGrams = 50d,
+                    SexRevealed = true,
+                    Genotype = showcase.Genotype.Clone(),
+                    Known = KnownGenetics.Unknown(),
+                };
+                colony.AddAnimal(pet, cage);
+
+                view.SelectCage(cage.Id);
+                navigator.ShowCageDetail();
+                yield return new WaitForSeconds(1f);
+                yield return Capture(outputDir, $"morph-{i:00}");
+            }
+        }
+
         [TearDown]
         public void TearDown()
         {
@@ -86,6 +112,31 @@ namespace TerrariumDays.Tests
                 target.Release();
                 Object.Destroy(target);
             }
+        }
+
+        /// <summary>Loads the Terrarium scene, routes its panel to an offscreen RenderTexture and ensures Logs/Screens exists.</summary>
+        private IEnumerator SetupScene(System.Action<TerrariumView> onView, System.Action<string> onOutputDir)
+        {
+            SceneManager.LoadScene("Terrarium");
+            yield return null;
+
+            var document = Object.FindFirstObjectByType<UIDocument>();
+            Assert.That(document, Is.Not.Null);
+            onView(document.GetComponent<TerrariumView>());
+
+            target = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32);
+            panelSettings = document.panelSettings;
+            panelSettings.targetTexture = target;
+
+            var outputDir = Path.Combine(Application.dataPath, "..", "Logs", "Screens");
+            Directory.CreateDirectory(outputDir);
+            onOutputDir(outputDir);
+        }
+
+        private static ShellNavigator NavigatorOf(TerrariumView view)
+        {
+            var navigatorField = typeof(TerrariumView).GetField("navigator", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            return (ShellNavigator)navigatorField.GetValue(view);
         }
 
         private IEnumerator Capture(string outputDir, string name)

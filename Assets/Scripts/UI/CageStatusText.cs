@@ -48,5 +48,16 @@ namespace TerrariumDays.UI
 
             return string.Join("・", alerts);
         }
+
+        /// <summary>The morph name and personality shown under the growth-stage label (§4.1/§5.2).</summary>
+        public static string ProfileFor(PetState pet)
+        {
+            var personality = pet.PersonalityKnown ? PersonalityTraits.Label(pet.Personality) : "性格不明";
+            return $"{MorphNamer.FullName(pet.Genotype, pet.Known)}・{personality}";
+        }
+
+        /// <summary>Feedback text shown the moment a shed reveals the animal's sex.</summary>
+        public static string SexRevealMessage(PetState pet) =>
+            $"{pet.Name}は{(pet.Sex == Sex.Female ? "♀メス" : "♂オス")}でした";
     }
 }

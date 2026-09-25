@@ -33,6 +33,7 @@
                             <ui:Button name="next-cage-button" text="▶" class="cage-nav-button" />
                         </ui:VisualElement>
                         <ui:Label name="growth-stage-label" text="ベビー 3.0g" class="growth-stage-label" />
+                        <ui:Label name="profile-label" text="" class="profile-label" />
                         <ui:VisualElement name="growth-gauge-track" class="gauge-track">
                             <ui:VisualElement name="growth-gauge-fill" class="gauge-fill" />
                         </ui:VisualElement>
