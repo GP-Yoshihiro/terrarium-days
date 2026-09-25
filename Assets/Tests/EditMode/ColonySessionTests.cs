@@ -23,7 +23,16 @@ namespace TerrariumDays.Tests
         }
 
         [TearDown]
-        public void TearDown() => File.Delete(path);
+        public void TearDown()
+        {
+            File.Delete(path);
+            File.Delete(path + ".tmp");
+            File.Delete(ColonySaveService.BackupPathFor(path));
+            foreach (var backup in Directory.GetFiles(Path.GetTempPath(), Path.GetFileName(path) + ".corrupt-*.bak"))
+            {
+                File.Delete(backup);
+            }
+        }
 
         private ColonySession NewSession() =>
             new ColonySession(path, new TimeService(() => realNow), care, economy, new Random(4));
@@ -45,6 +54,21 @@ namespace TerrariumDays.Tests
             {
                 Assert.That(pet.Hunger, Is.EqualTo(80d - care.HungerDecayPerHour * 2d).Within(1e-6));
             }
+        }
+
+        [Test]
+        public void Load_WithAnUnreadableFile_BacksItUpAndLeavesNoTmpFile()
+        {
+            File.WriteAllText(path, "not json");
+            UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*could not be loaded.*"));
+
+            var session = NewSession();
+            session.Load();
+
+            var backupPath = ColonySaveService.CorruptBackupPathFor(path, Start);
+            Assert.That(File.Exists(backupPath), Is.True);
+            Assert.That(File.ReadAllText(backupPath), Is.EqualTo("not json"));
+            Assert.That(File.Exists(path + ".tmp"), Is.False);
         }
 
         [Test]
@@ -113,6 +137,28 @@ namespace TerrariumDays.Tests
             session.Resume();
 
             Assert.That(session.Colony.Animals[0].Hunger, Is.EqualTo(80d - care.HungerDecayPerHour * 2d).Within(1e-6));
+        }
+
+        [Test]
+        public void Load_WithASchemaTwoSave_MigratesAndAppliesTheOfflineGapFromTheOldLastSaved()
+        {
+            var lastSaved = Start.AddHours(-2);
+            File.WriteAllText(path,
+                "{\"schemaVersion\":2,\"lastSavedAtUtc\":\"" + lastSaved.ToString("o", System.Globalization.CultureInfo.InvariantCulture) + "\"," +
+                "\"hunger\":80,\"hydration\":60,\"cleanliness\":50,\"health\":90,\"growth\":50,\"growthStage\":\"Juvenile\"," +
+                "\"selectedDecorId\":\"plant_01\",\"unlockedDecorIds\":[\"rock_01\",\"plant_01\"]," +
+                "\"lastShedAtUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"nextShedAtUtc\":\"2026-11-19T00:00:00.0000000+00:00\"}");
+
+            var session = NewSession();
+            session.Load();
+
+            Assert.That(session.Migrated, Is.True);
+            Assert.That(File.Exists(ColonySaveService.BackupPathFor(path)), Is.True);
+            Assert.That(session.Colony.Cages, Has.Count.EqualTo(1));
+            var pet = session.Colony.AnimalIn(session.Colony.Cages[0]);
+            Assert.That(pet, Is.Not.Null);
+            Assert.That(pet.Hunger, Is.EqualTo(80d - care.HungerDecayPerHour * 2d).Within(1e-6),
+                "the 2-hour gap since the old lastSavedAtUtc must be applied as offline progress");
         }
 
         [Test]

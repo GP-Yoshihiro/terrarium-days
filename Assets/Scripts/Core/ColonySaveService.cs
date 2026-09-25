@@ -26,11 +26,17 @@ namespace TerrariumDays.Core
 
         public bool LastLoadMigrated { get; private set; }
 
+        /// <summary>True when the previous LoadOrCreate found an unreadable save and backed it up instead of starting fresh over it.</summary>
+        public bool LastLoadFailed { get; private set; }
+
         public static string BackupPathFor(string path) => path + ".v2.bak";
+
+        public static string CorruptBackupPathFor(string path, DateTimeOffset nowUtc) => path + ".corrupt-" + nowUtc.UtcTicks + ".bak";
 
         public Colony LoadOrCreate(string path, DateTimeOffset nowUtc, System.Random random)
         {
             LastLoadMigrated = false;
+            LastLoadFailed = false;
             if (!File.Exists(path))
             {
                 var created = Colony.CreateNew(nowUtc, economy, care, random);
@@ -68,11 +74,27 @@ namespace TerrariumDays.Core
             }
             catch (Exception ex)
             {
+                LastLoadFailed = true;
+                try
+                {
+                    File.Copy(path, CorruptBackupPathFor(path, nowUtc), true);
+                }
+                catch (Exception backupEx)
+                {
+                    Debug.LogError($"Could not back up unreadable save at '{path}' ({backupEx.Message}).");
+                }
+
                 Debug.LogError($"Save data at '{path}' could not be loaded ({ex.Message}); starting fresh without overwriting the file.");
                 return Colony.CreateNew(nowUtc, economy, care, random);
             }
         }
 
+        /// <summary>
+        /// Atomic write: builds the new content next to the target as a ".tmp" file, then
+        /// replaces (or moves, first time) the target in one filesystem operation. Avoids a
+        /// truncated/corrupt save if the process is killed mid-write (e.g. iOS suspending the
+        /// app during OnApplicationPause).
+        /// </summary>
         public void Save(string path, Colony colony)
         {
             var directory = Path.GetDirectoryName(path);
@@ -81,7 +103,16 @@ namespace TerrariumDays.Core
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(path, JsonUtility.ToJson(ToSaveData(colony)));
+            var tmpPath = path + ".tmp";
+            File.WriteAllText(tmpPath, JsonUtility.ToJson(ToSaveData(colony)));
+            if (File.Exists(path))
+            {
+                File.Replace(tmpPath, path, null);
+            }
+            else
+            {
+                File.Move(tmpPath, path);
+            }
         }
 
         /// <summary>Old 0–100 growth gauge → grams: 0→3, 50→15, 100→45.</summary>

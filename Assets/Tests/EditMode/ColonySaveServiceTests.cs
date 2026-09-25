@@ -20,6 +20,8 @@ namespace TerrariumDays.Tests
         {
             File.Delete(path);
             File.Delete(ColonySaveService.BackupPathFor(path));
+            File.Delete(ColonySaveService.CorruptBackupPathFor(path, Now));
+            File.Delete(path + ".tmp");
         }
 
         [Test]
@@ -91,6 +93,22 @@ namespace TerrariumDays.Tests
             Assert.That(colony.IncubatorCount, Is.EqualTo(1));
         }
 
+        [Test]
+        public void ASchemaOneSave_WithNoSchemaVersionOrShedFields_MigratesWithoutThrowingAndGetsANextShed()
+        {
+            File.WriteAllText(path,
+                "{\"lastSavedAtUtc\":\"2026-09-25T10:00:00.0000000+00:00\",\"hunger\":70,\"hydration\":60," +
+                "\"cleanliness\":50,\"health\":90,\"growth\":50,\"growthStage\":\"Juvenile\",\"selectedDecorId\":\"plant_01\"," +
+                "\"unlockedDecorIds\":[\"rock_01\",\"plant_01\"]}");
+
+            Colony colony = null;
+            Assert.DoesNotThrow(() => colony = service.LoadOrCreate(path, Now, new Random(3)));
+
+            Assert.That(service.LastLoadMigrated, Is.True);
+            var pet = colony.AnimalIn(colony.Cages[0]);
+            Assert.That(pet.NextShedAtUtc - Now, Is.LessThanOrEqualTo(SheddingModel.IntervalFor(GrowthStage.Juvenile, new CareTuning())));
+        }
+
         [TestCase(0d, 3d)]
         [TestCase(25d, 9d)]
         [TestCase(75d, 30d)]
@@ -110,6 +128,20 @@ namespace TerrariumDays.Tests
 
             Assert.That(colony.Animals, Has.Count.EqualTo(1));
             Assert.That(File.ReadAllText(path), Is.EqualTo("not json"));
+        }
+
+        [Test]
+        public void AnUnreadableFile_IsBackedUpAndFlagsLastLoadFailed()
+        {
+            File.WriteAllText(path, "not json");
+            LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*could not be loaded.*"));
+
+            service.LoadOrCreate(path, Now, new Random(1));
+
+            var backupPath = ColonySaveService.CorruptBackupPathFor(path, Now);
+            Assert.That(File.Exists(backupPath), Is.True);
+            Assert.That(File.ReadAllText(backupPath), Is.EqualTo("not json"));
+            Assert.That(service.LastLoadFailed, Is.True);
         }
 
         [Test]
