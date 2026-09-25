@@ -122,6 +122,7 @@ namespace TerrariumDays.UI
         private Label cageTitleLabel;
         private const float SwipeThresholdPixels = 60f;
         private Vector2? swipeStartPosition;
+        private bool suppressNextPetTap;
 
         public PetState State => state;
 
@@ -151,14 +152,27 @@ namespace TerrariumDays.UI
             cageTitleLabel = root.Q<Label>("cage-title-label");
             homeView.CageSelected += id => { SelectCage(id); navigator.ShowCageDetail(); };
             cageListView.CageSelected += id => { SelectCage(id); navigator.ShowCageDetail(); };
-            root.Q<Button>("home-button").clicked += navigator.ShowHome;
+            root.Q<Button>("home-button").clicked += () =>
+            {
+                homeView.Invalidate();
+                navigator.ShowHome();
+                RefreshShell();
+            };
             root.Q<Button>("prev-cage-button").clicked += () => ShowCageStep(-1);
             root.Q<Button>("next-cage-button").clicked += () => ShowCageStep(1);
             root.Q<Button>("feed-all-button").clicked += OnFeedAllClicked;
             root.Q<Button>("water-all-button").clicked += OnWaterAllClicked;
             root.Q<Button>("clean-all-button").clicked += OnCleanAllClicked;
             ColonyChanged += RefreshShell;
-            navigator.TabChanged += _ => RefreshShell();
+            navigator.TabChanged += tab =>
+            {
+                if (tab == ShellTab.Cages && !navigator.ShowingCageDetail)
+                {
+                    cageListView.Invalidate();
+                }
+
+                RefreshShell();
+            };
 
             terrariumViewElement?.RegisterCallback<PointerDownEvent>(OnTerrariumPointerDown);
             terrariumViewElement?.RegisterCallback<PointerUpEvent>(OnTerrariumPointerUp);
@@ -783,8 +797,19 @@ namespace TerrariumDays.UI
                 cageTitleLabel.text = CageStatusText.TitleFor(currentCage, state);
             }
 
-            homeView?.Render(session.Colony, now, tuning);
-            cageListView?.Render(session.Colony, now, tuning);
+            // Rebuilding a list re-creates every row's Button, which can swallow a tap the
+            // player is mid-gesture on; only render the list that is actually on screen, and
+            // HomeView/CageListView additionally skip the rebuild when nothing shown in it
+            // has changed since the last render (see HomeView.CageListSignature).
+            if (navigator != null && navigator.Screen == ShellScreen.Home)
+            {
+                homeView?.Render(session.Colony, now, tuning);
+            }
+
+            if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Cages && !navigator.ShowingCageDetail)
+            {
+                cageListView?.Render(session.Colony, now, tuning);
+            }
         }
 
         private void OnTerrariumPointerDown(PointerDownEvent evt)
@@ -801,10 +826,37 @@ namespace TerrariumDays.UI
 
             var dx = evt.position.x - swipeStartPosition.Value.x;
             swipeStartPosition = null;
-            if (Math.Abs(dx) >= SwipeThresholdPixels)
+            ApplySwipeDelta(dx);
+        }
+
+        /// <summary>
+        /// Applies a horizontal drag distance in pixels: steps the cage when it crosses the
+        /// swipe threshold, and marks that the very next pet tap should be ignored (see
+        /// OnPetElementClicked) so a swipe starting/ending on the gecko is never also read
+        /// as a tap on it. Public (rather than folded into the pointer-event handlers) so
+        /// PlayMode tests can drive it directly without simulating raw pointer events.
+        /// </summary>
+        public void ApplySwipeDelta(float dx)
+        {
+            var step = SwipeStep(dx, SwipeThresholdPixels);
+            if (step == 0)
             {
-                ShowCageStep(dx < 0 ? 1 : -1);
+                return;
             }
+
+            suppressNextPetTap = true;
+            ShowCageStep(step);
+        }
+
+        /// <summary>Pure swipe-direction decision: -1/0/+1, tested without any UI plumbing.</summary>
+        public static int SwipeStep(float dx, float threshold)
+        {
+            if (Math.Abs(dx) < threshold)
+            {
+                return 0;
+            }
+
+            return dx < 0 ? 1 : -1;
         }
 
         private void OnWeatherText(string text)
@@ -842,8 +894,16 @@ namespace TerrariumDays.UI
             SaveCurrentState();
         }
 
-        private void OnPetElementClicked(ClickEvent evt)
+        public void OnPetElementClicked(ClickEvent evt)
         {
+            if (suppressNextPetTap)
+            {
+                // A recognised swipe that started/ended on the gecko must not also count as
+                // a tap on it; consume the flag so only this one click is skipped.
+                suppressNextPetTap = false;
+                return;
+            }
+
             OnPetTapped();
         }
 

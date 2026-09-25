@@ -581,6 +581,54 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void SwipeStep_OnlyReportsADirectionPastTheThreshold()
+        {
+            Assert.That(TerrariumView.SwipeStep(-100f, 60f), Is.EqualTo(1), "swiping left steps forward to the next cage");
+            Assert.That(TerrariumView.SwipeStep(100f, 60f), Is.EqualTo(-1), "swiping right steps back to the previous cage");
+            Assert.That(TerrariumView.SwipeStep(30f, 60f), Is.EqualTo(0));
+            Assert.That(TerrariumView.SwipeStep(-30f, 60f), Is.EqualTo(0));
+            Assert.That(TerrariumView.SwipeStep(-60f, 60f), Is.EqualTo(1), "exactly at the threshold still counts as a swipe");
+        }
+
+        [Test]
+        public void ApplySwipeDelta_BeyondThreshold_StepsTheCageAndSuppressesOnlyTheNextPetTap()
+        {
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var path = SaveColonyWith(new PetState { LastSavedAtUtc = nowUtc, NextShedAtUtc = nowUtc.AddDays(3) }, nowUtc);
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
+
+            view.ApplySwipeDelta(-100f);
+            Assert.That(view.State, Is.SameAs(second), "a recognised swipe still steps to the next cage");
+
+            // The swipe started/ended on the gecko: the very next pet tap must be ignored.
+            view.OnPetElementClicked(ClickEvent.GetPooled());
+            Assert.That(feedbackLabel.style.visibility.value, Is.EqualTo(Visibility.Hidden),
+                "a pet tap right after a recognised swipe must be ignored");
+
+            // But only that one click — a normal tap afterwards must still register.
+            view.OnPetElementClicked(ClickEvent.GetPooled());
+            Assert.That(feedbackLabel.style.visibility.value, Is.EqualTo(Visibility.Visible),
+                "a later, unrelated tap on the pet must still work");
+        }
+
+        [Test]
+        public void ApplySwipeDelta_BelowThreshold_DoesNotStepOrSuppressTheNextPetTap()
+        {
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var path = SaveColonyWith(new PetState { LastSavedAtUtc = nowUtc, NextShedAtUtc = nowUtc.AddDays(3) }, nowUtc);
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+            var first = view.State;
+
+            view.ApplySwipeDelta(20f);
+            Assert.That(view.State, Is.SameAs(first), "a short drag is not a swipe");
+
+            view.OnPetElementClicked(ClickEvent.GetPooled());
+            Assert.That(feedbackLabel.style.visibility.value, Is.EqualTo(Visibility.Visible),
+                "a tap not preceded by a recognised swipe must always register");
+        }
+
+        [Test]
         public void ShowCageStep_WrapsAroundAndSelectsThatCagesPet()
         {
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);

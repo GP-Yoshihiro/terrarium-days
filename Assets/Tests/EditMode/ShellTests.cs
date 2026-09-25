@@ -116,6 +116,52 @@ namespace TerrariumDays.Tests
             Assert.That(selected, Is.EqualTo(colony.Cages[0].Id));
         }
 
+        [Test]
+        public void CageListSignature_IsStableWhenNothingChanges()
+        {
+            var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
+            var tuning = new CareTuning();
+
+            Assert.That(HomeView.CageListSignature(colony, Now, tuning), Is.EqualTo(HomeView.CageListSignature(colony, Now, tuning)));
+        }
+
+        [Test]
+        public void CageListSignature_ChangesWhenAnAlertAppears()
+        {
+            var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
+            var tuning = new CareTuning();
+            var before = HomeView.CageListSignature(colony, Now, tuning);
+
+            colony.Animals[0].Hunger = 10d;
+
+            Assert.That(HomeView.CageListSignature(colony, Now, tuning), Is.Not.EqualTo(before));
+        }
+
+        [Test]
+        public void HomeView_Render_SkipsRebuildingUnchangedRacksButRebuildsWhenSomethingShownChanges()
+        {
+            var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
+            var tuning = new CareTuning();
+            var rackList = new VisualElement();
+            var home = new HomeView(rackList, null);
+
+            home.Render(colony, Now, tuning);
+            var firstRow = rackList.Query<Button>(className: "rack-slot").ToList()[0];
+
+            // A second render of an unchanged colony must not tear down and recreate the
+            // rows — doing so once a second could swallow a tap the player is mid-gesture on.
+            home.Render(colony, Now, tuning);
+            var sameRow = rackList.Query<Button>(className: "rack-slot").ToList()[0];
+            Assert.That(sameRow, Is.SameAs(firstRow), "an unchanged colony must not rebuild the rack list");
+
+            // Once something the row actually displays changes (its alert text), the row
+            // must be rebuilt.
+            colony.Animals[0].Hunger = 10d;
+            home.Render(colony, Now, tuning);
+            var rebuiltRow = rackList.Query<Button>(className: "rack-slot").ToList()[0];
+            Assert.That(rebuiltRow, Is.Not.SameAs(firstRow), "a changed alert must rebuild the row");
+        }
+
         private static Action FindClickAction(Clickable clickable)
         {
             foreach (var field in typeof(Clickable).GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance))
