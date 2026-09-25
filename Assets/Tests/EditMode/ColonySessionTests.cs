@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using TerrariumDays.Core;
 using TerrariumDays.Gameplay;
@@ -61,6 +62,25 @@ namespace TerrariumDays.Tests
             Assert.That(nextMonth.ElectricityCharged, Is.EqualTo(MaintenanceCosts.MonthlyElectricity(1, 1, economy)));
             Assert.That(session.Colony.Wallet.Money, Is.EqualTo(50000 - 800));
             Assert.That(session.Colony.LastBilledMonthIndex, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void SeveralGameMonthsAway_BillsEachMonthOnce()
+        {
+            var session = NewSession();
+            session.Load();
+
+            realNow += TimeSpan.FromDays(3) + TimeSpan.FromHours(1);
+            var report = session.Resume();
+
+            Assert.That(report.ElectricityCharged, Is.EqualTo(3 * MaintenanceCosts.MonthlyElectricity(1, 1, economy)));
+            Assert.That(session.Colony.LastBilledMonthIndex, Is.EqualTo(3));
+            Assert.That(session.Colony.Wallet.Ledger.Count(entry => entry.Category == LedgerCategory.Electricity), Is.EqualTo(3));
+            Assert.That(session.Colony.Wallet.Money, Is.EqualTo(50000 - 2400));
+
+            var again = session.Resume();
+
+            Assert.That(again.ElectricityCharged, Is.EqualTo(0));
         }
 
         [Test]
