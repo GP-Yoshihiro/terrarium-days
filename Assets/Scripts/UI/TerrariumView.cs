@@ -75,6 +75,7 @@ namespace TerrariumDays.UI
         private readonly Dictionary<string, Action> decorRowClickHandlers = new Dictionary<string, Action>();
         private string appliedDecorIconClass;
 
+        private VisualElement topBar;
         private Button debugButton;
         private VisualElement debugPanel;
         private Button debugCloseButton;
@@ -707,6 +708,7 @@ namespace TerrariumDays.UI
                 }
             }
 
+            topBar = root.Q<VisualElement>("top-bar");
             debugButton = root.Q<Button>("debug-button");
             debugPanel = root.Q<VisualElement>("debug-panel");
             debugCloseButton = root.Q<Button>("debug-close-button");
@@ -1182,7 +1184,11 @@ namespace TerrariumDays.UI
 
         /// <summary>
         /// Shows/hides the debug button. Call from Awake with Debug.isDebugBuild — kept as
-        /// a separate testable method rather than reading Debug.isDebugBuild inline.
+        /// a separate testable method rather than reading Debug.isDebugBuild inline. Also
+        /// toggles a class on the top bar so the cage-nav row (see Terrarium.uss
+        /// ".top-bar-with-debug .cage-nav") reserves room for the debug button instead of
+        /// letting it cover the next-cage button, without affecting release builds where the
+        /// debug button is hidden and no room needs to be reserved.
         /// </summary>
         public void ApplyDebugVisibility(bool isDebugBuild)
         {
@@ -1190,6 +1196,8 @@ namespace TerrariumDays.UI
             {
                 debugButton.style.display = isDebugBuild ? DisplayStyle.Flex : DisplayStyle.None;
             }
+
+            topBar?.EnableInClassList("top-bar-with-debug", isDebugBuild);
         }
 
         public void OnDebugButtonClicked()

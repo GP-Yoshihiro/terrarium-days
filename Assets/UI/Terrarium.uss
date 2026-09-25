@@ -586,6 +586,13 @@
     height: 36px;
 }
 
+/* Reserves room for the absolutely-positioned .debug-button (top-right of .top-bar) so it
+   never covers the next-cage button; toggled on .top-bar in TerrariumView.ApplyDebugVisibility
+   only for debug builds, where the debug button is actually visible. */
+.top-bar-with-debug .cage-nav {
+    margin-right: 72px;
+}
+
 .cage-nav-button {
     width: 44px;
     height: 36px;

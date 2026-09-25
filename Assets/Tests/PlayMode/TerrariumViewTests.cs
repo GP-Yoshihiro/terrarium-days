@@ -39,6 +39,7 @@ namespace TerrariumDays.Tests
         private Button decorDrawerCloseButton;
         private readonly Dictionary<string, Button> decorRowButtons = new Dictionary<string, Button>();
         private readonly Dictionary<string, Label> decorStatusLabels = new Dictionary<string, Label>();
+        private VisualElement topBar;
         private Button debugButton;
         private VisualElement debugPanel;
         private Label debugAppliedElapsedLabel;
@@ -117,6 +118,7 @@ namespace TerrariumDays.Tests
             }
             decorDrawer.Add(decorDrawerCloseButton);
 
+            topBar = new VisualElement { name = "top-bar" };
             debugButton = new Button { name = "debug-button" };
             debugPanel = new VisualElement { name = "debug-panel" };
             debugAppliedElapsedLabel = new Label { name = "debug-applied-elapsed-label" };
@@ -142,6 +144,7 @@ namespace TerrariumDays.Tests
             root.Add(decorImageElement);
             root.Add(decorButton);
             root.Add(decorDrawer);
+            root.Add(topBar);
             root.Add(debugButton);
             root.Add(debugPanel);
 
@@ -393,6 +396,21 @@ namespace TerrariumDays.Tests
 
             view.ApplyDebugVisibility(false);
             Assert.That(debugButton.style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
+        public void ApplyDebugVisibility_TogglesTheTopBarDebugClass_SoTheNextCageButtonStaysClearOfIt()
+        {
+            // The debug button is absolutely positioned over the top bar; the
+            // top-bar-with-debug class (Terrarium.uss) reserves room for it so it never
+            // covers the next-cage button, but only when the debug button is actually shown.
+            view.ApplyDebugVisibility(true);
+            Assert.That(topBar.ClassListContains("top-bar-with-debug"), Is.True,
+                "debug builds must reserve room for the debug button next to the cage-nav row");
+
+            view.ApplyDebugVisibility(false);
+            Assert.That(topBar.ClassListContains("top-bar-with-debug"), Is.False,
+                "release builds must not reserve unused room since the debug button is hidden");
         }
 
         [Test]

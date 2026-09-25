@@ -30,7 +30,7 @@ iOS build notes:
 - Food refusal (拒食) and shedding (脱皮) are time-driven and deterministic (`Core/AppetiteModel.cs`, `Core/OfflineProgressCalculator.cs`): no appetite in the last `PreGrowthGaugePercent` of a stage and in the `PreShedDays` before a shed; a shed happens every `ShedIntervalDays` and on every stage-up. While fasting, hunger falls slower and does not count against health or growth.
 
 ## Scope limits for this prototype
-- One pet only; no ads, accounts, push notifications, breeding, or purchases.
+- Multiple animals across multiple cages, breeding, incubation, money, and shop purchases are in scope. Still no ads, accounts, push notifications, or real-money purchases. Adult animals never die (eggs can fail).
 - Networking: the only allowed use is the optional current-location weather (`UI/WeatherService.cs`, Open-Meteo, no API key, coordinates rounded to ~1 km), approved 2026-09-24. Everything else must work offline; never make gameplay depend on the network.
 - Do not add a water shader, procedural animation system, or third-party package without explicit approval. The pet's sprite-frame animation (idle, walk, eat, sleep, yawn, threat, happy + hearts/Zzz) was approved on 2026-09-24: behaviour lives in `Gameplay/PetBehaviour.cs`, rendering in `UI/PetActor.cs`, tuning in `Core/PetBehaviourTuning.cs`; extend these rather than adding another animation system.
 - Keep all tuning values in data assets or dedicated configuration classes, never scattered magic numbers.
