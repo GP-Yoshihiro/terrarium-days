@@ -432,21 +432,9 @@ def clip_frames():
 
 
 # Before a shed the old skin turns milky and pale. Same poses, washed-out palette.
-PRE_SHED_WHITE = (236, 236, 242)
-
-
-def pre_shed(canvas):
-    out = []
-    for row in canvas:
-        new_row = []
-        for c in row:
-            if c is None:
-                new_row.append(None)
-                continue
-            k = 0.3 if c in (OUTLINE, EYE) else 0.5
-            new_row.append(tuple(int(round(v + (w - v) * k)) for v, w in zip(c, PRE_SHED_WHITE)))
-        out.append(new_row)
-    return out
+# This used to be pre-rendered here into a GeckoPreShed/ set; the pre-shed colours
+# are now derived at runtime from the normal frames by MorphAppearance.PreShed
+# (see Assets/Scripts/UI/MorphRecolor.cs).
 
 
 HEART = [
@@ -481,9 +469,8 @@ def bitmap(rows, palette, scale):
 def main():
     root = sys.argv[1] if len(sys.argv) > 1 else "Assets/Resources"
     gecko_dir = os.path.join(root, "Gecko")
-    pre_shed_dir = os.path.join(root, "GeckoPreShed")
     fx_dir = os.path.join(root, "Effects")
-    for d in (gecko_dir, pre_shed_dir, fx_dir):
+    for d in (gecko_dir, fx_dir):
         os.makedirs(d, exist_ok=True)
 
     for name, poses in clip_frames().items():
@@ -491,9 +478,7 @@ def main():
             canvas = render(pose)
             w, h, rows = upscale_rgba(canvas, SCALE)
             write_png(os.path.join(gecko_dir, f"{name}_{i:02d}.png"), w, h, rows)
-            w, h, rows = upscale_rgba(pre_shed(canvas), SCALE)
-            write_png(os.path.join(pre_shed_dir, f"{name}_{i:02d}.png"), w, h, rows)
-        print(f"{name}: {len(poses)} frames (+ pre-shed)")
+        print(f"{name}: {len(poses)} frames")
 
     heart_palette = {"X": (120, 20, 40), "R": (236, 64, 96), "H": (255, 150, 170), "W": (255, 255, 255)}
     w, h, rows = bitmap(HEART, heart_palette, 4)

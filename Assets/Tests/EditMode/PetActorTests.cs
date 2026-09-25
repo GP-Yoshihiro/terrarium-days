@@ -15,9 +15,11 @@ namespace TerrariumDays.Tests
         private readonly PetBehaviourTuning tuning = new PetBehaviourTuning();
         private readonly TerrariumArtLayout art = new TerrariumArtLayout();
 
-        private PetActor CreateActor(VisualElement element, VisualElement effectsLayer = null, int seed = 3)
+        private PetActor CreateActor(VisualElement element, VisualElement effectsLayer = null, int seed = 3,
+            PetSpriteLibrary library = null)
         {
-            var actor = new PetActor(element, tuning, art, new System.Random(seed), PetSpriteLibrary.LoadFromResources(), effectsLayer);
+            var actor = new PetActor(element, tuning, art, new System.Random(seed), library ?? PetSpriteLibrary.LoadFromResources(),
+                effectsLayer);
             actor.SetViewSize(ViewWidth, ViewHeight);
             return actor;
         }
@@ -46,8 +48,8 @@ namespace TerrariumDays.Tests
         public void BeforeAShed_ThePaleFrameSetIsShown()
         {
             var element = new VisualElement();
-            var actor = CreateActor(element);
             var library = PetSpriteLibrary.LoadFromResources();
+            var actor = CreateActor(element, library: library);
 
             actor.SetAppetite(AppetiteState.PreShed);
             var pale = element.style.backgroundImage.value.texture;
