@@ -57,7 +57,7 @@ namespace TerrariumDays.Core
 
                 if (probe.schemaVersion >= CurrentSchemaVersion)
                 {
-                    return FromSaveData(JsonUtility.FromJson<ColonySaveData>(json));
+                    return FromSaveData(JsonUtility.FromJson<ColonySaveData>(json), nowUtc);
                 }
 
                 File.Copy(path, BackupPathFor(path), true);
@@ -126,11 +126,11 @@ namespace TerrariumDays.Core
             return colony;
         }
 
-        private static Colony FromSaveData(ColonySaveData data)
+        private Colony FromSaveData(ColonySaveData data, DateTimeOffset nowUtc)
         {
             var colony = new Colony
             {
-                CalendarEpochUtc = Parse(data.calendarEpochUtc, DateTimeOffset.UtcNow),
+                CalendarEpochUtc = Parse(data.calendarEpochUtc, nowUtc),
                 RackCount = data.rackCount,
                 IncubatorCount = data.incubatorCount,
                 NextAnimalId = data.nextAnimalId,
@@ -142,7 +142,7 @@ namespace TerrariumDays.Core
             {
                 colony.Wallet.Ledger.Add(new LedgerEntry
                 {
-                    AtUtc = Parse(entry.atUtc, DateTimeOffset.UtcNow),
+                    AtUtc = Parse(entry.atUtc, nowUtc),
                     Category = Enum.TryParse(entry.category, out LedgerCategory category) ? category : LedgerCategory.Other,
                     Amount = entry.amount,
                     Note = entry.note,
@@ -157,18 +157,18 @@ namespace TerrariumDays.Core
                     Name = a.name,
                     Sex = Enum.TryParse(a.sex, out Sex sex) ? sex : Sex.Female,
                     WeightGrams = a.weightGrams,
-                    HatchedAtUtc = Parse(a.hatchedAtUtc, DateTimeOffset.UtcNow),
+                    HatchedAtUtc = Parse(a.hatchedAtUtc, nowUtc),
                     Stage = Enum.TryParse(a.stage, out GrowthStage stage) ? stage : GrowthStage.Baby,
-                    StageUpDueAtUtc = string.IsNullOrEmpty(a.stageUpDueAtUtc) ? (DateTimeOffset?)null : Parse(a.stageUpDueAtUtc, DateTimeOffset.UtcNow),
+                    StageUpDueAtUtc = string.IsNullOrEmpty(a.stageUpDueAtUtc) ? (DateTimeOffset?)null : Parse(a.stageUpDueAtUtc, nowUtc),
                     Hunger = a.hunger,
                     Hydration = a.hydration,
                     Cleanliness = a.cleanliness,
                     Health = a.health,
                     SelectedDecorId = string.IsNullOrEmpty(a.selectedDecorId) ? PetState.DefaultDecorId : a.selectedDecorId,
                     UnlockedDecorIds = a.unlockedDecorIds ?? new List<string> { PetState.DefaultDecorId },
-                    LastSavedAtUtc = Parse(a.lastSavedAtUtc, DateTimeOffset.UtcNow),
-                    LastShedAtUtc = Parse(a.lastShedAtUtc, DateTimeOffset.UtcNow),
-                    NextShedAtUtc = Parse(a.nextShedAtUtc, DateTimeOffset.UtcNow),
+                    LastSavedAtUtc = Parse(a.lastSavedAtUtc, nowUtc),
+                    LastShedAtUtc = Parse(a.lastShedAtUtc, nowUtc),
+                    NextShedAtUtc = Parse(a.nextShedAtUtc, nowUtc),
                 });
             }
 

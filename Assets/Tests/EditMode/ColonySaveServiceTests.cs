@@ -111,5 +111,28 @@ namespace TerrariumDays.Tests
             Assert.That(colony.Animals, Has.Count.EqualTo(1));
             Assert.That(File.ReadAllText(path), Is.EqualTo("not json"));
         }
+
+        [Test]
+        public void ASchemaThreeSaveWithMissingTimestamps_FallsBackToTheSuppliedNow()
+        {
+            File.WriteAllText(path,
+                "{\"schemaVersion\":3,\"calendarEpochUtc\":\"\",\"money\":50000," +
+                "\"ledger\":[],\"animals\":[{\"id\":1,\"name\":\"Test\",\"sex\":\"Female\"," +
+                "\"weightGrams\":15,\"hatchedAtUtc\":\"\",\"stage\":\"Baby\"," +
+                "\"stageUpDueAtUtc\":\"\",\"hunger\":50,\"hydration\":50,\"cleanliness\":50," +
+                "\"health\":100,\"selectedDecorId\":\"rock_01\",\"unlockedDecorIds\":[\"rock_01\"]," +
+                "\"lastSavedAtUtc\":\"\",\"lastShedAtUtc\":\"\",\"nextShedAtUtc\":\"\"}]," +
+                "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1}]," +
+                "\"rackCount\":0,\"incubatorCount\":1,\"nextAnimalId\":2,\"nextCageId\":2," +
+                "\"lastBilledMonthIndex\":0}");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(colony.CalendarEpochUtc, Is.EqualTo(Now));
+            var pet = colony.Animals[0];
+            Assert.That(pet.HatchedAtUtc, Is.EqualTo(Now));
+            Assert.That(pet.LastSavedAtUtc, Is.EqualTo(Now));
+            Assert.That(pet.StageUpDueAtUtc, Is.Null);
+        }
     }
 }
