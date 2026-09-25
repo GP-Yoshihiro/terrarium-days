@@ -126,6 +126,41 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void Feed_AFullPet_RefusesWithoutChargingOrChangingWeight()
+        {
+            var colony = NewColony();
+            var pet = colony.Animals[0];
+            pet.NextShedAtUtc = Now.AddDays(3);
+            pet.Hunger = care.FeedFullThreshold;
+            var weight = pet.WeightGrams;
+            var money = colony.Wallet.Money;
+
+            var outcome = new ColonyCareService(care, economy).Feed(colony, pet, Now);
+
+            Assert.That(outcome, Is.EqualTo(FeedOutcome.Full));
+            Assert.That(colony.Wallet.Money, Is.EqualTo(money));
+            Assert.That(pet.WeightGrams, Is.EqualTo(weight));
+            Assert.That(pet.Hunger, Is.EqualTo(care.FeedFullThreshold));
+        }
+
+        [Test]
+        public void FeedAll_CountsFullPetsAndSaysSoInTheMessage()
+        {
+            var colony = NewColony();
+            colony.Animals[0].NextShedAtUtc = Now.AddDays(3);
+            colony.Animals[0].Hunger = care.FeedFullThreshold;
+            var second = colony.AddAnimal(
+                new PetState { NextShedAtUtc = Now.AddDays(3), Hunger = 20d },
+                colony.AddCage(CageSize.Standard));
+
+            var result = new ColonyCareService(care, economy).FeedAll(colony, Now);
+
+            Assert.That((result.Fed, result.Refused, result.NoMoney, result.Full), Is.EqualTo((1, 0, 0, 1)));
+            Assert.That(result.ToMessage(), Is.EqualTo("1匹が食べました（1匹は満腹）"));
+            Assert.That(second.Hunger, Is.EqualTo(20d + care.FeedHungerAmount));
+        }
+
+        [Test]
         public void WaterAndCleanAll_CareForEveryPet()
         {
             var colony = NewColony();

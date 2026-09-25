@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TerrariumDays.Core;
 
 namespace TerrariumDays.Gameplay
@@ -8,7 +9,8 @@ namespace TerrariumDays.Gameplay
         Ate,
         RefusedPreShed,
         RefusedPreGrowth,
-        NotEnoughMoney
+        NotEnoughMoney,
+        Full
     }
 
     public sealed class BulkCareResult
@@ -16,21 +18,28 @@ namespace TerrariumDays.Gameplay
         public int Fed { get; set; }
         public int Refused { get; set; }
         public int NoMoney { get; set; }
+        public int Full { get; set; }
 
         public string ToMessage()
         {
             var text = $"{Fed}匹が食べました";
-            if (Refused > 0 && NoMoney > 0)
-            {
-                return text + $"（{Refused}匹は拒食中、{NoMoney}匹はお金が足りず）";
-            }
-
+            var parts = new List<string>();
             if (Refused > 0)
             {
-                return text + $"（{Refused}匹は拒食中）";
+                parts.Add($"{Refused}匹は拒食中");
             }
 
-            return NoMoney > 0 ? text + $"（{NoMoney}匹はお金が足りず）" : text;
+            if (NoMoney > 0)
+            {
+                parts.Add($"{NoMoney}匹はお金が足りず");
+            }
+
+            if (Full > 0)
+            {
+                parts.Add($"{Full}匹は満腹");
+            }
+
+            return parts.Count > 0 ? text + "（" + string.Join("、", parts) + "）" : text;
         }
     }
 
@@ -50,6 +59,11 @@ namespace TerrariumDays.Gameplay
 
         public FeedOutcome Feed(Colony colony, PetState pet, DateTimeOffset nowUtc)
         {
+            if (pet.Hunger >= care.FeedFullThreshold)
+            {
+                return FeedOutcome.Full;
+            }
+
             var appetite = AppetiteModel.Evaluate(pet, nowUtc, care);
             if (appetite == AppetiteState.PreShed)
             {
@@ -83,6 +97,9 @@ namespace TerrariumDays.Gameplay
                         break;
                     case FeedOutcome.NotEnoughMoney:
                         result.NoMoney++;
+                        break;
+                    case FeedOutcome.Full:
+                        result.Full++;
                         break;
                     default:
                         result.Refused++;

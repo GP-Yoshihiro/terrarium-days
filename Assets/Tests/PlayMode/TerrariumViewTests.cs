@@ -341,6 +341,27 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void OnFeedClicked_ForAFullPet_ShowsAlreadyFullAndDoesNotChargeMoney()
+        {
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var tuning = new CareTuning();
+            var path = SaveColonyWith(new PetState
+            {
+                Hunger = tuning.FeedFullThreshold,
+                LastSavedAtUtc = nowUtc,
+                NextShedAtUtc = nowUtc.AddDays(3),
+            }, nowUtc);
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+            var moneyBefore = view.Session.Colony.Wallet.Money;
+
+            view.OnFeedClicked();
+
+            Assert.That(feedbackLabel.text, Is.EqualTo(CareFeedbackMessage.AlreadyFullMessage));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyBefore));
+            Assert.That(view.State.Hunger, Is.EqualTo(tuning.FeedFullThreshold));
+        }
+
+        [Test]
         public void OnDecorButtonClicked_ShowsTheDrawer()
         {
             view.OnDecorButtonClicked();

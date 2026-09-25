@@ -27,7 +27,7 @@ namespace TerrariumDays.Gameplay
         public AppetiteState Feed(PetState state, System.DateTimeOffset nowUtc)
         {
             var appetite = AppetiteModel.Evaluate(state, nowUtc, tuning);
-            if (appetite == AppetiteState.Normal)
+            if (appetite == AppetiteState.Normal && state.Hunger < tuning.FeedFullThreshold)
             {
                 Feed(state);
             }

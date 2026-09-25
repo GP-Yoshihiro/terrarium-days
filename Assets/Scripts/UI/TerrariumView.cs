@@ -736,6 +736,14 @@ namespace TerrariumDays.UI
             if (session != null)
             {
                 var outcome = colonyCare.Feed(session.Colony, state, GameNowUtc());
+                if (outcome == FeedOutcome.Full)
+                {
+                    // Already full: no charge, no weight/hunger change, no eat animation.
+                    ShowFeedback(CareFeedbackMessage.AlreadyFullMessage);
+                    Render(state, tuning);
+                    return;
+                }
+
                 if (outcome == FeedOutcome.NotEnoughMoney)
                 {
                     ShowFeedback("お金が足りなくて餌を買えません");

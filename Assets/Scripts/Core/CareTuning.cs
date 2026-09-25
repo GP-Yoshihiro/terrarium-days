@@ -7,6 +7,9 @@ namespace TerrariumDays.Core
     public sealed class CareTuning
     {
         public double FeedHungerAmount { get; set; } = 30d;
+
+        /// <summary>Hunger at or above this is "full": Feed refuses (no charge, no weight, no hunger change).</summary>
+        public double FeedFullThreshold { get; set; } = 95d;
         public double RefreshWaterHydrationAmount { get; set; } = 30d;
         public double CleanCleanlinessAmount { get; set; } = 40d;
 
