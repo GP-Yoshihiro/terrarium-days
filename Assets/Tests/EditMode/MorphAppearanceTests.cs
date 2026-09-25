@@ -110,6 +110,18 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void Tangerine_IsQuantisedSoNearbyValuesShareAPaletteKey()
+        {
+            // 71 -> t=0.5857 and 73 -> t=0.6142 both round to t=0.6: same cached palette/key,
+            // so the sprite cache stays per morph rather than per individual once breeding
+            // spreads Tangerine continuously across 0-100.
+            var a = For(Genotype.Normal(tangerine: 71d));
+            var b = For(Genotype.Normal(tangerine: 73d));
+
+            Assert.That(a.Key, Is.EqualTo(b.Key));
+        }
+
+        [Test]
         public void MackSnowAndWhiteAndYellow_LightenTheBody()
         {
             var normalBase = MorphAppearance.Normal[PaletteRole.Base];

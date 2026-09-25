@@ -73,6 +73,11 @@ namespace TerrariumDays.Core
             var c = NormalColors();
 
             var tangerine = Math.Max(0d, Math.Min(1d, (g.Tangerine - 30d) / 70d));
+            // Quantise to steps of 0.1 so the palette (and MorphSprites' per-key sprite
+            // cache) is per morph rather than per individual: once breeding spreads
+            // Tangerine across 0-100, an unquantised blend would key a separate cached
+            // texture set for nearly every animal.
+            tangerine = Math.Round(tangerine * 10d) / 10d;
             if (tangerine > 0d)
             {
                 Toward(c, PaletteRole.Base, new Rgb(250, 130, 40), tangerine);
