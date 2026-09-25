@@ -814,7 +814,20 @@ namespace TerrariumDays.UI
 
         private void OnTerrariumPointerDown(PointerDownEvent evt)
         {
-            swipeStartPosition = evt.position;
+            BeginGestureTracking(evt.position);
+        }
+
+        /// <summary>
+        /// Starts tracking a new pointer gesture: records the start position and clears any
+        /// tap-suppression left over from a previous gesture. Without this, a swipe on the
+        /// background (which never reaches a pet click to consume the flag) would leave
+        /// suppressNextPetTap armed and silently swallow a later, unrelated tap on the pet.
+        /// Public so PlayMode tests can drive the same seam the PointerDown handler uses.
+        /// </summary>
+        public void BeginGestureTracking(Vector2 position)
+        {
+            swipeStartPosition = position;
+            suppressNextPetTap = false;
         }
 
         private void OnTerrariumPointerUp(PointerUpEvent evt)

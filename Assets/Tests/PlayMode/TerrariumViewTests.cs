@@ -613,6 +613,28 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void BeginGestureTracking_AfterARecognisedSwipe_ClearsTheTapSuppressionForTheNewGesture()
+        {
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var path = SaveColonyWith(new PetState { LastSavedAtUtc = nowUtc, NextShedAtUtc = nowUtc.AddDays(3) }, nowUtc);
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+            view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
+
+            // A recognised swipe arms the suppression flag but a background swipe never
+            // reaches a pet click to consume it.
+            view.ApplySwipeDelta(-100f);
+
+            // A new gesture starts (e.g. the player taps down on the pet later): the
+            // PointerDown handler must clear the leftover suppression so this unrelated tap
+            // is handled normally instead of being silently swallowed.
+            view.BeginGestureTracking(Vector2.zero);
+
+            view.OnPetElementClicked(ClickEvent.GetPooled());
+            Assert.That(feedbackLabel.style.visibility.value, Is.EqualTo(Visibility.Visible),
+                "a pet tap belonging to a new gesture must not be swallowed by a stale swipe suppression");
+        }
+
+        [Test]
         public void ApplySwipeDelta_BelowThreshold_DoesNotStepOrSuppressTheNextPetTap()
         {
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
