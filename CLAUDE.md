@@ -1,5 +1,9 @@
 # Terrarium Days — Claude Code project guide
 
+## 絶対遵守：応答は日本語
+- ユーザーへの応答は、最終報告だけでなく途中経過・ツール実行の合間の一文・見出し・表・質問（AskUserQuestion の選択肢を含む）まですべて日本語で書くこと。例外なし。
+- コード、コードコメント、コミットメッセージ、スキル本文（`.claude/skills/`）は既存の書き方（英語）に合わせてよい。
+
 ## Project goal
 Create a small, offline-first iOS (iPhone/iPad) portrait prototype in Unity: nurture one leopard gecko in a terrarium. The playable scope and acceptance criteria are in `GAME.md`.
 
