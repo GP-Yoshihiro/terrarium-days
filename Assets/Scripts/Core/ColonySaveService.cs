@@ -245,6 +245,15 @@ namespace TerrariumDays.Core
                 else
                 {
                     StarterGenetics.Apply(pet, random);
+
+                    // Phase-1 schema-3 saves predate genome tracking but not sex reveal:
+                    // players already saw ♂/♀ for anything past Baby, so keep it revealed
+                    // on migration. Schema-1/2 saves go through MigrateLegacy instead and
+                    // stay SexRevealed = false there (spec).
+                    if (pet.Stage != GrowthStage.Baby)
+                    {
+                        pet.SexRevealed = true;
+                    }
                 }
 
                 colony.Animals.Add(pet);

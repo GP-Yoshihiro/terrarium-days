@@ -211,7 +211,7 @@ namespace TerrariumDays.Tests
 
             Assert.That(first.Known.HetsUnknown, Is.True);
             Assert.That(MorphNamer.VisualName(first.Genotype), Is.EqualTo("ノーマル"));
-            Assert.That(first.SexRevealed, Is.False, "migrated animals keep an unknown sex until their next shed");
+            Assert.That(first.SexRevealed, Is.True, "phase-1 players already saw the sex of a non-Baby animal");
 
             var colony = service.LoadOrCreate(path, Now, new Random(3));
             service.Save(path, colony);
@@ -219,6 +219,21 @@ namespace TerrariumDays.Tests
 
             Assert.That(again.Personality, Is.EqualTo(colony.Animals[0].Personality));
             Assert.That(again.Genotype.Hypo, Is.EqualTo(colony.Animals[0].Genotype.Hypo));
+        }
+
+        [Test]
+        public void Load_Phase1SchemaThreeFile_BabyStaysWithUnknownSex()
+        {
+            // Same phase-1 schema-3 shape, but the animal is still a Baby: sex was never
+            // shown in phase 1 for a Baby, so migration must not reveal it either.
+            File.WriteAllText(path, "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":50000," +
+                "\"animals\":[{\"id\":1,\"name\":\"レオパ1\",\"sex\":\"Male\",\"weightGrams\":3.0,\"stage\":\"Baby\"," +
+                "\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100}]," +
+                "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1}],\"rackCount\":1,\"incubatorCount\":1,\"nextAnimalId\":2,\"nextCageId\":2}");
+
+            var first = service.LoadOrCreate(path, Now, new Random(3)).Animals[0];
+
+            Assert.That(first.SexRevealed, Is.False, "a migrated Baby has not shed yet, so its sex stays unknown");
         }
 
         [Test]
