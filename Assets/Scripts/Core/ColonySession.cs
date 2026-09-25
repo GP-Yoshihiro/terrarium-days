@@ -7,10 +7,11 @@ namespace TerrariumDays.Core
     {
         public List<(PetState Pet, GrowthStage Stage)> StageUps { get; } = new List<(PetState, GrowthStage)>();
         public List<PetState> Sheds { get; } = new List<PetState>();
+        public List<PetState> SexReveals { get; } = new List<PetState>();
         public long ElectricityCharged { get; set; }
         public TimeSpan AppliedElapsed { get; set; }
 
-        public bool HasEvents => StageUps.Count > 0 || Sheds.Count > 0 || ElectricityCharged > 0;
+        public bool HasEvents => StageUps.Count > 0 || Sheds.Count > 0 || SexReveals.Count > 0 || ElectricityCharged > 0;
     }
 
     /// <summary>
@@ -125,6 +126,11 @@ namespace TerrariumDays.Core
                 if (result.ShedCount > 0)
                 {
                     report.Sheds.Add(pet);
+                }
+
+                if (result.SexRevealed)
+                {
+                    report.SexReveals.Add(pet);
                 }
             }
 

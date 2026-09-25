@@ -16,6 +16,7 @@ namespace TerrariumDays.Tests
             Stage = stage,
             HatchedAtUtc = Now.AddDays(-ageMonths),
             Sex = sex,
+            SexRevealed = stage != GrowthStage.Baby,
         };
 
         [Test]
@@ -66,6 +67,7 @@ namespace TerrariumDays.Tests
                 if (pet.WeightGrams >= tuning.JuvenileMinWeightGrams)
                 {
                     pet.Stage = GrowthStage.Juvenile;
+                    pet.SexRevealed = true;
                 }
 
                 pet.WeightGrams += GrowthModel.FeedGain(pet, tuning);

@@ -39,6 +39,29 @@ namespace TerrariumDays.Core
         public string lastSavedAtUtc;
         public string lastShedAtUtc;
         public string nextShedAtUtc;
+        public int genomeVersion;
+        public List<GeneSaveData> genes;
+        public double hypo;
+        public double tangerine;
+        public List<HetSaveData> hets;
+        public bool hetsUnknown;
+        public string personality;
+        public bool personalityKnown;
+        public bool sexRevealed;
+    }
+
+    [Serializable]
+    public sealed class GeneSaveData
+    {
+        public string gene;
+        public int copies;
+    }
+
+    [Serializable]
+    public sealed class HetSaveData
+    {
+        public string gene;
+        public double probability;
     }
 
     [Serializable]

@@ -176,5 +176,22 @@ namespace TerrariumDays.Tests
             Assert.That(report.StageUps[0].Pet, Is.SameAs(pet));
             Assert.That(report.StageUps[0].Stage, Is.EqualTo(GrowthStage.Juvenile));
         }
+
+        [Test]
+        public void SexRevealsAreReportedWithThePetAndCountAsAnEvent()
+        {
+            var session = NewSession();
+            session.Load();
+            var pet = session.Colony.Animals[0];
+            pet.Stage = GrowthStage.Juvenile;
+            pet.NextShedAtUtc = realNow + TimeSpan.FromMinutes(3);
+
+            var report = session.SimulateGameTime(TimeSpan.FromMinutes(10));
+
+            Assert.That(report.SexReveals, Has.Count.EqualTo(1));
+            Assert.That(report.SexReveals[0], Is.SameAs(pet));
+            Assert.That(report.HasEvents, Is.True);
+            Assert.That(pet.SexKnown, Is.True);
+        }
     }
 }

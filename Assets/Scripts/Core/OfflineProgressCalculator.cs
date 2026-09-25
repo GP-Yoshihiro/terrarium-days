@@ -31,6 +31,7 @@ namespace TerrariumDays.Core
             var step = TimeSpan.FromMinutes(tuning.OfflineProgressStepMinutes);
             var stageBefore = state.GrowthStage;
             var sheds = 0;
+            var sexRevealed = false;
 
             for (var i = 0; i < stepCount; i++)
             {
@@ -62,13 +63,19 @@ namespace TerrariumDays.Core
                     state.LastShedAtUtc = stepEndUtc;
                     state.NextShedAtUtc = stepEndUtc + SheddingModel.IntervalFor(state.Stage, tuning);
                     sheds++;
+
+                    if (state.Stage != GrowthStage.Baby && !state.SexRevealed)
+                    {
+                        state.SexRevealed = true;
+                        sexRevealed = true;
+                    }
                 }
             }
 
             var appliedElapsed = TimeSpan.FromMinutes(stepCount * tuning.OfflineProgressStepMinutes);
             var stageAfter = state.GrowthStage;
 
-            return new OfflineProgressResult(appliedElapsed, stageAfter != stageBefore ? stageAfter : (GrowthStage?)null, sheds);
+            return new OfflineProgressResult(appliedElapsed, stageAfter != stageBefore ? stageAfter : (GrowthStage?)null, sheds, sexRevealed);
         }
 
         private void ApplyStep(PetState state, bool refusingFood)

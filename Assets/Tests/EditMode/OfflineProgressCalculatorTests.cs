@@ -93,5 +93,60 @@ namespace TerrariumDays.Tests
 
             Assert.That(state.Health, Is.EqualTo(50d));
         }
+
+        [Test]
+        public void Shed_RevealsTheSexOfAJuvenileOrOlder()
+        {
+            var state = new PetState
+            {
+                Stage = GrowthStage.Juvenile,
+                WeightGrams = 20d,
+                HatchedAtUtc = Epoch.AddDays(-5d),
+                LastSavedAtUtc = Epoch,
+                NextShedAtUtc = Epoch + TimeSpan.FromMinutes(3),
+            };
+
+            var result = new OfflineProgressCalculator(new CareTuning()).Apply(state, Epoch, Epoch + TimeSpan.FromMinutes(10));
+
+            Assert.That(result.SexRevealed, Is.True);
+            Assert.That(state.SexKnown, Is.True);
+        }
+
+        [Test]
+        public void Shed_OfABaby_KeepsTheSexHidden()
+        {
+            var state = new PetState
+            {
+                WeightGrams = 5d,
+                HatchedAtUtc = Epoch.AddDays(-1d),
+                LastSavedAtUtc = Epoch,
+                NextShedAtUtc = Epoch + TimeSpan.FromMinutes(3),
+            };
+
+            var result = new OfflineProgressCalculator(new CareTuning()).Apply(state, Epoch, Epoch + TimeSpan.FromMinutes(10));
+
+            Assert.That(result.ShedCount, Is.EqualTo(1));
+            Assert.That(result.SexRevealed, Is.False);
+            Assert.That(state.SexKnown, Is.False);
+        }
+
+        [Test]
+        public void GrowingIntoAJuvenile_RevealsTheSex()
+        {
+            var tuning = new CareTuning();
+            var state = new PetState
+            {
+                WeightGrams = 15.2d,
+                HatchedAtUtc = Epoch.AddDays(-2d),
+                LastSavedAtUtc = Epoch,
+                NextShedAtUtc = Epoch + TimeSpan.FromDays(3),
+                StageUpDueAtUtc = Epoch + TimeSpan.FromMinutes(2),
+            };
+
+            var result = new OfflineProgressCalculator(tuning).Apply(state, Epoch, Epoch + TimeSpan.FromMinutes(5));
+
+            Assert.That(result.NewGrowthStage, Is.EqualTo(GrowthStage.Juvenile));
+            Assert.That(result.SexRevealed, Is.True);
+        }
     }
 }

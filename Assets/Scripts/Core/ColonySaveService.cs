@@ -13,6 +13,7 @@ namespace TerrariumDays.Core
     public sealed class ColonySaveService
     {
         public const int CurrentSchemaVersion = 3;
+        public const int CurrentGenomeVersion = 1;
         private const string TimestampFormat = "o";
 
         private readonly CareTuning care;
@@ -63,7 +64,7 @@ namespace TerrariumDays.Core
 
                 if (probe.schemaVersion >= CurrentSchemaVersion)
                 {
-                    return FromSaveData(JsonUtility.FromJson<ColonySaveData>(json), nowUtc);
+                    return FromSaveData(JsonUtility.FromJson<ColonySaveData>(json), nowUtc, random);
                 }
 
                 File.Copy(path, BackupPathFor(path), true);
@@ -139,7 +140,7 @@ namespace TerrariumDays.Core
                 nextShed = nowUtc + interval;
             }
 
-            colony.AddAnimal(new PetState
+            var pet = new PetState
             {
                 Name = "レオパ1",
                 Sex = random.NextDouble() < 0.5 ? Sex.Female : Sex.Male,
@@ -155,11 +156,14 @@ namespace TerrariumDays.Core
                 LastSavedAtUtc = lastSaved,
                 LastShedAtUtc = Parse(data.lastShedAtUtc, lastSaved),
                 NextShedAtUtc = nextShed,
-            }, cage);
+                SexRevealed = false,
+            };
+            StarterGenetics.Apply(pet, random);
+            colony.AddAnimal(pet, cage);
             return colony;
         }
 
-        private Colony FromSaveData(ColonySaveData data, DateTimeOffset nowUtc)
+        private Colony FromSaveData(ColonySaveData data, DateTimeOffset nowUtc, System.Random random)
         {
             var colony = new Colony
             {
@@ -184,7 +188,7 @@ namespace TerrariumDays.Core
 
             foreach (var a in data.animals)
             {
-                colony.Animals.Add(new PetState
+                var pet = new PetState
                 {
                     Id = a.id,
                     Name = a.name,
@@ -202,7 +206,48 @@ namespace TerrariumDays.Core
                     LastSavedAtUtc = Parse(a.lastSavedAtUtc, nowUtc),
                     LastShedAtUtc = Parse(a.lastShedAtUtc, nowUtc),
                     NextShedAtUtc = Parse(a.nextShedAtUtc, nowUtc),
-                });
+                    SexRevealed = a.sexRevealed,
+                };
+
+                if (a.genomeVersion >= 1)
+                {
+                    var genotype = Genotype.Normal(a.hypo, a.tangerine);
+                    if (a.genes != null)
+                    {
+                        foreach (var g in a.genes)
+                        {
+                            if (Enum.TryParse(g.gene, out GeneId geneId))
+                            {
+                                genotype.Set(geneId, g.copies);
+                            }
+                        }
+                    }
+
+                    pet.Genotype = genotype;
+
+                    var known = new KnownGenetics { HetsUnknown = a.hetsUnknown };
+                    if (a.hets != null)
+                    {
+                        foreach (var h in a.hets)
+                        {
+                            if (Enum.TryParse(h.gene, out GeneId geneId))
+                            {
+                                known.SetHet(geneId, h.probability);
+                            }
+                        }
+                    }
+
+                    pet.Known = known;
+
+                    pet.Personality = Enum.TryParse(a.personality, out Personality personality) ? personality : PersonalityTraits.Roll(random);
+                    pet.PersonalityKnown = a.personalityKnown;
+                }
+                else
+                {
+                    StarterGenetics.Apply(pet, random);
+                }
+
+                colony.Animals.Add(pet);
             }
 
             foreach (var c in data.cages)
@@ -244,6 +289,23 @@ namespace TerrariumDays.Core
 
             foreach (var a in colony.Animals)
             {
+                var genes = new List<GeneSaveData>();
+                var hets = new List<HetSaveData>();
+                foreach (var gene in Genes.All)
+                {
+                    var copies = a.Genotype.Copies(gene);
+                    if (copies >= 1)
+                    {
+                        genes.Add(new GeneSaveData { gene = gene.ToString(), copies = copies });
+                    }
+
+                    var probability = a.Known.HetProbability(gene);
+                    if (probability > 0d)
+                    {
+                        hets.Add(new HetSaveData { gene = gene.ToString(), probability = probability });
+                    }
+                }
+
                 data.animals.Add(new AnimalSaveData
                 {
                     id = a.Id,
@@ -262,6 +324,15 @@ namespace TerrariumDays.Core
                     lastSavedAtUtc = Format(a.LastSavedAtUtc),
                     lastShedAtUtc = Format(a.LastShedAtUtc),
                     nextShedAtUtc = Format(a.NextShedAtUtc),
+                    genomeVersion = CurrentGenomeVersion,
+                    genes = genes,
+                    hypo = a.Genotype.Hypo,
+                    tangerine = a.Genotype.Tangerine,
+                    hets = hets,
+                    hetsUnknown = a.Known.HetsUnknown,
+                    personality = a.Personality.ToString(),
+                    personalityKnown = a.PersonalityKnown,
+                    sexRevealed = a.SexRevealed,
                 });
             }
 

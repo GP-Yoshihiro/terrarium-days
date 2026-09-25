@@ -73,7 +73,7 @@ namespace TerrariumDays.Tests
             var cage = new Cage { Id = 2 };
 
             Assert.That(CageStatusText.TitleFor(cage, new PetState { Name = "ハナ" }), Is.EqualTo("ケージ2 ハナ（ベビー・性別不明）"));
-            Assert.That(CageStatusText.TitleFor(cage, new PetState { Name = "ハナ", Stage = GrowthStage.Juvenile, Sex = Sex.Male }), Is.EqualTo("ケージ2 ハナ（ヤング・♂）"));
+            Assert.That(CageStatusText.TitleFor(cage, new PetState { Name = "ハナ", Stage = GrowthStage.Juvenile, Sex = Sex.Male, SexRevealed = true }), Is.EqualTo("ケージ2 ハナ（ヤング・♂）"));
             Assert.That(CageStatusText.TitleFor(cage, null), Is.EqualTo("ケージ2（空き）"));
         }
 

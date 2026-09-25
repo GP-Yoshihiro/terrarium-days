@@ -84,7 +84,7 @@ namespace TerrariumDays.Core
             var colony = new Colony { CalendarEpochUtc = nowUtc };
             colony.Wallet.Money = economy.StartingMoney;
             var cage = colony.AddCage(CageSize.Standard);
-            colony.AddAnimal(new PetState
+            var pet = new PetState
             {
                 Name = "レオパ1",
                 Sex = random.NextDouble() < 0.5 ? Sex.Female : Sex.Male,
@@ -93,7 +93,9 @@ namespace TerrariumDays.Core
                 LastSavedAtUtc = nowUtc,
                 LastShedAtUtc = nowUtc,
                 NextShedAtUtc = nowUtc + SheddingModel.IntervalFor(GrowthStage.Baby, care),
-            }, cage);
+            };
+            StarterGenetics.Apply(pet, random);
+            colony.AddAnimal(pet, cage);
             return colony;
         }
     }

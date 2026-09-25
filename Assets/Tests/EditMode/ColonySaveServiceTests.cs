@@ -9,6 +9,8 @@ namespace TerrariumDays.Tests
     public sealed class ColonySaveServiceTests
     {
         private static readonly DateTimeOffset Now = new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero);
+        private readonly CareTuning care = new CareTuning();
+        private readonly EconomyTuning economy = new EconomyTuning();
         private readonly ColonySaveService service = new ColonySaveService(new CareTuning(), new EconomyTuning());
         private string path;
 
@@ -67,14 +69,19 @@ namespace TerrariumDays.Tests
             Assert.That(loaded.CalendarEpochUtc, Is.EqualTo(Now));
         }
 
-        [Test]
-        public void ASchemaTwoSave_IsMigratedIntoCageOneAndBackedUp()
+        private void WriteLegacySave(string growthStage)
         {
             File.WriteAllText(path,
                 "{\"schemaVersion\":2,\"lastSavedAtUtc\":\"2026-09-25T11:00:00.0000000+00:00\",\"hunger\":70,\"hydration\":60," +
-                "\"cleanliness\":50,\"health\":90,\"growth\":50,\"growthStage\":\"Juvenile\",\"selectedDecorId\":\"plant_01\"," +
+                "\"cleanliness\":50,\"health\":90,\"growth\":50,\"growthStage\":\"" + growthStage + "\",\"selectedDecorId\":\"plant_01\"," +
                 "\"unlockedDecorIds\":[\"rock_01\",\"plant_01\"],\"lastShedAtUtc\":\"2026-09-20T00:00:00.0000000+00:00\"," +
                 "\"nextShedAtUtc\":\"2026-11-19T00:00:00.0000000+00:00\"}");
+        }
+
+        [Test]
+        public void ASchemaTwoSave_IsMigratedIntoCageOneAndBackedUp()
+        {
+            WriteLegacySave("Juvenile");
 
             var colony = service.LoadOrCreate(path, Now, new Random(3));
 
@@ -165,6 +172,76 @@ namespace TerrariumDays.Tests
             Assert.That(pet.HatchedAtUtc, Is.EqualTo(Now));
             Assert.That(pet.LastSavedAtUtc, Is.EqualTo(Now));
             Assert.That(pet.StageUpDueAtUtc, Is.Null);
+        }
+
+        [Test]
+        public void RoundTrip_KeepsGeneticsPersonalityAndSexReveal()
+        {
+            var colony = Colony.CreateNew(Now, economy, care, new Random(1));
+            var pet = colony.Animals[0];
+            pet.Genotype = Genotype.Normal(hypo: 72d, tangerine: 15d).Set(GeneId.MackSnow, 2).Set(GeneId.Eclipse, 1);
+            pet.Known = new KnownGenetics().SetHet(GeneId.Eclipse, 2d / 3d);
+            pet.Personality = Personality.Glutton;
+            pet.PersonalityKnown = false;
+            pet.SexRevealed = true;
+
+            service.Save(path, colony);
+            var loaded = service.LoadOrCreate(path, Now, new Random(2)).Animals[0];
+
+            Assert.That(loaded.Genotype.Copies(GeneId.MackSnow), Is.EqualTo(2));
+            Assert.That(loaded.Genotype.Copies(GeneId.Eclipse), Is.EqualTo(1));
+            Assert.That(loaded.Genotype.Hypo, Is.EqualTo(72d));
+            Assert.That(loaded.Known.HetProbability(GeneId.Eclipse), Is.EqualTo(2d / 3d).Within(1e-9));
+            Assert.That(loaded.Known.HetsUnknown, Is.False);
+            Assert.That(loaded.Personality, Is.EqualTo(Personality.Glutton));
+            Assert.That(loaded.PersonalityKnown, Is.False);
+            Assert.That(loaded.SexRevealed, Is.True);
+        }
+
+        [Test]
+        public void Load_Phase1SchemaThreeFile_GetsStarterGeneticsOnceAndKeepsThem()
+        {
+            // A schema-3 file written by phase 1: no genome fields at all.
+            File.WriteAllText(path, "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":50000," +
+                "\"animals\":[{\"id\":1,\"name\":\"レオパ1\",\"sex\":\"Male\",\"weightGrams\":45.0,\"stage\":\"Adult\"," +
+                "\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100}]," +
+                "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1}],\"rackCount\":1,\"incubatorCount\":1,\"nextAnimalId\":2,\"nextCageId\":2}");
+
+            var first = service.LoadOrCreate(path, Now, new Random(3)).Animals[0];
+
+            Assert.That(first.Known.HetsUnknown, Is.True);
+            Assert.That(MorphNamer.VisualName(first.Genotype), Is.EqualTo("ノーマル"));
+            Assert.That(first.SexRevealed, Is.False, "migrated animals keep an unknown sex until their next shed");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(3));
+            service.Save(path, colony);
+            var again = service.LoadOrCreate(path, Now, new Random(999)).Animals[0];
+
+            Assert.That(again.Personality, Is.EqualTo(colony.Animals[0].Personality));
+            Assert.That(again.Genotype.Hypo, Is.EqualTo(colony.Animals[0].Genotype.Hypo));
+        }
+
+        [Test]
+        public void Migrate_LegacyPet_IsNormalHetsUnknownWithUnknownSex()
+        {
+            // Reuse the existing schema-2 fixture helper of this test class for an adult pet.
+            WriteLegacySave(growthStage: "Adult");
+
+            var pet = service.LoadOrCreate(path, Now, new Random(4)).Animals[0];
+
+            Assert.That(MorphNamer.FullName(pet.Genotype, pet.Known), Is.EqualTo("ノーマル（ヘテロ不明）"));
+            Assert.That(pet.SexRevealed, Is.False);
+            Assert.That(pet.PersonalityKnown, Is.True);
+        }
+
+        [Test]
+        public void CreateNew_StartingAnimalHasStarterGenetics()
+        {
+            var pet = Colony.CreateNew(Now, economy, care, new Random(5)).Animals[0];
+
+            Assert.That(pet.Known.HetsUnknown, Is.True);
+            Assert.That(pet.Genotype.Hypo, Is.InRange(10d, 40d));
+            Assert.That(pet.Genotype.Tangerine, Is.InRange(10d, 40d));
         }
     }
 }

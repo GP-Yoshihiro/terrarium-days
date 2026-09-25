@@ -1341,14 +1341,18 @@ namespace TerrariumDays.UI
             }
 
             var now = GameNowUtc();
+            var showcase = StarterGenetics.Showcase[(session.Colony.NextAnimalId - 1) % StarterGenetics.Showcase.Count];
+            var random = new System.Random();
             session.Colony.AddAnimal(new PetState
             {
                 Name = $"レオパ{session.Colony.NextAnimalId}",
-                Sex = UnityEngine.Random.value < 0.5f ? Sex.Female : Sex.Male,
+                Sex = random.NextDouble() < 0.5 ? Sex.Female : Sex.Male,
                 HatchedAtUtc = now,
                 LastSavedAtUtc = now,
                 LastShedAtUtc = now,
                 NextShedAtUtc = now + SheddingModel.IntervalFor(GrowthStage.Baby, tuning),
+                Genotype = showcase.Genotype.Clone(),
+                Personality = PersonalityTraits.Roll(random),
             }, empty);
             SaveCurrentState();
             ColonyChanged?.Invoke();

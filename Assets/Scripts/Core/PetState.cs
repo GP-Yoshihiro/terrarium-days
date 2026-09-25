@@ -21,12 +21,21 @@ namespace TerrariumDays.Core
         /// <summary>True sex. Shown to the player only once <see cref="SexKnown"/>.</summary>
         public Sex Sex { get; set; } = Sex.Female;
 
-        public bool SexKnown => Stage != GrowthStage.Baby;
+        /// <summary>Stored: set when a juvenile-or-older animal sheds (§5.1 "known at juvenile").</summary>
+        public bool SexRevealed { get; set; }
+
+        public bool SexKnown => SexRevealed;
 
         public Personality Personality { get; set; } = Personality.Calm;
 
         /// <summary>False for a bought animal until it has been kept a while (§5.2); own hatchlings know it.</summary>
         public bool PersonalityKnown { get; set; } = true;
+
+        /// <summary>True genes; hidden from the player except what shows.</summary>
+        public Genotype Genotype { get; set; } = Genotype.Normal();
+
+        /// <summary>What the player knows about this animal's hets.</summary>
+        public KnownGenetics Known { get; set; } = new KnownGenetics();
 
         public double WeightGrams
         {
