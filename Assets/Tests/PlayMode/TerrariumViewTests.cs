@@ -517,13 +517,25 @@ namespace TerrariumDays.Tests
         [Test]
         public void OnDebugSimulate12HoursClicked_AppliesExactlyTwelveHoursOfProgress()
         {
-            var path = CreateTempSavePath();
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var tuning = new CareTuning();
+            // A fresh LoadColony() rolls the starting animal's personality at random
+            // (StarterGenetics.Apply); Shy stretches the pre-shed fast to x1.5 and can pull
+            // the x0.3 hunger-decay window into these 12 hours, making the assertion below
+            // flaky (~20% of runs, the Shy share of the five personalities). Pin the
+            // personality via SaveColonyWith so the scenario (a Baby, hunger 80, no shed for
+            // 14h) is deterministic.
+            var path = SaveColonyWith(new PetState
+            {
+                Personality = Personality.Calm,
+                LastSavedAtUtc = nowUtc,
+                LastShedAtUtc = nowUtc,
+                NextShedAtUtc = nowUtc + SheddingModel.IntervalFor(GrowthStage.Baby, tuning),
+            }, nowUtc);
             view.LoadColony(path, nowUtc);
 
             view.OnDebugSimulate12HoursClicked();
 
-            var tuning = new CareTuning();
             Assert.That(view.State.Hunger, Is.EqualTo(80d - tuning.HungerDecayPerHour * 12d).Within(1e-6));
             Assert.That(debugAppliedElapsedLabel.text, Is.EqualTo("前回反映: 12時間0分"));
         }
