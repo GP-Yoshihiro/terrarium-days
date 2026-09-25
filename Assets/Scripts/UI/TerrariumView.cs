@@ -394,7 +394,7 @@ namespace TerrariumDays.UI
                 ShowFeedback(ShedMessage);
             }
 
-            if (state != null)
+            if (state != null && (report.AppliedElapsed > TimeSpan.Zero || report.HasEvents))
             {
                 Render(state, tuning);
             }

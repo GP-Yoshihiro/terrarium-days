@@ -468,6 +468,25 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void ApplyLiveTickDelta_WithoutACompletedStep_DoesNotRerenderUntilAStepCompletes()
+        {
+            var path = CreateTempSavePath();
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            view.LoadColony(path, nowUtc);
+            view.OnDebugMultiplierClicked(40d);
+            growthStageLabel.text = "SENTINEL";
+
+            // At x40, one real second is 40 game seconds: short of the 1-minute (60s) step,
+            // so the tick has nothing new to show and must not re-render.
+            view.ApplyLiveTickDelta(TimeSpan.FromSeconds(1));
+            Assert.That(growthStageLabel.text, Is.EqualTo("SENTINEL"), "a tick with no applied elapsed and no events must not call Render");
+
+            // The second tick crosses the 1-minute step: now it must re-render.
+            view.ApplyLiveTickDelta(TimeSpan.FromSeconds(1));
+            Assert.That(growthStageLabel.text, Is.Not.EqualTo("SENTINEL"), "once a step completes, Render must run again");
+        }
+
+        [Test]
         public void OnDebugSimulate12HoursClicked_AppliesExactlyTwelveHoursOfProgress()
         {
             var path = CreateTempSavePath();
