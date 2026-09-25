@@ -22,26 +22,26 @@ namespace TerrariumDays.Tests
         public void Apply_WithZeroElapsedTime_ChangesNothingAndReturnsNoEvent()
         {
             var state = new PetState();
-            var before = (state.Hunger, state.Hydration, state.Cleanliness, state.Health, state.Growth);
+            var before = (state.Hunger, state.Hydration, state.Cleanliness, state.Health, state.WeightGrams);
 
             var result = calculator.Apply(state, Epoch, Epoch);
 
             Assert.That(result.AppliedElapsed, Is.EqualTo(TimeSpan.Zero));
             Assert.That(result.NewGrowthStage, Is.Null);
-            Assert.That((state.Hunger, state.Hydration, state.Cleanliness, state.Health, state.Growth), Is.EqualTo(before));
+            Assert.That((state.Hunger, state.Hydration, state.Cleanliness, state.Health, state.WeightGrams), Is.EqualTo(before));
         }
 
         [Test]
         public void Apply_WithDeviceClockMovedBackward_TreatsElapsedAsZero()
         {
             var state = new PetState();
-            var before = (state.Hunger, state.Hydration, state.Cleanliness, state.Health, state.Growth);
+            var before = (state.Hunger, state.Hydration, state.Cleanliness, state.Health, state.WeightGrams);
 
             var result = calculator.Apply(state, Epoch, Epoch - TimeSpan.FromHours(1));
 
             Assert.That(result.AppliedElapsed, Is.EqualTo(TimeSpan.Zero));
             Assert.That(result.NewGrowthStage, Is.Null);
-            Assert.That((state.Hunger, state.Hydration, state.Cleanliness, state.Health, state.Growth), Is.EqualTo(before));
+            Assert.That((state.Hunger, state.Hydration, state.Cleanliness, state.Health, state.WeightGrams), Is.EqualTo(before));
         }
 
         [Test]
@@ -65,59 +65,33 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void Apply_WhenAllCareStatsStayAtOrAboveHealthyThreshold_RecoversHealthAndAdvancesGrowth()
+        public void Apply_WhenAllCareStatsStayAtOrAboveHealthyThreshold_RecoversHealth()
         {
-            var state = new PetState { Hunger = 90d, Hydration = 90d, Cleanliness = 90d, Health = 50d, Growth = 0d };
+            var state = new PetState { Hunger = 90d, Hydration = 90d, Cleanliness = 90d, Health = 50d };
 
             calculator.Apply(state, Epoch, Epoch + TimeSpan.FromHours(1));
 
             Assert.That(state.Health, Is.EqualTo(50d + tuning.HealthRecoveryPerHour).Within(1e-9));
-            Assert.That(state.Growth, Is.EqualTo(tuning.GrowthPerHour).Within(1e-9));
         }
 
         [Test]
         public void Apply_WhenAnyCareStatStaysBelowLowThreshold_DecreasesHealthOnly()
         {
-            var state = new PetState { Hunger = 15d, Hydration = 90d, Cleanliness = 90d, Health = 50d, Growth = 0d };
+            var state = new PetState { Hunger = 15d, Hydration = 90d, Cleanliness = 90d, Health = 50d };
 
             calculator.Apply(state, Epoch, Epoch + TimeSpan.FromHours(1));
 
             Assert.That(state.Health, Is.EqualTo(50d - tuning.HealthDecayPerHour).Within(1e-9));
-            Assert.That(state.Growth, Is.EqualTo(0d));
         }
 
         [Test]
-        public void Apply_WhenCareStatsAreInTheNeitherZone_LeavesHealthAndGrowthUnchanged()
+        public void Apply_WhenCareStatsAreInTheNeitherZone_LeavesHealthUnchanged()
         {
-            var state = new PetState { Hunger = 30d, Hydration = 90d, Cleanliness = 90d, Health = 50d, Growth = 10d };
+            var state = new PetState { Hunger = 30d, Hydration = 90d, Cleanliness = 90d, Health = 50d };
 
             calculator.Apply(state, Epoch, Epoch + TimeSpan.FromHours(1));
 
             Assert.That(state.Health, Is.EqualTo(50d));
-            Assert.That(state.Growth, Is.EqualTo(10d));
-        }
-
-        [Test]
-        public void Apply_WhenGrowthCrossesAStageBoundary_ReturnsTheNewStageExactlyOnce()
-        {
-            var state = new PetState { Hunger = 90d, Hydration = 90d, Cleanliness = 90d, Growth = 49.9d };
-
-            var result = calculator.Apply(state, Epoch, Epoch + TimeSpan.FromMinutes(15));
-
-            Assert.That(state.GrowthStage, Is.EqualTo(GrowthStage.Juvenile));
-            Assert.That(result.NewGrowthStage, Is.EqualTo(GrowthStage.Juvenile));
-        }
-
-        [Test]
-        public void Apply_WhenGrowthChangesWithoutCrossingAStageBoundary_ReturnsNoEvent()
-        {
-            var state = new PetState { Hunger = 90d, Hydration = 90d, Cleanliness = 90d, Growth = 60d };
-
-            var result = calculator.Apply(state, Epoch, Epoch + TimeSpan.FromHours(1));
-
-            Assert.That(state.Growth, Is.GreaterThan(60d));
-            Assert.That(state.GrowthStage, Is.EqualTo(GrowthStage.Juvenile));
-            Assert.That(result.NewGrowthStage, Is.Null);
         }
     }
 }

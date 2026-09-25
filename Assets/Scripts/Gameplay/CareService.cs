@@ -17,6 +17,7 @@ namespace TerrariumDays.Gameplay
         public void Feed(PetState state)
         {
             state.Hunger += tuning.FeedHungerAmount;
+            state.WeightGrams += GrowthModel.FeedGain(state, tuning);
         }
 
         /// <summary>

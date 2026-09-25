@@ -20,7 +20,7 @@ namespace TerrariumDays.Tests
 
             Assert.That(tuning.HealthDecayPerHour, Is.EqualTo(5d));
             Assert.That(tuning.HealthRecoveryPerHour, Is.EqualTo(2d));
-            Assert.That(tuning.GrowthPerHour, Is.EqualTo(100d / 168d));
+            Assert.That(tuning.FeedWeightGainGrams, Is.EqualTo(2.2d));
 
             Assert.That(tuning.HealthyCareThreshold, Is.EqualTo(40d));
             Assert.That(tuning.LowCareThreshold, Is.EqualTo(20d));

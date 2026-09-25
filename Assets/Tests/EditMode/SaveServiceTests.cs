@@ -44,7 +44,6 @@ namespace TerrariumDays.Tests
             Assert.That(state.Hydration, Is.EqualTo(80d));
             Assert.That(state.Cleanliness, Is.EqualTo(80d));
             Assert.That(state.Health, Is.EqualTo(100d));
-            Assert.That(state.Growth, Is.EqualTo(0d));
             Assert.That(state.SelectedDecorId, Is.EqualTo(PetState.DefaultDecorId));
             Assert.That(state.LastSavedAtUtc, Is.EqualTo(Now));
             Assert.That(File.Exists(filePath), Is.True);
@@ -59,7 +58,6 @@ namespace TerrariumDays.Tests
                 Hydration = 42d,
                 Cleanliness = 91d,
                 Health = 73d,
-                Growth = 65d,
                 SelectedDecorId = "lamp_02",
                 UnlockedDecorIds = new List<string> { "rock_01", "lamp_02", "vine_03" },
                 LastSavedAtUtc = Now
@@ -72,8 +70,6 @@ namespace TerrariumDays.Tests
             Assert.That(loaded.Hydration, Is.EqualTo(original.Hydration));
             Assert.That(loaded.Cleanliness, Is.EqualTo(original.Cleanliness));
             Assert.That(loaded.Health, Is.EqualTo(original.Health));
-            Assert.That(loaded.Growth, Is.EqualTo(original.Growth));
-            Assert.That(loaded.GrowthStage, Is.EqualTo(GrowthStage.Juvenile));
             Assert.That(loaded.SelectedDecorId, Is.EqualTo(original.SelectedDecorId));
             Assert.That(loaded.UnlockedDecorIds, Is.EqualTo(original.UnlockedDecorIds));
             Assert.That(loaded.LastSavedAtUtc, Is.EqualTo(original.LastSavedAtUtc));

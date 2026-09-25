@@ -122,8 +122,8 @@
                     <ui:Slider name="debug-health-slider" low-value="0" high-value="100" value="100" class="debug-slider" />
                 </ui:VisualElement>
                 <ui:VisualElement class="debug-slider-row">
-                    <ui:Label text="成長度" class="debug-slider-label" />
-                    <ui:Slider name="debug-growth-slider" low-value="0" high-value="100" value="0" class="debug-slider" />
+                    <ui:Label text="体重(g)" class="debug-slider-label" />
+                    <ui:Slider name="debug-weight-slider" low-value="0" high-value="80" value="3" class="debug-slider" />
                 </ui:VisualElement>
                 <ui:Label name="debug-applied-elapsed-label" text="" class="debug-applied-elapsed-label" />
                 <ui:Button name="debug-clear-save-button" text="セーブデータ削除" class="debug-clear-save-button" />

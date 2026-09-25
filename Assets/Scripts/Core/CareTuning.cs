@@ -16,18 +16,28 @@ namespace TerrariumDays.Core
 
         public double HealthDecayPerHour { get; set; } = 5d;
         public double HealthRecoveryPerHour { get; set; } = 2d;
-        public double GrowthPerHour { get; set; } = 100d / 168d;
 
         public double HealthyCareThreshold { get; set; } = 40d;
         public double LowCareThreshold { get; set; } = 20d;
 
-        // Food refusal (拒食) and shedding (脱皮). Leopard geckos stop eating in the days before a
-        // shed and around growth spurts; they are not ill, so hunger falls slower and low hunger
-        // neither hurts health nor blocks growth while they refuse food.
-        public double ShedIntervalDays { get; set; } = 60d;
-        public double PreShedDays { get; set; } = 2d;
-        /// <summary>Percent of the current stage's gauge after which the pet fasts before growing.</summary>
-        public double PreGrowthGaugePercent { get; set; } = 90d;
+        // Body weight and growth stages (grams / game months). Stage-up needs these, then a
+        // PreGrowthFastGameDays fast, then a shed.
+        public double HatchlingWeightGrams { get; set; } = 3d;
+        public double JuvenileMinWeightGrams { get; set; } = 15d;
+        public double AdultMinWeightGrams { get; set; } = 40d;
+        public double AdultMinAgeMonths { get; set; } = 10d;
+        public double FeedWeightGainGrams { get; set; } = 2.2d;
+        public double FemaleWeightCapGrams { get; set; } = 60d;
+        public double MaleWeightCapGrams { get; set; } = 75d;
+        public double UnknownSexWeightCapGrams { get; set; } = 65d;
+        public double FastingWeightLossPerGameDay { get; set; } = 0.1d;
+        public double PreGrowthFastGameDays { get; set; } = 3d;
+
+        // Shedding, in game days.
+        public double PreShedGameDays { get; set; } = 2d;
+        public double YoungShedIntervalGameDays { get; set; } = 17.5d;
+        public double AdultShedIntervalGameDays { get; set; } = 45d;
+
         public double AnorexiaHungerDecayMultiplier { get; set; } = 0.3d;
 
         public double MaxOfflineProgressHours { get; set; } = 12d;

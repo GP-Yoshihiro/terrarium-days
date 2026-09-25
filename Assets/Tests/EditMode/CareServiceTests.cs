@@ -19,7 +19,7 @@ namespace TerrariumDays.Tests
         [Test]
         public void Feed_IncreasesOnlyHungerByTheTunedAmount()
         {
-            var state = new PetState { Hunger = 50d, Hydration = 50d, Cleanliness = 50d, Health = 90d, Growth = 10d };
+            var state = new PetState { Hunger = 50d, Hydration = 50d, Cleanliness = 50d, Health = 90d };
 
             service.Feed(state);
 
@@ -27,13 +27,13 @@ namespace TerrariumDays.Tests
             Assert.That(state.Hydration, Is.EqualTo(50d));
             Assert.That(state.Cleanliness, Is.EqualTo(50d));
             Assert.That(state.Health, Is.EqualTo(90d));
-            Assert.That(state.Growth, Is.EqualTo(10d));
+            Assert.That(state.WeightGrams, Is.GreaterThan(3d));
         }
 
         [Test]
         public void RefreshWater_IncreasesOnlyHydrationByTheTunedAmount()
         {
-            var state = new PetState { Hunger = 50d, Hydration = 50d, Cleanliness = 50d, Health = 90d, Growth = 10d };
+            var state = new PetState { Hunger = 50d, Hydration = 50d, Cleanliness = 50d, Health = 90d };
 
             service.RefreshWater(state);
 
@@ -41,13 +41,13 @@ namespace TerrariumDays.Tests
             Assert.That(state.Hunger, Is.EqualTo(50d));
             Assert.That(state.Cleanliness, Is.EqualTo(50d));
             Assert.That(state.Health, Is.EqualTo(90d));
-            Assert.That(state.Growth, Is.EqualTo(10d));
+            Assert.That(state.WeightGrams, Is.EqualTo(3d));
         }
 
         [Test]
         public void Clean_IncreasesOnlyCleanlinessByTheTunedAmount()
         {
-            var state = new PetState { Hunger = 50d, Hydration = 50d, Cleanliness = 50d, Health = 90d, Growth = 10d };
+            var state = new PetState { Hunger = 50d, Hydration = 50d, Cleanliness = 50d, Health = 90d };
 
             service.Clean(state);
 
@@ -55,7 +55,7 @@ namespace TerrariumDays.Tests
             Assert.That(state.Hunger, Is.EqualTo(50d));
             Assert.That(state.Hydration, Is.EqualTo(50d));
             Assert.That(state.Health, Is.EqualTo(90d));
-            Assert.That(state.Growth, Is.EqualTo(10d));
+            Assert.That(state.WeightGrams, Is.EqualTo(3d));
         }
 
         [Test]

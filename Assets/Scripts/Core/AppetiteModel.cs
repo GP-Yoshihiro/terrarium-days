@@ -20,13 +20,12 @@ namespace TerrariumDays.Core
     {
         public static AppetiteState Evaluate(PetState state, DateTimeOffset nowUtc, CareTuning tuning)
         {
-            if (nowUtc >= state.NextShedAtUtc - TimeSpan.FromDays(tuning.PreShedDays))
+            if (nowUtc >= state.NextShedAtUtc - GameCalendar.RealTimeFor(tuning.PreShedGameDays))
             {
                 return AppetiteState.PreShed;
             }
 
-            if (state.GrowthStage != GrowthStage.Adult
-                && GrowthGaugeCalculator.PercentWithinStage(state.Growth) >= tuning.PreGrowthGaugePercent)
+            if (state.StageUpDueAtUtc.HasValue && nowUtc < state.StageUpDueAtUtc.Value)
             {
                 return AppetiteState.PreGrowth;
             }

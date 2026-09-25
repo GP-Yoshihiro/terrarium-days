@@ -43,7 +43,7 @@ namespace TerrariumDays.Core
             {
                 LastSavedAtUtc = nowUtc,
                 LastShedAtUtc = nowUtc,
-                NextShedAtUtc = nowUtc.AddDays(new CareTuning().ShedIntervalDays),
+                NextShedAtUtc = nowUtc + GameCalendar.RealTimeFor(new CareTuning().YoungShedIntervalGameDays),
             };
         }
 
@@ -69,7 +69,7 @@ namespace TerrariumDays.Core
             var lastSaved = DateTimeOffset.ParseExact(data.lastSavedAtUtc, TimestampFormat, CultureInfo.InvariantCulture);
             // Schema-1 saves have no shedding schedule: start one interval after the last save.
             var lastShed = ParseOr(data.lastShedAtUtc, lastSaved);
-            var nextShed = ParseOr(data.nextShedAtUtc, lastSaved.AddDays(new CareTuning().ShedIntervalDays));
+            var nextShed = ParseOr(data.nextShedAtUtc, lastSaved + GameCalendar.RealTimeFor(new CareTuning().YoungShedIntervalGameDays));
 
             return new PetState
             {
@@ -77,7 +77,6 @@ namespace TerrariumDays.Core
                 Hydration = data.hydration,
                 Cleanliness = data.cleanliness,
                 Health = data.health,
-                Growth = data.growth,
                 SelectedDecorId = string.IsNullOrEmpty(data.selectedDecorId) ? PetState.DefaultDecorId : data.selectedDecorId,
                 UnlockedDecorIds = data.unlockedDecorIds ?? new List<string> { PetState.DefaultDecorId },
                 LastSavedAtUtc = lastSaved,
@@ -103,7 +102,7 @@ namespace TerrariumDays.Core
                 hydration = state.Hydration,
                 cleanliness = state.Cleanliness,
                 health = state.Health,
-                growth = state.Growth,
+                growth = 0d,
                 growthStage = state.GrowthStage.ToString(),
                 selectedDecorId = state.SelectedDecorId,
                 unlockedDecorIds = state.UnlockedDecorIds,

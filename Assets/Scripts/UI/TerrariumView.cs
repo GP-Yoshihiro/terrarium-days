@@ -81,7 +81,7 @@ namespace TerrariumDays.UI
         private Slider debugHydrationSlider;
         private Slider debugCleanlinessSlider;
         private Slider debugHealthSlider;
-        private Slider debugGrowthSlider;
+        private Slider debugWeightSlider;
         private Coroutine liveTickCoroutine;
         private DateTimeOffset virtualNow;
         private TimeSpan lastAppliedElapsed;
@@ -89,7 +89,7 @@ namespace TerrariumDays.UI
         private EventCallback<ChangeEvent<float>> debugHydrationSliderCallback;
         private EventCallback<ChangeEvent<float>> debugCleanlinessSliderCallback;
         private EventCallback<ChangeEvent<float>> debugHealthSliderCallback;
-        private EventCallback<ChangeEvent<float>> debugGrowthSliderCallback;
+        private EventCallback<ChangeEvent<float>> debugWeightSliderCallback;
         private readonly PetBehaviourTuning petBehaviourTuning = new PetBehaviourTuning();
         private readonly TerrariumArtLayout artLayout = new TerrariumArtLayout();
         private VisualElement terrariumViewElement;
@@ -206,12 +206,12 @@ namespace TerrariumDays.UI
             debugHydrationSliderCallback = evt => OnDebugHydrationChanged(evt.newValue);
             debugCleanlinessSliderCallback = evt => OnDebugCleanlinessChanged(evt.newValue);
             debugHealthSliderCallback = evt => OnDebugHealthChanged(evt.newValue);
-            debugGrowthSliderCallback = evt => OnDebugGrowthChanged(evt.newValue);
+            debugWeightSliderCallback = evt => OnDebugWeightChanged(evt.newValue);
             debugHungerSlider?.RegisterValueChangedCallback(debugHungerSliderCallback);
             debugHydrationSlider?.RegisterValueChangedCallback(debugHydrationSliderCallback);
             debugCleanlinessSlider?.RegisterValueChangedCallback(debugCleanlinessSliderCallback);
             debugHealthSlider?.RegisterValueChangedCallback(debugHealthSliderCallback);
-            debugGrowthSlider?.RegisterValueChangedCallback(debugGrowthSliderCallback);
+            debugWeightSlider?.RegisterValueChangedCallback(debugWeightSliderCallback);
 
             ApplyDebugVisibility(Debug.isDebugBuild);
 
@@ -472,9 +472,9 @@ namespace TerrariumDays.UI
                 debugHealthSlider?.UnregisterValueChangedCallback(debugHealthSliderCallback);
             }
 
-            if (debugGrowthSliderCallback != null)
+            if (debugWeightSliderCallback != null)
             {
-                debugGrowthSlider?.UnregisterValueChangedCallback(debugGrowthSliderCallback);
+                debugWeightSlider?.UnregisterValueChangedCallback(debugWeightSliderCallback);
             }
         }
 
@@ -617,7 +617,7 @@ namespace TerrariumDays.UI
             debugHydrationSlider = root.Q<Slider>("debug-hydration-slider");
             debugCleanlinessSlider = root.Q<Slider>("debug-cleanliness-slider");
             debugHealthSlider = root.Q<Slider>("debug-health-slider");
-            debugGrowthSlider = root.Q<Slider>("debug-growth-slider");
+            debugWeightSlider = root.Q<Slider>("debug-weight-slider");
 
             SetUpDrawOrder();
         }
@@ -744,7 +744,7 @@ namespace TerrariumDays.UI
                 return;
             }
 
-            milestoneStageLabel.text = stage.ToString();
+            milestoneStageLabel.text = GrowthModel.StageLabel(stage);
             milestoneMessageLabel.text = MilestoneMessageFor(stage);
             milestoneModal.style.display = DisplayStyle.Flex;
         }
@@ -1125,14 +1125,14 @@ namespace TerrariumDays.UI
             SaveCurrentState();
         }
 
-        public void OnDebugGrowthChanged(double value)
+        public void OnDebugWeightChanged(double grams)
         {
             if (state == null)
             {
                 return;
             }
 
-            state.Growth = value;
+            state.WeightGrams = grams;
             Render(state, tuning);
             SaveCurrentState();
         }
@@ -1148,7 +1148,7 @@ namespace TerrariumDays.UI
             debugHydrationSlider?.SetValueWithoutNotify((float)state.Hydration);
             debugCleanlinessSlider?.SetValueWithoutNotify((float)state.Cleanliness);
             debugHealthSlider?.SetValueWithoutNotify((float)state.Health);
-            debugGrowthSlider?.SetValueWithoutNotify((float)state.Growth);
+            debugWeightSlider?.SetValueWithoutNotify((float)state.WeightGrams);
             UpdateDebugAppliedElapsedLabel();
         }
 
@@ -1192,8 +1192,8 @@ namespace TerrariumDays.UI
 
         public void Render(PetState petState, CareTuning careTuning)
         {
-            growthStageLabel.text = petState.GrowthStage.ToString();
-            growthGaugeFill.style.width = new Length((float)GrowthGaugeCalculator.PercentWithinStage(petState.Growth), LengthUnit.Percent);
+            growthStageLabel.text = $"{GrowthModel.StageLabel(petState.Stage)} {petState.WeightGrams:0.0}g";
+            growthGaugeFill.style.width = new Length((float)(GrowthModel.ProgressToNextStage(petState, GameNowUtc(), careTuning) * 100d), LengthUnit.Percent);
 
             RenderStatusRow(hungerBarFill, hungerValueLabel, petState.Hunger, careTuning);
             RenderStatusRow(hydrationBarFill, hydrationValueLabel, petState.Hydration, careTuning);

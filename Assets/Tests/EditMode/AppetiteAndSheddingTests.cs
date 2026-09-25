@@ -10,11 +10,13 @@ namespace TerrariumDays.Tests
         private static readonly DateTimeOffset Now = new DateTimeOffset(2026, 9, 24, 12, 0, 0, TimeSpan.Zero);
         private readonly CareTuning tuning = new CareTuning();
 
-        private PetState StateWithShedIn(TimeSpan untilShed, double growth = 10d)
+        private PetState StateWithShedIn(TimeSpan untilShed, double weight = 10d, GrowthStage stage = GrowthStage.Baby, double ageMonths = 2d)
         {
             return new PetState
             {
-                Growth = growth,
+                WeightGrams = weight,
+                Stage = stage,
+                HatchedAtUtc = Now.AddDays(-ageMonths),
                 LastSavedAtUtc = Now,
                 NextShedAtUtc = Now + untilShed,
             };
@@ -29,34 +31,27 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void Appetite_IsLostInTheDaysBeforeAShed()
+        public void Appetite_IsLostInTheGameDaysBeforeAShed()
         {
-            var state = StateWithShedIn(TimeSpan.FromDays(tuning.PreShedDays - 0.5));
+            var state = StateWithShedIn(GameCalendar.RealTimeFor(tuning.PreShedGameDays - 0.5));
 
             Assert.That(AppetiteModel.Evaluate(state, Now, tuning), Is.EqualTo(AppetiteState.PreShed));
         }
 
         [Test]
-        public void Appetite_IsLostJustBeforeTheGrowthGaugeFills()
+        public void Appetite_IsLostWhileAStageUpIsPending()
         {
-            // 48 of 50 in the Baby band = 96% of the stage.
-            var state = StateWithShedIn(TimeSpan.FromDays(30), growth: 48d);
+            var state = StateWithShedIn(TimeSpan.FromDays(3));
+            state.StageUpDueAtUtc = Now + TimeSpan.FromMinutes(30);
 
             Assert.That(AppetiteModel.Evaluate(state, Now, tuning), Is.EqualTo(AppetiteState.PreGrowth));
-        }
-
-        [Test]
-        public void Appetite_AnAdultHasNoGrowthRefusal()
-        {
-            var state = StateWithShedIn(TimeSpan.FromDays(30), growth: 100d);
-
-            Assert.That(AppetiteModel.Evaluate(state, Now, tuning), Is.EqualTo(AppetiteState.Normal));
+            Assert.That(AppetiteModel.Evaluate(state, Now + TimeSpan.FromMinutes(31), tuning), Is.EqualTo(AppetiteState.Normal));
         }
 
         [Test]
         public void Feed_WhileRefusingFood_DoesNotRaiseHunger()
         {
-            var state = StateWithShedIn(TimeSpan.FromDays(1));
+            var state = StateWithShedIn(GameCalendar.RealTimeFor(1d));
             state.Hunger = 50d;
 
             var result = new CareService(tuning).Feed(state, Now);
@@ -80,27 +75,64 @@ namespace TerrariumDays.Tests
         [Test]
         public void Offline_WhileRefusingFood_HungerDropsSlowerAndDoesNotHurtHealth()
         {
-            var state = StateWithShedIn(TimeSpan.FromDays(1));
+            // Stays inside the pre-shed window the whole time (the shed itself, 1 game day
+            // out, would otherwise reschedule NextShedAtUtc and end the refusal early).
+            var elapsed = GameCalendar.RealTimeFor(1d) - TimeSpan.FromMinutes(1);
+            var state = StateWithShedIn(GameCalendar.RealTimeFor(1d));
             state.Hunger = 15d; // would normally count as "low care"
             state.Health = 80d;
 
-            new OfflineProgressCalculator(tuning).Apply(state, Now, Now + TimeSpan.FromHours(10));
+            new OfflineProgressCalculator(tuning).Apply(state, Now, Now + elapsed);
 
-            var expectedHunger = 15d - tuning.HungerDecayPerHour * tuning.AnorexiaHungerDecayMultiplier * 10d;
+            var expectedHunger = 15d - tuning.HungerDecayPerHour * tuning.AnorexiaHungerDecayMultiplier * elapsed.TotalHours;
             Assert.That(state.Hunger, Is.EqualTo(expectedHunger).Within(1e-6));
             Assert.That(state.Health, Is.GreaterThanOrEqualTo(80d));
         }
 
         [Test]
-        public void Offline_RefusingFoodBeforeAStageUp_DoesNotStallGrowth()
+        public void Offline_ReachingTheNextStagesWeight_FastsThreeGameDaysThenGrowsAndSheds()
         {
-            // Hunger too low to count as healthy, but the pet is in its pre-growth fast.
-            var state = StateWithShedIn(TimeSpan.FromDays(30), growth: 48d);
-            state.Hunger = 30d;
+            var state = StateWithShedIn(TimeSpan.FromDays(3), weight: 15.2d);
+            var fast = GameCalendar.RealTimeFor(tuning.PreGrowthFastGameDays);
 
-            new OfflineProgressCalculator(tuning).Apply(state, Now, Now + TimeSpan.FromHours(12));
+            var first = new OfflineProgressCalculator(tuning).Apply(state, Now, Now + TimeSpan.FromMinutes(1));
+            Assert.That(first.NewGrowthStage, Is.Null);
+            Assert.That(state.StageUpDueAtUtc, Is.EqualTo(Now + TimeSpan.FromMinutes(1) + fast));
+            Assert.That(AppetiteModel.Evaluate(state, Now + TimeSpan.FromMinutes(2), tuning), Is.EqualTo(AppetiteState.PreGrowth));
 
-            Assert.That(state.GrowthStage, Is.EqualTo(GrowthStage.Juvenile));
+            var second = new OfflineProgressCalculator(tuning).Apply(state, state.LastSavedAtUtc + first.AppliedElapsed, Now + TimeSpan.FromMinutes(1) + fast);
+            Assert.That(second.NewGrowthStage, Is.EqualTo(GrowthStage.Juvenile));
+            Assert.That(second.ShedCount, Is.EqualTo(1));
+            Assert.That(state.StageUpDueAtUtc, Is.Null);
+        }
+
+        [Test]
+        public void Offline_AnUnderAgeHeavyJuvenile_DoesNotBecomeAnAdult()
+        {
+            var state = StateWithShedIn(TimeSpan.FromDays(3), weight: 50d, stage: GrowthStage.Juvenile, ageMonths: 6d);
+
+            var result = new OfflineProgressCalculator(tuning).Apply(state, Now, Now + TimeSpan.FromHours(12));
+
+            Assert.That(result.NewGrowthStage, Is.Null);
+            Assert.That(state.StageUpDueAtUtc, Is.Null);
+        }
+
+        [Test]
+        public void Offline_FastingLosesATenthOfAGramPerGameDay()
+        {
+            var state = StateWithShedIn(GameCalendar.RealTimeFor(1d), weight: 20d, stage: GrowthStage.Juvenile);
+
+            new OfflineProgressCalculator(tuning).Apply(state, Now, Now + GameCalendar.RealTimeFor(1d));
+
+            Assert.That(state.WeightGrams, Is.EqualTo(20d - 0.1d).Within(1e-6));
+        }
+
+        [TestCase(GrowthStage.Baby, 17.5)]
+        [TestCase(GrowthStage.Juvenile, 17.5)]
+        [TestCase(GrowthStage.Adult, 45d)]
+        public void ShedInterval_DependsOnTheStage(GrowthStage stage, double gameDays)
+        {
+            Assert.That(SheddingModel.IntervalFor(stage, tuning), Is.EqualTo(GameCalendar.RealTimeFor(gameDays)));
         }
 
         [Test]
@@ -112,61 +144,7 @@ namespace TerrariumDays.Tests
 
             Assert.That(result.ShedCount, Is.EqualTo(1));
             Assert.That(state.LastShedAtUtc, Is.EqualTo(Now + TimeSpan.FromHours(3)));
-            Assert.That(state.NextShedAtUtc, Is.EqualTo(Now + TimeSpan.FromHours(3) + TimeSpan.FromDays(tuning.ShedIntervalDays)));
-        }
-
-        [Test]
-        public void Offline_GrowingIntoTheNextStage_TriggersAShed()
-        {
-            var state = StateWithShedIn(TimeSpan.FromDays(30), growth: 49.9d);
-
-            var result = new OfflineProgressCalculator(tuning).Apply(state, Now, Now + TimeSpan.FromHours(2));
-
-            Assert.That(result.NewGrowthStage, Is.EqualTo(GrowthStage.Juvenile));
-            Assert.That(result.ShedCount, Is.EqualTo(1));
-            Assert.That(state.NextShedAtUtc - state.LastShedAtUtc, Is.EqualTo(TimeSpan.FromDays(tuning.ShedIntervalDays)));
-        }
-
-        [Test]
-        public void Save_RoundTripsTheSheddingSchedule()
-        {
-            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"shed-{Guid.NewGuid():N}.json");
-            try
-            {
-                var state = StateWithShedIn(TimeSpan.FromDays(5));
-                state.LastShedAtUtc = Now - TimeSpan.FromDays(55);
-                var service = new SaveService();
-
-                service.Save(path, state);
-                var loaded = service.LoadOrCreateDefault(path, Now);
-
-                Assert.That(loaded.NextShedAtUtc, Is.EqualTo(state.NextShedAtUtc));
-                Assert.That(loaded.LastShedAtUtc, Is.EqualTo(state.LastShedAtUtc));
-            }
-            finally
-            {
-                System.IO.File.Delete(path);
-            }
-        }
-
-        [Test]
-        public void Save_FromBeforeShedding_SchedulesTheFirstShedOneIntervalAfterTheLastSave()
-        {
-            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"shed-legacy-{Guid.NewGuid():N}.json");
-            try
-            {
-                System.IO.File.WriteAllText(path,
-                    "{\"schemaVersion\":1,\"lastSavedAtUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100,\"growth\":0,\"growthStage\":\"Baby\",\"selectedDecorId\":\"rock_01\",\"unlockedDecorIds\":[\"rock_01\"]}");
-
-                var loaded = new SaveService().LoadOrCreateDefault(path, Now);
-
-                var lastSaved = new DateTimeOffset(2026, 9, 20, 0, 0, 0, TimeSpan.Zero);
-                Assert.That(loaded.NextShedAtUtc, Is.EqualTo(lastSaved + TimeSpan.FromDays(tuning.ShedIntervalDays)));
-            }
-            finally
-            {
-                System.IO.File.Delete(path);
-            }
+            Assert.That(state.NextShedAtUtc, Is.EqualTo(Now + TimeSpan.FromHours(3) + SheddingModel.IntervalFor(GrowthStage.Baby, tuning)));
         }
     }
 }

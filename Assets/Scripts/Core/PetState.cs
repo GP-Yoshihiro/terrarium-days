@@ -3,10 +3,7 @@ using System.Collections.Generic;
 
 namespace TerrariumDays.Core
 {
-    /// <summary>
-    /// Care state, growth, and decor selection for the single pet. Plain data, no MonoBehaviour.
-    /// Field shape mirrors the save JSON in Terrarium_Days_仕様書.md section 8.1.
-    /// </summary>
+    /// <summary>One animal: identity, body, care state and schedules. Plain data.</summary>
     public sealed class PetState
     {
         public const string DefaultDecorId = "rock_01";
@@ -15,7 +12,32 @@ namespace TerrariumDays.Core
         private double hydration = 80d;
         private double cleanliness = 80d;
         private double health = 100d;
-        private double growth;
+        private double weightGrams = 3d;
+
+        public int Id { get; set; }
+
+        public string Name { get; set; } = "レオパ";
+
+        /// <summary>True sex. Shown to the player only once <see cref="SexKnown"/>.</summary>
+        public Sex Sex { get; set; } = Sex.Female;
+
+        public bool SexKnown => Stage != GrowthStage.Baby;
+
+        public double WeightGrams
+        {
+            get => weightGrams;
+            set => weightGrams = Math.Max(0d, value);
+        }
+
+        public DateTimeOffset HatchedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+
+        /// <summary>Stored growth stage; it only advances after the pre-growth fast.</summary>
+        public GrowthStage Stage { get; set; } = GrowthStage.Baby;
+
+        public GrowthStage GrowthStage => Stage;
+
+        /// <summary>When the pre-growth fast ends and the stage goes up; null when not fasting for growth.</summary>
+        public DateTimeOffset? StageUpDueAtUtc { get; set; }
 
         public double Hunger
         {
@@ -41,14 +63,6 @@ namespace TerrariumDays.Core
             set => health = StatusValue.Clamp(value);
         }
 
-        public double Growth
-        {
-            get => growth;
-            set => growth = StatusValue.Clamp(value);
-        }
-
-        public GrowthStage GrowthStage => GrowthStageFromGrowth(Growth);
-
         public string SelectedDecorId { get; set; } = DefaultDecorId;
 
         public List<string> UnlockedDecorIds { get; set; } = new List<string> { DefaultDecorId };
@@ -59,21 +73,6 @@ namespace TerrariumDays.Core
         public DateTimeOffset LastShedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
         /// <summary>When the next periodic shed is due; food is refused in the days before it.</summary>
-        public DateTimeOffset NextShedAtUtc { get; set; } = DateTimeOffset.UtcNow.AddDays(new CareTuning().ShedIntervalDays);
-
-        public static GrowthStage GrowthStageFromGrowth(double growth)
-        {
-            if (growth >= 100d)
-            {
-                return GrowthStage.Adult;
-            }
-
-            if (growth >= 50d)
-            {
-                return GrowthStage.Juvenile;
-            }
-
-            return GrowthStage.Baby;
-        }
+        public DateTimeOffset NextShedAtUtc { get; set; } = DateTimeOffset.UtcNow + GameCalendar.RealTimeFor(new CareTuning().YoungShedIntervalGameDays);
     }
 }

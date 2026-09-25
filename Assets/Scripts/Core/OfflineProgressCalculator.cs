@@ -4,7 +4,8 @@ namespace TerrariumDays.Core
 {
     /// <summary>
     /// Deterministic elapsed-time state update, capped and stepped per
-    /// Terrarium_Days_仕様書.md section 7. No MonoBehaviour dependency.
+    /// Terrarium_Days_仕様書.md section 7. Weight, stage-up and sheds run on game time.
+    /// No MonoBehaviour dependency.
     /// </summary>
     public sealed class OfflineProgressCalculator
     {
@@ -34,14 +35,31 @@ namespace TerrariumDays.Core
             for (var i = 0; i < stepCount; i++)
             {
                 var stepEndUtc = previousUtc + TimeSpan.FromTicks(step.Ticks * (i + 1));
-                var stageAtStepStart = state.GrowthStage;
-                ApplyStep(state, AppetiteModel.IsRefusingFood(state, stepEndUtc, tuning));
+                var refusing = AppetiteModel.IsRefusingFood(state, stepEndUtc, tuning);
+                ApplyStep(state, refusing);
 
-                // Growing into a new stage sheds the old skin; otherwise shed on schedule.
-                if (state.GrowthStage != stageAtStepStart || stepEndUtc >= state.NextShedAtUtc)
+                if (refusing)
+                {
+                    state.WeightGrams -= tuning.FastingWeightLossPerGameDay * step.TotalMinutes / GameCalendar.RealMinutesPerGameDay;
+                }
+
+                var shedNow = stepEndUtc >= state.NextShedAtUtc;
+                if (!state.StageUpDueAtUtc.HasValue && GrowthModel.MeetsNextStage(state, stepEndUtc, tuning))
+                {
+                    // Pre-growth fast first; the stage goes up (with a shed) when it ends.
+                    state.StageUpDueAtUtc = stepEndUtc + GameCalendar.RealTimeFor(tuning.PreGrowthFastGameDays);
+                }
+                else if (state.StageUpDueAtUtc.HasValue && stepEndUtc >= state.StageUpDueAtUtc.Value)
+                {
+                    state.Stage = GrowthModel.NextStage(state.Stage) ?? state.Stage;
+                    state.StageUpDueAtUtc = null;
+                    shedNow = true;
+                }
+
+                if (shedNow)
                 {
                     state.LastShedAtUtc = stepEndUtc;
-                    state.NextShedAtUtc = stepEndUtc.AddDays(tuning.ShedIntervalDays);
+                    state.NextShedAtUtc = stepEndUtc + SheddingModel.IntervalFor(state.Stage, tuning);
                     sheds++;
                 }
             }
@@ -76,7 +94,6 @@ namespace TerrariumDays.Core
             if (allHealthy)
             {
                 state.Health += tuning.HealthRecoveryPerHour * stepHours;
-                state.Growth += tuning.GrowthPerHour * stepHours;
             }
             else if (anyLow)
             {
