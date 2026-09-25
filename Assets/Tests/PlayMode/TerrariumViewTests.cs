@@ -169,6 +169,11 @@ namespace TerrariumDays.Tests
                 {
                     File.Delete(path);
                 }
+
+                if (File.Exists(ColonySaveService.BackupPathFor(path)))
+                {
+                    File.Delete(ColonySaveService.BackupPathFor(path));
+                }
             }
 
             tempSavePaths.Clear();
@@ -315,6 +320,22 @@ namespace TerrariumDays.Tests
             Assert.That(view.State.GrowthStage, Is.EqualTo(GrowthStage.Juvenile));
             Assert.That(milestoneModal.style.display.value, Is.EqualTo(DisplayStyle.Flex));
             Assert.That(milestoneStageLabel.text, Is.EqualTo(GrowthModel.StageLabel(GrowthStage.Juvenile)));
+        }
+
+        [Test]
+        public void LoadColony_WithASchemaTwoSave_ShowsTheMigrationFeedbackMessage()
+        {
+            var path = CreateTempSavePath();
+            var nowUtc = new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero);
+            File.WriteAllText(path,
+                "{\"schemaVersion\":2,\"lastSavedAtUtc\":\"2026-09-25T11:00:00.0000000+00:00\",\"hunger\":70,\"hydration\":60," +
+                "\"cleanliness\":50,\"health\":90,\"growth\":50,\"growthStage\":\"Juvenile\",\"selectedDecorId\":\"plant_01\"," +
+                "\"unlockedDecorIds\":[\"rock_01\",\"plant_01\"],\"lastShedAtUtc\":\"2026-09-20T00:00:00.0000000+00:00\"," +
+                "\"nextShedAtUtc\":\"2026-11-19T00:00:00.0000000+00:00\"}");
+
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+
+            Assert.That(feedbackLabel.text, Is.EqualTo("データを新しい形式に移しました（ケージ1）"));
         }
 
         [Test]
