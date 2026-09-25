@@ -60,6 +60,19 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void AddAnimal_IntoAnOccupiedCage_ThrowsAndChangesNothing()
+        {
+            var colony = NewColony();
+            var animalCountBefore = colony.Animals.Count;
+            var nextIdBefore = colony.NextAnimalId;
+
+            Assert.Throws<InvalidOperationException>(() => colony.AddAnimal(new PetState(), colony.Cages[0]));
+
+            Assert.That(colony.Animals.Count, Is.EqualTo(animalCountBefore));
+            Assert.That(colony.NextAnimalId, Is.EqualTo(nextIdBefore));
+        }
+
+        [Test]
         public void Feed_ChargesTheFeedCostAndAddsWeight()
         {
             var colony = NewColony();

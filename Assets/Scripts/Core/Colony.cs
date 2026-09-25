@@ -63,6 +63,11 @@ namespace TerrariumDays.Core
 
         public PetState AddAnimal(PetState pet, Cage cage)
         {
+            if (cage != null && !cage.IsEmpty)
+            {
+                throw new InvalidOperationException($"Cage {cage.Id} is already occupied.");
+            }
+
             pet.Id = NextAnimalId++;
             Animals.Add(pet);
             if (cage != null)
