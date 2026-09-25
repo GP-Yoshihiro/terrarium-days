@@ -1,0 +1,240 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using UnityEngine;
+
+namespace TerrariumDays.Core
+{
+    /// <summary>
+    /// Saves and loads the colony (schema 3). Schema 1/2 single-pet saves are migrated into
+    /// cage 1 and the original file is kept as a backup.
+    /// </summary>
+    public sealed class ColonySaveService
+    {
+        public const int CurrentSchemaVersion = 3;
+        private const string TimestampFormat = "o";
+
+        private readonly CareTuning care;
+        private readonly EconomyTuning economy;
+
+        public ColonySaveService(CareTuning care, EconomyTuning economy)
+        {
+            this.care = care;
+            this.economy = economy;
+        }
+
+        public bool LastLoadMigrated { get; private set; }
+
+        public static string BackupPathFor(string path) => path + ".v2.bak";
+
+        public Colony LoadOrCreate(string path, DateTimeOffset nowUtc, System.Random random)
+        {
+            LastLoadMigrated = false;
+            if (!File.Exists(path))
+            {
+                var created = Colony.CreateNew(nowUtc, economy, care, random);
+                Save(path, created);
+                return created;
+            }
+
+            try
+            {
+                var json = File.ReadAllText(path);
+                var probe = JsonUtility.FromJson<SchemaProbe>(json);
+                if (probe == null)
+                {
+                    throw new InvalidDataException("Empty save.");
+                }
+
+                if (probe.schemaVersion >= CurrentSchemaVersion)
+                {
+                    return FromSaveData(JsonUtility.FromJson<ColonySaveData>(json));
+                }
+
+                File.Copy(path, BackupPathFor(path), true);
+                var migrated = MigrateLegacy(JsonUtility.FromJson<PetSaveData>(json), nowUtc, random);
+                LastLoadMigrated = true;
+                Save(path, migrated);
+                return migrated;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Save data at '{path}' could not be loaded ({ex.Message}); starting fresh without overwriting the file.");
+                return Colony.CreateNew(nowUtc, economy, care, random);
+            }
+        }
+
+        public void Save(string path, Colony colony)
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(path, JsonUtility.ToJson(ToSaveData(colony)));
+        }
+
+        /// <summary>Old 0–100 growth gauge → grams: 0→3, 50→15, 100→45.</summary>
+        public static double WeightFromLegacyGrowth(double growth)
+        {
+            growth = Math.Max(0d, Math.Min(100d, growth));
+            return growth <= 50d ? 3d + growth / 50d * 12d : 15d + (growth - 50d) / 50d * 30d;
+        }
+
+        private Colony MigrateLegacy(PetSaveData data, DateTimeOffset nowUtc, System.Random random)
+        {
+            var colony = new Colony { CalendarEpochUtc = nowUtc };
+            colony.Wallet.Money = economy.StartingMoney;
+            var cage = colony.AddCage(CageSize.Standard);
+            var stage = Enum.TryParse(data.growthStage, out GrowthStage parsed) ? parsed : GrowthStage.Baby;
+            var ageMonths = stage == GrowthStage.Adult ? 12d : stage == GrowthStage.Juvenile ? 5d : 1d;
+            var lastSaved = Parse(data.lastSavedAtUtc, nowUtc);
+            var nextShed = Parse(data.nextShedAtUtc, nowUtc);
+            var interval = SheddingModel.IntervalFor(stage, care);
+            if (nextShed - nowUtc > interval)
+            {
+                nextShed = nowUtc + interval;
+            }
+
+            colony.AddAnimal(new PetState
+            {
+                Name = "レオパ1",
+                Sex = random.NextDouble() < 0.5 ? Sex.Female : Sex.Male,
+                WeightGrams = WeightFromLegacyGrowth(data.growth),
+                Stage = stage,
+                HatchedAtUtc = nowUtc.AddDays(-ageMonths),
+                Hunger = data.hunger,
+                Hydration = data.hydration,
+                Cleanliness = data.cleanliness,
+                Health = data.health,
+                SelectedDecorId = string.IsNullOrEmpty(data.selectedDecorId) ? PetState.DefaultDecorId : data.selectedDecorId,
+                UnlockedDecorIds = data.unlockedDecorIds ?? new List<string> { PetState.DefaultDecorId },
+                LastSavedAtUtc = lastSaved,
+                LastShedAtUtc = Parse(data.lastShedAtUtc, lastSaved),
+                NextShedAtUtc = nextShed,
+            }, cage);
+            return colony;
+        }
+
+        private static Colony FromSaveData(ColonySaveData data)
+        {
+            var colony = new Colony
+            {
+                CalendarEpochUtc = Parse(data.calendarEpochUtc, DateTimeOffset.UtcNow),
+                RackCount = data.rackCount,
+                IncubatorCount = data.incubatorCount,
+                NextAnimalId = data.nextAnimalId,
+                NextCageId = data.nextCageId,
+                LastBilledMonthIndex = data.lastBilledMonthIndex,
+            };
+            colony.Wallet.Money = data.money;
+            foreach (var entry in data.ledger)
+            {
+                colony.Wallet.Ledger.Add(new LedgerEntry
+                {
+                    AtUtc = Parse(entry.atUtc, DateTimeOffset.UtcNow),
+                    Category = Enum.TryParse(entry.category, out LedgerCategory category) ? category : LedgerCategory.Other,
+                    Amount = entry.amount,
+                    Note = entry.note,
+                });
+            }
+
+            foreach (var a in data.animals)
+            {
+                colony.Animals.Add(new PetState
+                {
+                    Id = a.id,
+                    Name = a.name,
+                    Sex = Enum.TryParse(a.sex, out Sex sex) ? sex : Sex.Female,
+                    WeightGrams = a.weightGrams,
+                    HatchedAtUtc = Parse(a.hatchedAtUtc, DateTimeOffset.UtcNow),
+                    Stage = Enum.TryParse(a.stage, out GrowthStage stage) ? stage : GrowthStage.Baby,
+                    StageUpDueAtUtc = string.IsNullOrEmpty(a.stageUpDueAtUtc) ? (DateTimeOffset?)null : Parse(a.stageUpDueAtUtc, DateTimeOffset.UtcNow),
+                    Hunger = a.hunger,
+                    Hydration = a.hydration,
+                    Cleanliness = a.cleanliness,
+                    Health = a.health,
+                    SelectedDecorId = string.IsNullOrEmpty(a.selectedDecorId) ? PetState.DefaultDecorId : a.selectedDecorId,
+                    UnlockedDecorIds = a.unlockedDecorIds ?? new List<string> { PetState.DefaultDecorId },
+                    LastSavedAtUtc = Parse(a.lastSavedAtUtc, DateTimeOffset.UtcNow),
+                    LastShedAtUtc = Parse(a.lastShedAtUtc, DateTimeOffset.UtcNow),
+                    NextShedAtUtc = Parse(a.nextShedAtUtc, DateTimeOffset.UtcNow),
+                });
+            }
+
+            foreach (var c in data.cages)
+            {
+                colony.Cages.Add(new Cage
+                {
+                    Id = c.id,
+                    Size = Enum.TryParse(c.size, out CageSize size) ? size : CageSize.Standard,
+                    AnimalId = c.animalId,
+                });
+            }
+
+            return colony;
+        }
+
+        private static ColonySaveData ToSaveData(Colony colony)
+        {
+            var data = new ColonySaveData
+            {
+                schemaVersion = CurrentSchemaVersion,
+                calendarEpochUtc = Format(colony.CalendarEpochUtc),
+                money = colony.Wallet.Money,
+                rackCount = colony.RackCount,
+                incubatorCount = colony.IncubatorCount,
+                nextAnimalId = colony.NextAnimalId,
+                nextCageId = colony.NextCageId,
+                lastBilledMonthIndex = colony.LastBilledMonthIndex,
+            };
+            foreach (var entry in colony.Wallet.Ledger)
+            {
+                data.ledger.Add(new LedgerSaveData
+                {
+                    atUtc = Format(entry.AtUtc),
+                    category = entry.Category.ToString(),
+                    amount = entry.Amount,
+                    note = entry.Note,
+                });
+            }
+
+            foreach (var a in colony.Animals)
+            {
+                data.animals.Add(new AnimalSaveData
+                {
+                    id = a.Id,
+                    name = a.Name,
+                    sex = a.Sex.ToString(),
+                    weightGrams = a.WeightGrams,
+                    hatchedAtUtc = Format(a.HatchedAtUtc),
+                    stage = a.Stage.ToString(),
+                    stageUpDueAtUtc = a.StageUpDueAtUtc.HasValue ? Format(a.StageUpDueAtUtc.Value) : string.Empty,
+                    hunger = a.Hunger,
+                    hydration = a.Hydration,
+                    cleanliness = a.Cleanliness,
+                    health = a.Health,
+                    selectedDecorId = a.SelectedDecorId,
+                    unlockedDecorIds = a.UnlockedDecorIds,
+                    lastSavedAtUtc = Format(a.LastSavedAtUtc),
+                    lastShedAtUtc = Format(a.LastShedAtUtc),
+                    nextShedAtUtc = Format(a.NextShedAtUtc),
+                });
+            }
+
+            foreach (var c in colony.Cages)
+            {
+                data.cages.Add(new CageSaveData { id = c.Id, size = c.Size.ToString(), animalId = c.AnimalId });
+            }
+
+            return data;
+        }
+
+        private static string Format(DateTimeOffset value) => value.ToString(TimestampFormat, CultureInfo.InvariantCulture);
+
+        private static DateTimeOffset Parse(string value, DateTimeOffset fallback) =>
+            string.IsNullOrEmpty(value) ? fallback : DateTimeOffset.ParseExact(value, TimestampFormat, CultureInfo.InvariantCulture);
+    }
+}
