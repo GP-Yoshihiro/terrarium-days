@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using NUnit.Framework;
+using UnityEngine.TestTools;
 using TerrariumDays.Core;
 
 namespace TerrariumDays.Tests
@@ -103,6 +104,7 @@ namespace TerrariumDays.Tests
         public void AnUnreadableFile_StartsFreshWithoutOverwritingIt()
         {
             File.WriteAllText(path, "not json");
+            LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*could not be loaded.*"));
 
             var colony = service.LoadOrCreate(path, Now, new Random(1));
 

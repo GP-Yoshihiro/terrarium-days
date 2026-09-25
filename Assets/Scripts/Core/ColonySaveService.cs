@@ -41,6 +41,14 @@ namespace TerrariumDays.Core
             try
             {
                 var json = File.ReadAllText(path);
+
+                // Validate JSON format before parsing to avoid JsonUtility error logs
+                var trimmed = json.TrimStart();
+                if (string.IsNullOrEmpty(json) || (!trimmed.StartsWith("{") && !trimmed.StartsWith("[")))
+                {
+                    throw new InvalidDataException("Not valid JSON.");
+                }
+
                 var probe = JsonUtility.FromJson<SchemaProbe>(json);
                 if (probe == null)
                 {

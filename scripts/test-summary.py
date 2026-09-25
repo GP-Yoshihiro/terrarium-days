@@ -2,7 +2,8 @@
 """Token-lean summary of Unity test results and build logs.
 
 Prints totals per results file, then only the failing tests (name, first message line,
-first project stack frame) and unique compiler/Xcode errors. Use it instead of reading
+first project stack frame), unique compiler/Xcode errors, and assets Unity ignored
+because of a broken .meta file (such scripts silently never compile or run). Use it instead of reading
 the raw XML/log files, which run to hundreds of KB.
 
 usage: scripts/test-summary.py [Logs/EditMode-results.xml ...] [--log Logs/xcodebuild.log ...]
@@ -38,7 +39,8 @@ for path in results:
 seen = set()
 for path in logs:
     for line in open(path, encoding="utf-8", errors="replace"):
-        m = re.search(r"(error CS\d+: .*|^\S+\.(?:cs|mm|m|h|cpp):\d+:\d+: error: .*|^error: .*)", line)
+        m = re.search(r"(error CS\d+: .*|^\S+\.(?:cs|mm|m|h|cpp):\d+:\d+: error: .*|^error: .*"
+                      r"|The \.meta file .* will be ignored.*)", line)
         if m and m.group(1) not in seen:
             seen.add(m.group(1))
             print(f"{os.path.basename(path)}: {m.group(1)[:220]}")
