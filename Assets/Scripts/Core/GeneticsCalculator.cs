@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace TerrariumDays.Core
 {
@@ -44,5 +45,75 @@ namespace TerrariumDays.Core
             var roll = random.NextDouble();
             return copies >= 2 ? 1 : copies <= 0 ? 0 : roll < 0.5d ? 1 : 0;
         }
+
+        /// <summary>
+        /// Chance of each visual morph from what the player knows (§4.4). Single genes only;
+        /// hypo/tangerine are judged on the parents' mean (see the plan's rulings).
+        /// </summary>
+        public static List<MorphOdds> PredictVisualOdds(Genotype mother, KnownGenetics motherKnown,
+            Genotype father, KnownGenetics fatherKnown)
+        {
+            var perGene = new double[Genes.All.Length][];
+            foreach (var gene in Genes.All)
+            {
+                perGene[(int)gene] = KnownGenetics.Blend(
+                    KnownGenetics.BelievedCopies(mother, motherKnown, gene),
+                    KnownGenetics.BelievedCopies(father, fatherKnown, gene));
+            }
+
+            var totals = new Dictionary<string, double>();
+            var child = Genotype.Normal((mother.Hypo + father.Hypo) / 2d, (mother.Tangerine + father.Tangerine) / 2d);
+            Enumerate(perGene, 0, 1d, child, totals);
+
+            var result = new List<MorphOdds>();
+            foreach (var pair in totals)
+            {
+                result.Add(new MorphOdds(pair.Key, pair.Value));
+            }
+
+            result.Sort((a, b) => b.Probability != a.Probability
+                ? b.Probability.CompareTo(a.Probability)
+                : string.CompareOrdinal(a.Name, b.Name));
+            return result;
+        }
+
+        private static void Enumerate(double[][] perGene, int index, double probability, Genotype child,
+            Dictionary<string, double> totals)
+        {
+            if (index == perGene.Length)
+            {
+                var name = MorphNamer.VisualName(child);
+                totals.TryGetValue(name, out var sum);
+                totals[name] = sum + probability;
+                return;
+            }
+
+            for (var copies = 0; copies < 3; copies++)
+            {
+                var p = perGene[index][copies];
+                if (p <= 0d)
+                {
+                    continue;
+                }
+
+                child.Set(Genes.All[index], copies);
+                Enumerate(perGene, index + 1, probability * p, child, totals);
+            }
+
+            child.Set(Genes.All[index], 0);
+        }
+    }
+
+    public readonly struct MorphOdds
+    {
+        public MorphOdds(string name, double probability)
+        {
+            Name = name;
+            Probability = probability;
+        }
+
+        public string Name { get; }
+
+        public double Probability { get; }
     }
 }
