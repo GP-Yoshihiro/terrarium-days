@@ -153,8 +153,8 @@ namespace TerrariumDays.UI
             moneyLabel = root.Q<Label>("money-label");
             gameDateLabel = root.Q<Label>("game-date-label");
             cageTitleLabel = root.Q<Label>("cage-title-label");
-            homeView.CageSelected += id => { SelectCage(id); navigator.ShowCageDetail(); };
-            cageListView.CageSelected += id => { SelectCage(id); navigator.ShowCageDetail(); };
+            homeView.CageSelected += id => { if (SelectCage(id)) navigator.ShowCageDetail(); };
+            cageListView.CageSelected += id => { if (SelectCage(id)) navigator.ShowCageDetail(); };
             root.Q<Button>("home-button").clicked += () =>
             {
                 homeView.Invalidate();
@@ -345,18 +345,25 @@ namespace TerrariumDays.UI
             }
         }
 
-        public void SelectCage(int cageId)
+        /// <summary>
+        /// Selects the given cage's animal. Returns false and leaves the current selection
+        /// untouched when the cage is empty (e.g. a bought-but-unfilled cage), so callers
+        /// never navigate to a detail screen that would show/act on the previous animal.
+        /// </summary>
+        public bool SelectCage(int cageId)
         {
-            currentCage = session.Colony.Cages.Find(c => c.Id == cageId);
-            var pet = session.Colony.AnimalIn(currentCage);
+            var cage = session.Colony.Cages.Find(c => c.Id == cageId);
+            var pet = session.Colony.AnimalIn(cage);
             if (pet == null)
             {
-                return;
+                return false;
             }
 
+            currentCage = cage;
             Initialize(pet, tuning);
             RebuildPetActor();
             ColonyChanged?.Invoke();
+            return true;
         }
 
         public void ShowCageStep(int delta)

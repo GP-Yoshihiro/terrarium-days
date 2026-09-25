@@ -86,6 +86,7 @@ namespace TerrariumDays.UI
             var pet = colony.AnimalIn(cage);
             var slot = new Button(() => CageSelected?.Invoke(cage.Id));
             slot.AddToClassList("rack-slot");
+            slot.SetEnabled(pet != null);
             var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
             thumb.AddToClassList("rack-thumb");
             var frame = pet != null ? sprites?.Frame(PetClip.Idle, 0) : null;

@@ -709,6 +709,23 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void SelectCage_OfAnEmptyCage_ReturnsFalseAndKeepsThePreviousSelection()
+        {
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var path = SaveColonyWith(new PetState { LastSavedAtUtc = nowUtc, NextShedAtUtc = nowUtc.AddDays(3) }, nowUtc);
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+            var previousState = view.State;
+            var previousCage = view.CurrentCage;
+            var emptyCage = view.Session.Colony.AddCage(CageSize.Standard);
+
+            var selected = view.SelectCage(emptyCage.Id);
+
+            Assert.That(selected, Is.False);
+            Assert.That(view.State, Is.SameAs(previousState));
+            Assert.That(view.CurrentCage, Is.SameAs(previousCage));
+        }
+
+        [Test]
         public void ShowCageStep_WrapsAroundAndSelectsThatCagesPet()
         {
             var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);

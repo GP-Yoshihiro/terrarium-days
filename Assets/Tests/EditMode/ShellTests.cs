@@ -117,6 +117,21 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void HomeView_ABoughtEmptyCageSlotIsDisabled()
+        {
+            var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
+            colony.AddCage(CageSize.Standard); // bought but no animal placed in it
+            var rackList = new VisualElement();
+            var home = new HomeView(rackList, null);
+
+            home.Render(colony, Now, new CareTuning());
+
+            var slots = rackList.Query<Button>(className: "rack-slot").ToList();
+            Assert.That(slots[1].enabledSelf, Is.False, "a bought cage with no animal must not be selectable");
+            Assert.That(slots[1].Q<Label>(className: "rack-name").text, Is.EqualTo("空きケージ"));
+        }
+
+        [Test]
         public void CageListSignature_IsStableWhenNothingChanges()
         {
             var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
