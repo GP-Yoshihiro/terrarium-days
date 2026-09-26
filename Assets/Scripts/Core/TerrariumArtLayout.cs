@@ -45,6 +45,29 @@ namespace TerrariumDays.Core
             ["heat_lamp_01"] = DecorPlacement.Hanging(new SpriteFootprint(180f, 164f, 35f, 137f, 0f, 106f), 0.72f, 0.3f),
             ["driftwood_01"] = DecorPlacement.OnFloor(new SpriteFootprint(180f, 164f, 20f, 156f, 17f, 111f), 0.12f, 0.5f, 0.38f),
         };
+
+        /// <summary>
+        /// Where a cage's decor slots stand on the floor, by slot index (X, Depth). Floor decor
+        /// uses its slot's spot so up to three pieces do not overlap; hanging decor keeps its own X.
+        /// </summary>
+        public IReadOnlyList<(float X, float Depth)> DecorSlotSpots { get; set; } = new List<(float, float)>
+        {
+            (0.15f, 0.45f),
+            (0.85f, 0.6f),
+            (0.5f, 0.38f),
+        };
+
+        public DecorPlacement PlacementFor(string decorId, int slot)
+        {
+            var own = Decor[decorId];
+            if (own.IsHanging || slot < 0 || slot >= DecorSlotSpots.Count)
+            {
+                return own;
+            }
+
+            var spot = DecorSlotSpots[slot];
+            return DecorPlacement.OnFloor(own.Sprite, spot.X, spot.Depth, own.BodyWidthFraction);
+        }
     }
 
     /// <summary>

@@ -169,11 +169,15 @@ namespace TerrariumDays.Core
             {
                 CalendarEpochUtc = Parse(data.calendarEpochUtc, nowUtc),
                 RackCount = data.rackCount,
-                IncubatorCount = data.incubatorCount,
                 NextAnimalId = data.nextAnimalId,
                 NextCageId = data.nextCageId,
                 LastBilledMonthIndex = data.lastBilledMonthIndex,
             };
+            colony.Incubators.Clear();
+            for (var i = 0; i < data.incubatorCount; i++)
+            {
+                colony.Incubators.Add(IncubatorModel.Simple);
+            }
             colony.Wallet.Money = data.money;
             foreach (var entry in data.ledger)
             {

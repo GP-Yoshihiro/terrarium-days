@@ -10,12 +10,20 @@ namespace TerrariumDays.Core
         Large
     }
 
+    public enum IncubatorModel
+    {
+        Simple,
+        Standard,
+        Luxury
+    }
+
     /// <summary>One cage on a rack; holds at most one animal (pairing comes later).</summary>
     public sealed class Cage
     {
         public int Id { get; set; }
         public CageSize Size { get; set; } = CageSize.Standard;
         public int AnimalId { get; set; } = -1;
+        public List<string> DecorIds { get; set; } = new List<string>();
         public bool IsEmpty => AnimalId < 0;
     }
 
@@ -32,7 +40,9 @@ namespace TerrariumDays.Core
         public List<PetState> Animals { get; set; } = new List<PetState>();
         public List<Cage> Cages { get; set; } = new List<Cage>();
         public int RackCount { get; set; } = 1;
-        public int IncubatorCount { get; set; } = 1;
+        public Inventory Inventory { get; set; } = new Inventory();
+        public List<IncubatorModel> Incubators { get; set; } = new List<IncubatorModel> { IncubatorModel.Simple };
+        public int IncubatorCount => Incubators.Count;
         public int NextAnimalId { get; set; } = 1;
         public int NextCageId { get; set; } = 1;
         public int LastBilledMonthIndex { get; set; }
@@ -78,12 +88,32 @@ namespace TerrariumDays.Core
             return pet;
         }
 
-        /// <summary>A fresh room: one baby of random sex in one standard cage, starting money, one simple incubator.</summary>
+        /// <summary>Takes the animal out of the room (sold); its cage becomes empty and keeps its decor.</summary>
+        public bool RemoveAnimal(PetState pet)
+        {
+            if (pet == null || !Animals.Remove(pet))
+            {
+                return false;
+            }
+
+            foreach (var cage in Cages)
+            {
+                if (cage.AnimalId == pet.Id)
+                {
+                    cage.AnimalId = -1;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>A fresh room: one baby of random sex in one standard cage with a rock, starting money, one simple incubator.</summary>
         public static Colony CreateNew(DateTimeOffset nowUtc, EconomyTuning economy, CareTuning care, Random random)
         {
             var colony = new Colony { CalendarEpochUtc = nowUtc };
             colony.Wallet.Money = economy.StartingMoney;
             var cage = colony.AddCage(CageSize.Standard);
+            cage.DecorIds.Add(DecorItems.StarterDecorId);
             var pet = new PetState
             {
                 Name = "レオパ1",
