@@ -23,6 +23,7 @@
                         <ui:Button name="water-all-button" text="全ケージ水替え" class="bulk-button" />
                         <ui:Button name="clean-all-button" text="全ケージ掃除" class="bulk-button" />
                     </ui:VisualElement>
+                    <ui:Label name="cage-list-empty-label" text="" class="cage-list-empty-label" />
                     <ui:ScrollView name="cage-list" class="cage-list" />
                 </ui:VisualElement>
                 <ui:VisualElement name="cage-detail-panel" class="panel">
@@ -86,6 +87,16 @@
                         <ui:Button name="decor-button" text="そうしょく" class="care-button" />
                     </ui:VisualElement>
                 </ui:VisualElement>
+                <ui:VisualElement name="shop-panel" class="panel">
+                    <ui:VisualElement class="shop-section-bar">
+                        <ui:Button name="shop-section-animals" text="生体" class="shop-section-button" />
+                        <ui:Button name="shop-section-supplies" text="用品" class="shop-section-button" />
+                        <ui:Button name="shop-section-wholesale" text="卸売り" class="shop-section-button" />
+                    </ui:VisualElement>
+                    <ui:Label name="shop-restock-label" text="" class="shop-restock-label" />
+                    <ui:Label name="shop-message-label" text="" class="shop-message-label" />
+                    <ui:ScrollView name="shop-list" class="shop-list" />
+                </ui:VisualElement>
                 <ui:VisualElement name="placeholder-panel" class="panel">
                     <ui:Label name="placeholder-label" text="" class="placeholder-label" />
                 </ui:VisualElement>
@@ -97,6 +108,15 @@
             <ui:Button name="tab-shop" text="ショップ" class="tab-button" />
             <ui:Button name="tab-events" text="イベント" class="tab-button" />
             <ui:Button name="tab-ledger" text="台帳" class="tab-button" />
+        </ui:VisualElement>
+        <ui:VisualElement name="confirm-modal" class="milestone-modal-overlay">
+            <ui:VisualElement class="milestone-modal-card">
+                <ui:Label name="confirm-message-label" text="" class="milestone-message-label" />
+                <ui:VisualElement class="confirm-button-row">
+                    <ui:Button name="confirm-yes-button" text="はい" class="confirm-yes-button" />
+                    <ui:Button name="confirm-no-button" text="いいえ" class="confirm-no-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="milestone-modal" class="milestone-modal-overlay">
             <ui:VisualElement class="milestone-modal-card">

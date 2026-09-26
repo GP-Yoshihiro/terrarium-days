@@ -29,6 +29,8 @@ namespace TerrariumDays.UI
         private readonly VisualElement main;
         private readonly VisualElement cageList;
         private readonly VisualElement cageDetail;
+        private readonly VisualElement shop;
+        private readonly VisualElement ledger;
         private readonly VisualElement placeholder;
         private readonly Label placeholderLabel;
         private readonly Dictionary<ShellTab, Button> tabButtons = new Dictionary<ShellTab, Button>();
@@ -39,6 +41,8 @@ namespace TerrariumDays.UI
             main = root.Q("main-screen");
             cageList = root.Q("cage-list-panel");
             cageDetail = root.Q("cage-detail-panel");
+            shop = root.Q("shop-panel");
+            ledger = root.Q("ledger-panel");
             placeholder = root.Q("placeholder-panel");
             placeholderLabel = root.Q<Label>("placeholder-label");
             Bind(root, "tab-cages", ShellTab.Cages);
@@ -63,8 +67,6 @@ namespace TerrariumDays.UI
             {
                 case ShellTab.Incubator:
                     return "孵卵器は段階5で追加されます";
-                case ShellTab.Shop:
-                    return "ショップは段階3で追加されます";
                 case ShellTab.Events:
                     return "イベントは段階6で追加されます";
                 case ShellTab.Ledger:
@@ -105,7 +107,10 @@ namespace TerrariumDays.UI
             SetDisplay(main, true);
             SetDisplay(cageDetail, tab == ShellTab.Cages && ShowingCageDetail);
             SetDisplay(cageList, tab == ShellTab.Cages && !ShowingCageDetail);
-            SetDisplay(placeholder, tab != ShellTab.Cages);
+            SetDisplay(shop, tab == ShellTab.Shop);
+            SetDisplay(ledger, tab == ShellTab.Ledger);
+            var hasPanel = tab == ShellTab.Cages || (tab == ShellTab.Shop && shop != null) || (tab == ShellTab.Ledger && ledger != null);
+            SetDisplay(placeholder, !hasPanel);
             if (placeholderLabel != null)
             {
                 placeholderLabel.text = PlaceholderTextFor(tab);

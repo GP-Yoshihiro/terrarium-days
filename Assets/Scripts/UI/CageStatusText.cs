@@ -7,6 +7,9 @@ namespace TerrariumDays.UI
     /// <summary>Short texts shown on home slots and in the cage list.</summary>
     public static class CageStatusText
     {
+        /// <summary>Shown when the colony has no animals (the last one was wholesaled) — the cage list, and bulk care feedback.</summary>
+        public const string NoAnimalsMessage = "個体がいません。ショップで迎えましょう";
+
         public static string TitleFor(Cage cage, PetState pet)
         {
             if (pet == null)

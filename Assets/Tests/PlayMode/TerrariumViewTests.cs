@@ -1,12 +1,15 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using TerrariumDays.Core;
 using TerrariumDays.Gameplay;
 using TerrariumDays.UI;
 using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 
 namespace TerrariumDays.Tests
@@ -48,6 +51,18 @@ namespace TerrariumDays.Tests
         private Label debugAppliedElapsedLabel;
         private Slider debugWeightSlider;
         private VisualElement petElement;
+        private VisualElement shopPanel;
+        private Button shopSectionAnimalsButton;
+        private Button shopSectionSuppliesButton;
+        private Button shopSectionWholesaleButton;
+        private Label shopRestockLabel;
+        private Label shopMessageLabel;
+        private ScrollView shopList;
+        private VisualElement confirmModal;
+        private Label confirmMessageLabel;
+        private Button confirmYesButton;
+        private Button confirmNoButton;
+        private Label cageListEmptyLabel;
         private readonly List<string> tempSavePaths = new List<string>();
 
         private string CreateTempSavePath()
@@ -140,6 +155,30 @@ namespace TerrariumDays.Tests
 
             petElement = new VisualElement { name = "pet-image" };
 
+            shopPanel = new VisualElement { name = "shop-panel" };
+            shopSectionAnimalsButton = new Button { name = "shop-section-animals" };
+            shopSectionSuppliesButton = new Button { name = "shop-section-supplies" };
+            shopSectionWholesaleButton = new Button { name = "shop-section-wholesale" };
+            shopRestockLabel = new Label { name = "shop-restock-label" };
+            shopMessageLabel = new Label { name = "shop-message-label" };
+            shopList = new ScrollView { name = "shop-list" };
+            shopPanel.Add(shopSectionAnimalsButton);
+            shopPanel.Add(shopSectionSuppliesButton);
+            shopPanel.Add(shopSectionWholesaleButton);
+            shopPanel.Add(shopRestockLabel);
+            shopPanel.Add(shopMessageLabel);
+            shopPanel.Add(shopList);
+
+            confirmModal = new VisualElement { name = "confirm-modal" };
+            confirmMessageLabel = new Label { name = "confirm-message-label" };
+            confirmYesButton = new Button { name = "confirm-yes-button" };
+            confirmNoButton = new Button { name = "confirm-no-button" };
+            confirmModal.Add(confirmMessageLabel);
+            confirmModal.Add(confirmYesButton);
+            confirmModal.Add(confirmNoButton);
+
+            cageListEmptyLabel = new Label { name = "cage-list-empty-label" };
+
             root.Add(growthStageLabel);
             root.Add(profileChips);
             root.Add(growthGaugeFill);
@@ -162,6 +201,9 @@ namespace TerrariumDays.Tests
             }
             root.Add(decorButton);
             root.Add(decorDrawer);
+            root.Add(shopPanel);
+            root.Add(confirmModal);
+            root.Add(cageListEmptyLabel);
             root.Add(topBar);
             root.Add(debugButton);
             root.Add(debugPanel);
@@ -874,6 +916,275 @@ namespace TerrariumDays.Tests
             Assert.That(feedbackLabel.text, Is.EqualTo(CageStatusText.SexRevealMessage(view.State)));
             Assert.That(view.State.SexKnown, Is.True);
             StringAssert.DoesNotContain("性別不明", CageStatusText.TitleFor(view.CurrentCage, view.State));
+        }
+
+        // ---- Shop tab (§9): animals, supplies, wholesale, and the confirmation dialog. ----
+
+        private static readonly DateTimeOffset ShopNow = new DateTimeOffset(2026, 9, 26, 0, 0, 0, TimeSpan.Zero);
+
+        private ShopView ShopViewOf() =>
+            (ShopView)typeof(TerrariumView).GetField("shopView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+
+        private void RenderShop() =>
+            ShopViewOf().Render(view.Session.Colony, new ShopService(new EconomyTuning(), view.Tuning), view.Session.Calendar, ShopNow);
+
+        /// <summary>UI Toolkit queues Button clicks and only pumps them on a real update tick,
+        /// which EditMode/coroutine-less code never gets; invoke the wired Clickable action
+        /// directly instead (same technique as ShellTests.FindClickAction).</summary>
+        private static Action FindClickAction(Clickable clickable)
+        {
+            foreach (var field in typeof(Clickable).GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (field.GetValue(clickable) is Action action)
+                {
+                    return action;
+                }
+            }
+
+            return null;
+        }
+
+        private void ClickConfirmYes()
+        {
+            var action = FindClickAction(confirmYesButton.clickable);
+            Assert.That(action, Is.Not.Null, "confirm-yes-button has no click action wired up");
+            action();
+        }
+
+        private void ClickConfirmNo()
+        {
+            var action = FindClickAction(confirmNoButton.clickable);
+            Assert.That(action, Is.Not.Null, "confirm-no-button has no click action wired up");
+            action();
+        }
+
+        [Test]
+        public void ShopAnimalsSection_ListsEveryOfferWithItsShopPrice()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var shopService = new ShopService(new EconomyTuning(), view.Tuning);
+
+            RenderShop();
+
+            var offers = view.Session.Colony.Shop.Offers;
+            Assert.That(offers.Count, Is.InRange(4, 6));
+
+            var priceLabels = shopList.Query<Label>(className: "shop-row-price-label").ToList();
+            Assert.That(priceLabels, Has.Count.EqualTo(offers.Count));
+            for (var i = 0; i < offers.Count; i++)
+            {
+                Assert.That(priceLabels[i].text, Is.EqualTo(ShopText.Yen(shopService.PriceOf(offers[i]))));
+            }
+        }
+
+        [Test]
+        public void ShopBuyAnimal_WithAnEmptyCageAndEnoughMoney_ConfirmYes_AddsTheAnimalAndChargesThePrice()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            view.Session.Colony.AddCage(CageSize.Standard); // an empty cage to receive the purchase
+            view.Session.Colony.Wallet.Money = 1_000_000;
+            var moneyBefore = view.Session.Colony.Wallet.Money;
+            var animalsBefore = view.Session.Colony.Animals.Count;
+            var offer = view.Session.Colony.Shop.Offers[0];
+            var shopService = new ShopService(new EconomyTuning(), view.Tuning);
+            var price = shopService.PriceOf(offer);
+
+            view.OnShopOfferBuyRequested(offer.OfferId);
+            Assert.That(confirmModal.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            ClickConfirmYes();
+
+            Assert.That(view.Session.Colony.Animals.Count, Is.EqualTo(animalsBefore + 1));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyBefore - price));
+            var lastEntry = view.Session.Colony.Wallet.Ledger.Last();
+            Assert.That(lastEntry.Category, Is.EqualTo(LedgerCategory.AnimalPurchase));
+            var boughtPet = view.Session.Colony.Animals.Last();
+            var cage = view.Session.Colony.CageOf(boughtPet);
+            Assert.That(shopMessageLabel.text, Is.EqualTo(ShopText.BoughtAnimalMessage(boughtPet, cage)));
+        }
+
+        [Test]
+        public void ShopBuyAnimal_WithNoEmptyCage_ConfirmYes_ShowsTheFailureAndChangesNothing()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            // The starter colony's only cage already holds the starter animal, so there is no
+            // empty cage for the newly bought one.
+            var moneyBefore = view.Session.Colony.Wallet.Money;
+            var animalsBefore = view.Session.Colony.Animals.Count;
+            var offer = view.Session.Colony.Shop.Offers[0];
+
+            view.OnShopOfferBuyRequested(offer.OfferId);
+            ClickConfirmYes();
+
+            Assert.That(view.Session.Colony.Animals.Count, Is.EqualTo(animalsBefore));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyBefore));
+            Assert.That(shopMessageLabel.text, Is.EqualTo(ShopText.FailureMessage(ShopResult.NoEmptyCage)));
+        }
+
+        [Test]
+        public void ShopBuyAnimal_ConfirmNo_ChangesNothing()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            view.Session.Colony.AddCage(CageSize.Standard);
+            view.Session.Colony.Wallet.Money = 1_000_000;
+            var moneyBefore = view.Session.Colony.Wallet.Money;
+            var animalsBefore = view.Session.Colony.Animals.Count;
+            var offer = view.Session.Colony.Shop.Offers[0];
+
+            view.OnShopOfferBuyRequested(offer.OfferId);
+            ClickConfirmNo();
+
+            Assert.That(confirmModal.style.display.value, Is.EqualTo(DisplayStyle.None));
+            Assert.That(view.Session.Colony.Animals.Count, Is.EqualTo(animalsBefore));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyBefore));
+        }
+
+        [Test]
+        public void ShopBuySupply_StandardCage_AddsACageAndAnExtraEmptySlotShowsAtHome()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            view.Session.Colony.Wallet.Money = 1_000_000;
+            var cagesBefore = view.Session.Colony.Cages.Count;
+
+            view.OnShopItemBuyRequested("cage_standard");
+            ClickConfirmYes();
+
+            Assert.That(view.Session.Colony.Cages.Count, Is.EqualTo(cagesBefore + 1));
+            var newCage = view.Session.Colony.Cages.Last();
+            Assert.That(newCage.IsEmpty, Is.True);
+
+            var rackList = new VisualElement();
+            var home = new HomeView(rackList);
+            home.Render(view.Session.Colony, ShopNow, view.Tuning);
+            var emptyCageSlots = rackList.Query<Label>(className: "rack-name").ToList()
+                .Count(l => l.text == "空きケージ");
+            Assert.That(emptyCageSlots, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ShopWholesale_SellingTheUnselectedAnimal_RemovesItAndPaysTheWholesalePrice()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
+            var moneyBefore = view.Session.Colony.Wallet.Money;
+            var shopService = new ShopService(new EconomyTuning(), view.Tuning);
+            var pay = shopService.WholesalePriceOf(second);
+            var selectedBefore = view.State;
+
+            view.OnShopWholesaleRequested(second.Id);
+            ClickConfirmYes();
+
+            Assert.That(view.Session.Colony.Animals.Count, Is.EqualTo(1));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyBefore + pay));
+            Assert.That(view.State, Is.SameAs(selectedBefore), "the selection must not change when a different animal is sold");
+            Assert.That(shopMessageLabel.text, Is.EqualTo(ShopText.WholesaleMessage("ふたり目", pay)));
+        }
+
+        [Test]
+        public void ShopWholesale_SellingTheSelectedAnimal_SelectsAnotherOccupiedCage()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var selected = view.State;
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
+
+            view.OnShopWholesaleRequested(selected.Id);
+            ClickConfirmYes();
+
+            Assert.That(view.Session.Colony.Animals.Count, Is.EqualTo(1));
+            Assert.That(view.State, Is.SameAs(second), "a cage still holding an animal must become the new selection");
+        }
+
+        [Test]
+        public void ShopWholesale_TheLastAnimal_WarnsInTheConfirmationAndLeavesTheColonyEmpty()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var only = view.State;
+
+            view.OnShopWholesaleRequested(only.Id);
+
+            StringAssert.EndsWith(ShopText.LastAnimalWarning, confirmMessageLabel.text);
+
+            ClickConfirmYes();
+
+            // (a) the colony has no animals, no selection, and the cage detail screen is not
+            // showing something for an animal that no longer exists.
+            Assert.That(view.Session.Colony.Animals.Count, Is.EqualTo(0));
+            Assert.That(view.State, Is.Null);
+            Assert.That(view.CurrentCage, Is.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator ShopWholesale_TheLastAnimal_LeavesEverythingSafeAfterwards()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var only = view.State;
+
+            view.OnShopWholesaleRequested(only.Id);
+            ClickConfirmYes();
+
+            // Bulk care must not change money any further once the colony is empty.
+            var moneyBefore = view.Session.Colony.Wallet.Money;
+
+            // (b) rendering the home view throws nothing and shows every slot as empty.
+            var rackList = new VisualElement();
+            var home = new HomeView(rackList);
+            Assert.DoesNotThrow(() => home.Render(view.Session.Colony, ShopNow, view.Tuning));
+            foreach (var slot in rackList.Query<Button>(className: "rack-slot").ToList())
+            {
+                Assert.That(slot.enabledSelf, Is.False);
+            }
+
+            // (c) bulk care no-ops with the no-animals feedback and spends nothing.
+            view.OnFeedAllClicked();
+            Assert.That(feedbackLabel.text, Is.EqualTo(CageStatusText.NoAnimalsMessage));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyBefore));
+            view.OnWaterAllClicked();
+            Assert.That(feedbackLabel.text, Is.EqualTo(CageStatusText.NoAnimalsMessage));
+            view.OnCleanAllClicked();
+            Assert.That(feedbackLabel.text, Is.EqualTo(CageStatusText.NoAnimalsMessage));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyBefore));
+
+            // (d) stepping through cages throws nothing (there is nothing to step through).
+            Assert.DoesNotThrow(() => view.ShowCageStep(1));
+
+            // (e) a few live-tick frames and a time jump throw nothing.
+            for (var i = 0; i < 3; i++)
+            {
+                yield return null;
+            }
+
+            Assert.DoesNotThrow(() => view.OnDebugSimulate12HoursClicked());
+
+            // (f) saving and reloading the same save throws nothing and stays empty.
+            Assert.DoesNotThrow(() => view.LoadColony(path, ShopNow, new TimeService(() => ShopNow)));
+            Assert.That(view.State, Is.Null);
+
+            // (g) buying a new animal from the shop selects its cage and it can be opened from the cage list.
+            view.Session.Colony.Wallet.Money = 1_000_000;
+            var offer = view.Session.Colony.Shop.Offers[0];
+            view.OnShopOfferBuyRequested(offer.OfferId);
+            ClickConfirmYes();
+
+            Assert.That(view.State, Is.Not.Null);
+            var boughtCage = view.CurrentCage;
+            Assert.That(boughtCage, Is.Not.Null);
+
+            var cageListRoot = new VisualElement();
+            var cageListView = new CageListView(cageListRoot);
+            var openedCageId = -1;
+            cageListView.CageSelected += id => openedCageId = id;
+            cageListView.Render(view.Session.Colony, ShopNow, view.Tuning);
+            var row = cageListRoot.Query<Button>(className: "cage-row").ToList()[0];
+            FindClickAction(row.clickable)();
+            Assert.That(openedCageId, Is.EqualTo(boughtCage.Id));
         }
     }
 }

@@ -37,6 +37,7 @@ namespace TerrariumDays.UI
         private readonly EconomyTuning economyTuning = new EconomyTuning();
         private ColonySession session;
         private ColonyCareService colonyCare;
+        private ShopService shopService;
         private Cage currentCage;
 
         public ColonySession Session => session;
@@ -129,6 +130,10 @@ namespace TerrariumDays.UI
         private ShellNavigator navigator;
         private HomeView homeView;
         private CageListView cageListView;
+        private ShopView shopView;
+        private ConfirmDialog confirmDialog;
+        private Label shopMessageLabel;
+        private Label cageListEmptyLabel;
         private Label moneyLabel;
         private Label gameDateLabel;
         private Label cageTitleLabel;
@@ -178,6 +183,13 @@ namespace TerrariumDays.UI
 
             homeView.CageSelected += OnCageTapped;
             cageListView.CageSelected += OnCageTapped;
+            if (shopView != null)
+            {
+                shopView.OfferBuyRequested += OnShopOfferBuyRequested;
+                shopView.ItemBuyRequested += OnShopItemBuyRequested;
+                shopView.WholesaleRequested += OnShopWholesaleRequested;
+            }
+
             homeButton.clicked += OnHomeButtonClicked;
             prevCageButton.clicked += OnPrevCageButtonClicked;
             nextCageButton.clicked += OnNextCageButtonClicked;
@@ -350,9 +362,18 @@ namespace TerrariumDays.UI
             session = new ColonySession(atSavePath, timeService, tuning, economyTuning, new System.Random());
             colonyCare = new ColonyCareService(tuning, economyTuning);
             careService = new CareService(tuning);
+            shopService = new ShopService(economyTuning, tuning);
             var report = session.Load();
             var first = session.Colony.OccupiedCages();
-            SelectCage(first.Count > 0 ? first[0].Id : session.Colony.Cages[0].Id);
+            if (first.Count > 0)
+            {
+                SelectCage(first[0].Id);
+            }
+            else
+            {
+                ClearSelection();
+            }
+
             HandleReport(report);
             if (session.Migrated)
             {
@@ -384,10 +405,46 @@ namespace TerrariumDays.UI
             }
 
             currentCage = cage;
+            if (petElement != null)
+            {
+                petElement.style.display = DisplayStyle.Flex;
+            }
+
             Initialize(pet, tuning);
             RebuildPetActor();
             ColonyChanged?.Invoke();
             return true;
+        }
+
+        /// <summary>
+        /// Clears the current selection when there is no animal to show it for (the colony
+        /// has zero animals — e.g. the last one was just wholesaled). Hides the pet and decor
+        /// so a stale look is never left on screen, and backs out of the cage detail screen
+        /// if it was open (it would otherwise show a detail view for nothing).
+        /// </summary>
+        public void ClearSelection()
+        {
+            state = null;
+            currentCage = null;
+            petActor?.Effects.Clear();
+            petActor = null;
+            if (petElement != null)
+            {
+                petElement.style.display = DisplayStyle.None;
+            }
+
+            foreach (var element in decorImageElements)
+            {
+                if (element != null)
+                {
+                    element.style.display = DisplayStyle.None;
+                }
+            }
+
+            if (navigator != null && navigator.ShowingCageDetail)
+            {
+                navigator.ShowCageList();
+            }
         }
 
         public void ShowCageStep(int delta)
@@ -443,6 +500,11 @@ namespace TerrariumDays.UI
                 Render(state, tuning);
             }
 
+            if (report.Restocked)
+            {
+                shopView?.Invalidate();
+            }
+
             if (report.HasEvents)
             {
                 ColonyChanged?.Invoke();
@@ -477,6 +539,12 @@ namespace TerrariumDays.UI
                 cageListView.Invalidate();
             }
 
+            if (tab == ShellTab.Shop)
+            {
+                shopView?.Invalidate();
+                ShowShopMessage(string.Empty);
+            }
+
             RefreshShell();
         }
 
@@ -490,6 +558,12 @@ namespace TerrariumDays.UI
         {
             if (session == null)
             {
+                return;
+            }
+
+            if (session.Colony.Animals.Count == 0)
+            {
+                ShowFeedback(CageStatusText.NoAnimalsMessage);
                 return;
             }
 
@@ -605,6 +679,16 @@ namespace TerrariumDays.UI
             {
                 cageListView.CageSelected -= OnCageTapped;
             }
+
+            if (shopView != null)
+            {
+                shopView.OfferBuyRequested -= OnShopOfferBuyRequested;
+                shopView.ItemBuyRequested -= OnShopItemBuyRequested;
+                shopView.WholesaleRequested -= OnShopWholesaleRequested;
+                shopView.Dispose();
+            }
+
+            confirmDialog?.Dispose();
 
             if (homeButton != null)
             {
@@ -864,11 +948,25 @@ namespace TerrariumDays.UI
             debugHealthSlider = root.Q<Slider>("debug-health-slider");
             debugWeightSlider = root.Q<Slider>("debug-weight-slider");
 
+            var shopPanel = root.Q<VisualElement>("shop-panel");
+            shopView = shopPanel != null ? new ShopView(shopPanel) : null;
+            shopMessageLabel = root.Q<Label>("shop-message-label");
+            cageListEmptyLabel = root.Q<Label>("cage-list-empty-label");
+
+            var confirmModal = root.Q<VisualElement>("confirm-modal");
+            confirmDialog = new ConfirmDialog(confirmModal, root.Q<Label>("confirm-message-label"),
+                root.Q<Button>("confirm-yes-button"), root.Q<Button>("confirm-no-button"));
+
             SetUpDrawOrder();
         }
 
         public void OnFeedClicked()
         {
+            if (state == null)
+            {
+                return;
+            }
+
             var before = state.Hunger;
 
             if (session != null)
@@ -981,6 +1079,18 @@ namespace TerrariumDays.UI
             if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Cages && !navigator.ShowingCageDetail)
             {
                 cageListView?.Render(session.Colony, now, tuning);
+
+                if (cageListEmptyLabel != null)
+                {
+                    var noAnimals = session.Colony.Animals.Count == 0;
+                    cageListEmptyLabel.text = noAnimals ? CageStatusText.NoAnimalsMessage : string.Empty;
+                    cageListEmptyLabel.style.visibility = noAnimals ? Visibility.Visible : Visibility.Hidden;
+                }
+            }
+
+            if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Shop)
+            {
+                shopView?.Render(session.Colony, shopService, session.Calendar, now);
             }
         }
 
@@ -1054,6 +1164,11 @@ namespace TerrariumDays.UI
 
         public void OnRefreshWaterClicked()
         {
+            if (state == null)
+            {
+                return;
+            }
+
             var before = state.Hydration;
             careService.RefreshWater(state);
             OnCareApplied(before, RefreshWaterSuccessMessage, actor => actor.Cheer());
@@ -1061,6 +1176,11 @@ namespace TerrariumDays.UI
 
         public void OnCleanClicked()
         {
+            if (state == null)
+            {
+                return;
+            }
+
             var before = state.Cleanliness;
             careService.Clean(state);
             OnCareApplied(before, CleanSuccessMessage, actor => actor.Cheer());
@@ -1632,6 +1752,162 @@ namespace TerrariumDays.UI
             yield return new WaitForSeconds(FeedbackDurationSeconds);
             feedbackLabel.style.visibility = Visibility.Hidden;
             feedbackHideCoroutine = null;
+        }
+
+        /// <summary>Sets the shop tab's fixed-height feedback slot (§9); hidden while empty, like feedback-label.</summary>
+        private void ShowShopMessage(string message)
+        {
+            if (shopMessageLabel == null)
+            {
+                return;
+            }
+
+            shopMessageLabel.text = message;
+            shopMessageLabel.style.visibility = string.IsNullOrEmpty(message) ? Visibility.Hidden : Visibility.Visible;
+        }
+
+        /// <summary>Asks to buy an offered animal; the actual purchase happens on the confirmation's "はい" (see ConfirmBuyAnimal).</summary>
+        public void OnShopOfferBuyRequested(int offerId)
+        {
+            if (session == null || shopService == null)
+            {
+                return;
+            }
+
+            var offer = session.Colony.Shop.Offers.Find(o => o.OfferId == offerId);
+            if (offer == null)
+            {
+                return;
+            }
+
+            var price = shopService.PriceOf(offer);
+            var what = MorphNamer.VisualName(offer.Animal.Genotype);
+            confirmDialog?.Show(ShopText.ConfirmBuy(what, price), () => ConfirmBuyAnimal(offerId));
+        }
+
+        private void ConfirmBuyAnimal(int offerId)
+        {
+            var result = shopService.BuyAnimal(session.Colony, offerId, GameNowUtc());
+            if (result == ShopResult.Ok)
+            {
+                var pet = session.Colony.Animals[session.Colony.Animals.Count - 1];
+                var cage = session.Colony.CageOf(pet);
+                ShowShopMessage(ShopText.BoughtAnimalMessage(pet, cage));
+                if (currentCage == null)
+                {
+                    SelectCage(cage.Id);
+                }
+
+                SaveCurrentState();
+                ColonyChanged?.Invoke();
+                shopView?.Invalidate();
+            }
+            else
+            {
+                ShowShopMessage(ShopText.FailureMessage(result));
+            }
+
+            RefreshShell();
+        }
+
+        /// <summary>Asks to buy a supply item; the actual purchase happens on the confirmation's "はい" (see ConfirmBuyItem).</summary>
+        public void OnShopItemBuyRequested(string itemId)
+        {
+            if (session == null || shopService == null)
+            {
+                return;
+            }
+
+            var item = ShopCatalog.Find(itemId, economyTuning);
+            if (item == null)
+            {
+                return;
+            }
+
+            confirmDialog?.Show(ShopText.ConfirmBuy(item.Label, item.Price), () => ConfirmBuyItem(itemId));
+        }
+
+        private void ConfirmBuyItem(string itemId)
+        {
+            var item = ShopCatalog.Find(itemId, economyTuning);
+            var result = shopService.BuyItem(session.Colony, itemId, GameNowUtc());
+            if (result == ShopResult.Ok)
+            {
+                ShowShopMessage(item != null ? ShopText.BoughtItemMessage(item) : string.Empty);
+                SaveCurrentState();
+                ColonyChanged?.Invoke();
+                shopView?.Invalidate();
+            }
+            else
+            {
+                ShowShopMessage(ShopText.FailureMessage(result));
+            }
+
+            RefreshShell();
+        }
+
+        /// <summary>Asks to wholesale one of the player's animals; the sale happens on the confirmation's "はい" (see ConfirmWholesale).</summary>
+        public void OnShopWholesaleRequested(int animalId)
+        {
+            if (session == null || shopService == null)
+            {
+                return;
+            }
+
+            var pet = session.Colony.AnimalById(animalId);
+            if (pet == null)
+            {
+                return;
+            }
+
+            var pay = shopService.WholesalePriceOf(pet);
+            var message = ShopText.ConfirmWholesale(pet, pay);
+            if (session.Colony.Animals.Count == 1)
+            {
+                message += ShopText.LastAnimalWarning;
+            }
+
+            confirmDialog?.Show(message, () => ConfirmWholesale(animalId));
+        }
+
+        private void ConfirmWholesale(int animalId)
+        {
+            var pet = session.Colony.AnimalById(animalId);
+            if (pet == null)
+            {
+                return;
+            }
+
+            var name = pet.Name;
+            var pay = shopService.WholesalePriceOf(pet);
+            var wasSelected = state == pet;
+            var result = shopService.Wholesale(session.Colony, animalId, GameNowUtc());
+            if (result == ShopResult.Ok)
+            {
+                ShowShopMessage(ShopText.WholesaleMessage(name, pay));
+                if (wasSelected)
+                {
+                    var occupied = session.Colony.OccupiedCages();
+                    if (occupied.Count > 0)
+                    {
+                        SelectCage(occupied[0].Id);
+                    }
+                    else
+                    {
+                        ClearSelection();
+                    }
+                }
+
+                SaveCurrentState();
+                ColonyChanged?.Invoke();
+                shopView?.Invalidate();
+            }
+            else
+            {
+                ShowShopMessage(ShopText.FailureMessage(result));
+            }
+
+            RefreshShell();
         }
 
         public void Render(PetState petState, CareTuning careTuning)

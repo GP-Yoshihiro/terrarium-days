@@ -1,5 +1,6 @@
 using System.Collections;
 using System.IO;
+using System.Reflection;
 using NUnit.Framework;
 using TerrariumDays.Core;
 using TerrariumDays.UI;
@@ -128,6 +129,55 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "decor-slots");
         }
 
+        /// <summary>
+        /// Captures the shop tab's three sections and its confirmation dialog into
+        /// Logs/Screens/shop-*.png: rows must fit the screen width, long morph names wrap by
+        /// word, and the buy/confirm buttons are tap-sized.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureShopScreens()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var colony = view.Session.Colony;
+            colony.Wallet.Money = 1_000_000;
+            var secondCage = colony.AddCage(CageSize.Standard);
+            colony.AddAnimal(new PetState
+            {
+                Name = "ふたり目",
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                SexRevealed = true,
+                Genotype = StarterGenetics.Showcase[StarterGenetics.Showcase.Count - 1].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, secondCage);
+
+            var navigator = NavigatorOf(view);
+            navigator.ShowTab(ShellTab.Shop);
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "shop-animals");
+
+            var document = view.GetComponent<UIDocument>();
+            ClickNamed(document, "shop-section-supplies");
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "shop-supplies");
+
+            ClickNamed(document, "shop-section-wholesale");
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "shop-wholesale");
+
+            // Tap a real "卸す" row button, exercising the actual Awake-wired event path into
+            // TerrariumView so the confirmation shown is the real one, not a hand-built stand-in.
+            var wholesaleButton = document.rootVisualElement.Q<Button>(className: "shop-buy-button");
+            Assert.That(wholesaleButton, Is.Not.Null, "expected at least one wholesale row");
+            FindClickAction(wholesaleButton.clickable)();
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "shop-confirm-dialog");
+        }
+
         [TearDown]
         public void TearDown()
         {
@@ -164,8 +214,36 @@ namespace TerrariumDays.Tests
 
         private static ShellNavigator NavigatorOf(TerrariumView view)
         {
-            var navigatorField = typeof(TerrariumView).GetField("navigator", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var navigatorField = typeof(TerrariumView).GetField("navigator", BindingFlags.NonPublic | BindingFlags.Instance);
             return (ShellNavigator)navigatorField.GetValue(view);
+        }
+
+        /// <summary>
+        /// Finds a named Button anywhere in the document and invokes its wired click action.
+        /// UI Toolkit queues pointer-driven clicks and only pumps them on a real update tick
+        /// that a coroutine-driven PlayMode test does not reliably get within one frame, so the
+        /// Clickable delegate is invoked directly instead (same technique as ShellTests).
+        /// </summary>
+        private static void ClickNamed(UIDocument document, string buttonName)
+        {
+            var button = document.rootVisualElement.Q<Button>(buttonName);
+            Assert.That(button, Is.Not.Null, buttonName);
+            var action = FindClickAction(button.clickable);
+            Assert.That(action, Is.Not.Null, $"{buttonName} has no click action wired up");
+            action();
+        }
+
+        private static System.Action FindClickAction(Clickable clickable)
+        {
+            foreach (var field in typeof(Clickable).GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (field.GetValue(clickable) is System.Action action)
+                {
+                    return action;
+                }
+            }
+
+            return null;
         }
 
         private IEnumerator Capture(string outputDir, string name)

@@ -13,7 +13,7 @@ namespace TerrariumDays.Tests
         private static VisualElement BuildShell()
         {
             var root = new VisualElement();
-            foreach (var name in new[] { "home-screen", "main-screen", "cage-list-panel", "cage-detail-panel", "placeholder-panel" })
+            foreach (var name in new[] { "home-screen", "main-screen", "cage-list-panel", "cage-detail-panel", "shop-panel", "placeholder-panel" })
             {
                 root.Add(new VisualElement { name = name });
             }
@@ -62,9 +62,14 @@ namespace TerrariumDays.Tests
 
             nav.ShowTab(ShellTab.Shop);
 
-            Assert.That(Display(root, "placeholder-panel"), Is.EqualTo(DisplayStyle.Flex));
-            Assert.That(root.Q<Label>("placeholder-label").text, Is.EqualTo("ショップは段階3で追加されます"));
+            Assert.That(Display(root, "shop-panel"), Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(Display(root, "placeholder-panel"), Is.EqualTo(DisplayStyle.None));
             Assert.That(root.Q<Button>("tab-shop").ClassListContains("tab-selected"), Is.True);
+
+            nav.ShowTab(ShellTab.Events);
+
+            Assert.That(Display(root, "placeholder-panel"), Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(root.Q<Label>("placeholder-label").text, Is.EqualTo("イベントは段階6で追加されます"));
         }
 
         [Test]
@@ -157,6 +162,30 @@ namespace TerrariumDays.Tests
             var slots = rackList.Query<Button>(className: "rack-slot").ToList();
             Assert.That(slots[1].enabledSelf, Is.False, "a bought cage with no animal must not be selectable");
             Assert.That(slots[1].Q<Label>(className: "rack-name").text, Is.EqualTo("空きケージ"));
+        }
+
+        [Test]
+        public void HomeView_WithNoAnimals_ShowsAllSlotsAsEmptyWithoutThrowing()
+        {
+            var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
+            colony.RemoveAnimal(colony.Animals[0]);
+            var tuning = new CareTuning();
+            var rackList = new VisualElement();
+            var home = new HomeView(rackList);
+
+            Assert.DoesNotThrow(() => home.Render(colony, Now, tuning));
+            Assert.DoesNotThrow(() => HomeView.CageListSignature(colony, Now, tuning));
+
+            var slots = rackList.Query<Button>(className: "rack-slot").ToList();
+            Assert.That(slots, Has.Count.EqualTo(4));
+            foreach (var slot in slots)
+            {
+                Assert.That(slot.enabledSelf, Is.False, "no animal is left to select");
+            }
+
+            // The one bought (but now empty) cage says so; the rest are unbought shelves.
+            Assert.That(slots[0].Q<Label>(className: "rack-name").text, Is.EqualTo("空きケージ"));
+            Assert.That(slots[1].Q<Label>(className: "rack-name").text, Is.EqualTo("空き棚"));
         }
 
         [Test]

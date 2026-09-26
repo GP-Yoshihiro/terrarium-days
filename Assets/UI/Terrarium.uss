@@ -567,6 +567,173 @@
     color: rgb(120, 90, 60);
 }
 
+/* Fixed-height slot above the cage list, reserved for CageStatusText.NoAnimalsMessage
+   (visibility only, like .feedback-label) so it never shifts the bulk-care bar. */
+.cage-list-empty-label {
+    height: 24px;
+    min-height: 24px;
+    flex-shrink: 0;
+    margin: 6px 16px 0;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    -unity-text-align: middle-center;
+}
+
+.shop-section-bar {
+    flex-direction: row;
+    height: 44px;
+    flex-shrink: 0;
+}
+
+.shop-section-button {
+    flex-grow: 1;
+    flex-basis: 0;
+    margin: 0;
+    border-width: 0;
+    border-radius: 0;
+    background-color: rgba(90, 62, 40, 0.08);
+    color: rgb(140, 110, 80);
+    font-size: 14px;
+}
+
+.shop-restock-label {
+    height: 20px;
+    min-height: 20px;
+    flex-shrink: 0;
+    margin: 6px 16px 0;
+    font-size: 13px;
+    color: rgb(90, 62, 40);
+}
+
+/* Fixed-height slot for shop feedback (buy/wholesale result), visibility only like
+   .feedback-label so a message never shifts the list. */
+.shop-message-label {
+    height: 24px;
+    min-height: 24px;
+    flex-shrink: 0;
+    margin: 4px 16px;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.shop-list {
+    flex-grow: 1;
+    padding: 0 12px;
+}
+
+/* A row is a small vertical card, not one cramped horizontal line: on a phone-width screen
+   there is not enough room for thumbnail + wrapping name/detail + price + button side by
+   side, so the thumbnail sits with the name on its own header line, the detail text gets
+   the row's full width to wrap in, and price/button share a footer line. This is what lets
+   a long, multi-word morph name actually wrap at word boundaries instead of being squeezed
+   into a sliver of a column and breaking mid-word. */
+.shop-row {
+    flex-direction: column;
+    min-height: 72px;
+    margin: 0 0 8px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgba(90, 62, 40, 0.08);
+}
+
+.shop-row-header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.shop-row-thumb {
+    width: 64px;
+    height: 36px;
+    margin-right: 10px;
+    flex-shrink: 0;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+/* white-space: normal wraps at word boundaries, so a long morph name (space-separated
+   words) breaks between words instead of overflowing the row. flex-basis: 0 makes this
+   label take exactly its flex-grow share of the header row (the default "auto" basis sizes
+   off the unwrapped text's full width first, which can squeeze it far narrower than the
+   space actually available next to the thumbnail). */
+.shop-row-name-label {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    white-space: normal;
+}
+
+.shop-row-detail-label {
+    font-size: 12px;
+    color: rgb(120, 90, 60);
+    white-space: normal;
+    margin-bottom: 2px;
+}
+
+.shop-row-footer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+}
+
+.shop-row-price-label {
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    -unity-font-style: bold;
+}
+
+.shop-buy-button {
+    width: 96px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgb(255, 167, 38);
+    color: rgb(255, 255, 255);
+    font-size: 14px;
+    -unity-font-style: bold;
+}
+
+.shop-empty-label {
+    margin: 24px 8px;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.confirm-button-row {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.confirm-yes-button,
+.confirm-no-button {
+    width: 47%;
+    height: 48px;
+    border-radius: 12px;
+    border-width: 0;
+    color: rgb(255, 255, 255);
+    font-size: 18px;
+    -unity-font-style: bold;
+}
+
+.confirm-yes-button {
+    background-color: rgb(255, 167, 38);
+}
+
+.confirm-no-button {
+    background-color: rgba(90, 62, 40, 0.4);
+}
+
 .placeholder-label {
     margin: 40px 16px;
     font-size: 16px;
