@@ -8,10 +8,13 @@ namespace TerrariumDays.Core
         public List<(PetState Pet, GrowthStage Stage)> StageUps { get; } = new List<(PetState, GrowthStage)>();
         public List<PetState> Sheds { get; } = new List<PetState>();
         public List<PetState> SexReveals { get; } = new List<PetState>();
+        public List<PetState> PersonalityReveals { get; } = new List<PetState>();
         public long ElectricityCharged { get; set; }
         public TimeSpan AppliedElapsed { get; set; }
+        public bool Restocked { get; set; }
 
-        public bool HasEvents => StageUps.Count > 0 || Sheds.Count > 0 || SexReveals.Count > 0 || ElectricityCharged > 0;
+        public bool HasEvents => StageUps.Count > 0 || Sheds.Count > 0 || SexReveals.Count > 0 || ElectricityCharged > 0
+            || PersonalityReveals.Count > 0 || Restocked;
     }
 
     /// <summary>
@@ -50,6 +53,10 @@ namespace TerrariumDays.Core
 
         public bool Migrated { get; private set; }
 
+        public bool SaveBlocked { get; private set; }
+
+        public bool DecorMovedToInventory { get; private set; }
+
         public TimeService Clock => clock;
 
         public string SavePath => savePath;
@@ -64,11 +71,17 @@ namespace TerrariumDays.Core
             var nowUtc = clock.UtcNow();
             Colony = saveService.LoadOrCreate(savePath, nowUtc, random);
             Migrated = saveService.LastLoadMigrated;
+            DecorMovedToInventory = saveService.LastLoadMovedDecor;
+            SaveBlocked = saveService.LastLoadBackupFailed;
             Calendar = new GameCalendar(Colony.CalendarEpochUtc);
             GameNowUtc = nowUtc;
             var report = ApplyUntil(nowUtc);
             Resync(nowUtc);
-            saveService.Save(savePath, Colony);
+            if (!SaveBlocked)
+            {
+                saveService.Save(savePath, Colony);
+            }
+
             return report;
         }
 
@@ -102,6 +115,11 @@ namespace TerrariumDays.Core
         public void Save()
         {
             Resync(clock.UtcNow());
+            if (SaveBlocked)
+            {
+                return;
+            }
+
             saveService.Save(savePath, Colony);
         }
 
@@ -132,9 +150,15 @@ namespace TerrariumDays.Core
                 {
                     report.SexReveals.Add(pet);
                 }
+
+                if (PersonalityReveal.ApplyIfDue(pet, targetUtc))
+                {
+                    report.PersonalityReveals.Add(pet);
+                }
             }
 
             report.ElectricityCharged = BillElectricity(targetUtc);
+            report.Restocked = Colony.Shop.EnsureStocked(Calendar.MonthIndexAt(targetUtc), targetUtc, care);
             return report;
         }
 

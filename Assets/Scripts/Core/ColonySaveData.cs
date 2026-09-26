@@ -18,6 +18,27 @@ namespace TerrariumDays.Core
         public int nextAnimalId;
         public int nextCageId;
         public int lastBilledMonthIndex;
+        public int inventoryVersion;
+        public List<InventorySaveData> inventory = new List<InventorySaveData>();
+        public List<string> incubators = new List<string>();
+        public int shopSeed;
+        public bool shopStocked;
+        public int shopMonthIndex;
+        public List<ShopOfferSaveData> shopOffers = new List<ShopOfferSaveData>();
+    }
+
+    [Serializable]
+    public sealed class InventorySaveData
+    {
+        public string id;
+        public int count;
+    }
+
+    [Serializable]
+    public sealed class ShopOfferSaveData
+    {
+        public int offerId;
+        public AnimalSaveData animal;
     }
 
     [Serializable]
@@ -48,6 +69,7 @@ namespace TerrariumDays.Core
         public string personality;
         public bool personalityKnown;
         public bool sexRevealed;
+        public string personalityRevealAtUtc;
     }
 
     [Serializable]
@@ -70,6 +92,7 @@ namespace TerrariumDays.Core
         public int id;
         public string size;
         public int animalId;
+        public List<string> decorIds = new List<string>();
     }
 
     [Serializable]

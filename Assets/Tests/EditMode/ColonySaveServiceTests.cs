@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine.TestTools;
 using TerrariumDays.Core;
@@ -98,6 +99,10 @@ namespace TerrariumDays.Tests
                 "the old 60-real-day shed date is pulled into the new game-time cycle");
             Assert.That(colony.Wallet.Money, Is.EqualTo(50000));
             Assert.That(colony.IncubatorCount, Is.EqualTo(1));
+            Assert.That(service.LastLoadMovedDecor, Is.True);
+            Assert.That(colony.Inventory.Count("rock_01"), Is.EqualTo(1));
+            Assert.That(colony.Inventory.Count("plant_01"), Is.EqualTo(1));
+            Assert.That(colony.Cages[0].DecorIds, Is.Empty);
         }
 
         [Test]
@@ -257,6 +262,129 @@ namespace TerrariumDays.Tests
             Assert.That(pet.Known.HetsUnknown, Is.True);
             Assert.That(pet.Genotype.Hypo, Is.InRange(10d, 40d));
             Assert.That(pet.Genotype.Tangerine, Is.InRange(10d, 40d));
+        }
+
+        [Test]
+        public void RoundTrip_KeepsShopInventoryDecorIncubatorsAndRevealTime()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            colony.Shop.Seed = 42;
+            colony.Shop.EnsureStocked(3, Now, care);
+            colony.Inventory.Add("plant_01", 2);
+            colony.Inventory.Add(ShopCatalog.NestBoxId, 1);
+            var cage = colony.AddCage(CageSize.Large);
+            cage.DecorIds.Add("driftwood_01");
+            colony.Incubators.Add(IncubatorModel.Luxury);
+            var pet = colony.Animals[0];
+            pet.PersonalityKnown = false;
+            pet.PersonalityRevealAtUtc = Now.AddHours(3);
+
+            service.Save(path, colony);
+            var loaded = service.LoadOrCreate(path, Now, new Random(2));
+
+            Assert.That(service.LastLoadMovedDecor, Is.False);
+            Assert.That(loaded.Shop.Seed, Is.EqualTo(42));
+            Assert.That(loaded.Shop.StockMonthIndex, Is.EqualTo(3));
+            Assert.That(loaded.Shop.Offers.Select(o => o.OfferId), Is.EqualTo(colony.Shop.Offers.Select(o => o.OfferId)));
+            Assert.That(loaded.Shop.Offers.Select(o => MorphNamer.FullName(o.Animal.Genotype, o.Animal.Known)),
+                Is.EqualTo(colony.Shop.Offers.Select(o => MorphNamer.FullName(o.Animal.Genotype, o.Animal.Known))));
+            Assert.That(loaded.Shop.Offers.All(o => !o.Animal.PersonalityKnown && o.Animal.PersonalityRevealAtUtc == null), Is.True);
+            Assert.That(loaded.Inventory.Count("plant_01"), Is.EqualTo(2));
+            Assert.That(loaded.Inventory.Count(ShopCatalog.NestBoxId), Is.EqualTo(1));
+            Assert.That(loaded.Cages[0].DecorIds, Is.EqualTo(new[] { "rock_01" }));
+            Assert.That(loaded.Cages[1].DecorIds, Is.EqualTo(new[] { "driftwood_01" }));
+            Assert.That(loaded.Incubators, Is.EqualTo(new[] { IncubatorModel.Simple, IncubatorModel.Luxury }));
+            Assert.That(loaded.Animals[0].PersonalityRevealAtUtc, Is.EqualTo(Now.AddHours(3)));
+        }
+
+        [Test]
+        public void AColonyWithNoAnimals_SavesAndLoads()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            colony.RemoveAnimal(colony.Animals[0]);
+
+            service.Save(path, colony);
+            var loaded = service.LoadOrCreate(path, Now, new Random(2));
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(loaded.Animals, Is.Empty);
+            Assert.That(loaded.Cages, Has.Count.EqualTo(1));
+            Assert.That(loaded.Cages[0].IsEmpty, Is.True);
+            Assert.That(loaded.NextAnimalId, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void ANeverStockedShop_StaysNeverStockedAfterAReload()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            service.Save(path, colony);
+
+            Assert.That(service.LoadOrCreate(path, Now, new Random(1)).Shop.StockMonthIndex, Is.EqualTo(ShopStock.NeverStocked));
+        }
+
+        [Test]
+        public void Load_Phase2File_MovesEachAnimalsUnlockedDecorIntoTheInventoryOnce()
+        {
+            File.WriteAllText(path, "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":50000," +
+                "\"animals\":[" +
+                "{\"id\":1,\"name\":\"レオパ1\",\"sex\":\"Male\",\"weightGrams\":45.0,\"stage\":\"Adult\",\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\"," +
+                "\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100,\"selectedDecorId\":\"plant_01\"," +
+                "\"unlockedDecorIds\":[\"rock_01\",\"plant_01\",\"water_dish_01\"],\"genomeVersion\":1,\"personality\":\"Calm\",\"personalityKnown\":true}," +
+                "{\"id\":2,\"name\":\"レオパ2\",\"sex\":\"Female\",\"weightGrams\":5.0,\"stage\":\"Baby\",\"hatchedAtUtc\":\"2026-09-24T00:00:00.0000000+00:00\"," +
+                "\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100,\"selectedDecorId\":\"rock_01\"," +
+                "\"unlockedDecorIds\":[\"rock_01\"],\"genomeVersion\":1,\"personality\":\"Shy\",\"personalityKnown\":true}]," +
+                "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1},{\"id\":2,\"size\":\"Standard\",\"animalId\":2}]," +
+                "\"rackCount\":1,\"incubatorCount\":1,\"nextAnimalId\":3,\"nextCageId\":3}");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(3));
+
+            Assert.That(service.LastLoadMovedDecor, Is.True);
+            Assert.That(colony.Inventory.Count("rock_01"), Is.EqualTo(2));
+            Assert.That(colony.Inventory.Count("plant_01"), Is.EqualTo(1));
+            Assert.That(colony.Inventory.Count("water_dish_01"), Is.EqualTo(1));
+            Assert.That(colony.Cages.TrueForAll(c => c.DecorIds.Count == 0), Is.True);
+            Assert.That(colony.Incubators, Is.EqualTo(new[] { IncubatorModel.Simple }));
+            Assert.That(colony.Shop.StockMonthIndex, Is.EqualTo(ShopStock.NeverStocked));
+
+            service.Save(path, colony);
+            var again = service.LoadOrCreate(path, Now, new Random(3));
+
+            Assert.That(service.LastLoadMovedDecor, Is.False);
+            Assert.That(again.Inventory.Count("rock_01"), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void AFileWithoutASchemaThatIsNotAnOldPetSave_IsTreatedAsUnreadable()
+        {
+            File.WriteAllText(path, "{\"foo\":1}");
+            LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*could not be loaded.*"));
+
+            service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(service.LastLoadFailed, Is.True);
+            Assert.That(service.LastLoadMigrated, Is.False);
+            Assert.That(File.Exists(ColonySaveService.BackupPathFor(path)), Is.False);
+            Assert.That(File.ReadAllText(path), Is.EqualTo("{\"foo\":1}"));
+        }
+
+        [Test]
+        public void ACorruptBackupThatCannotBeWritten_IsReported()
+        {
+            File.WriteAllText(path, "not json");
+            var backupPath = ColonySaveService.CorruptBackupPathFor(path, Now);
+            Directory.CreateDirectory(backupPath);
+            LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*Could not back up.*"));
+            LogAssert.Expect(UnityEngine.LogType.Error, new System.Text.RegularExpressions.Regex(".*could not be loaded.*"));
+            try
+            {
+                service.LoadOrCreate(path, Now, new Random(1));
+
+                Assert.That(service.LastLoadBackupFailed, Is.True);
+            }
+            finally
+            {
+                Directory.Delete(backupPath);
+            }
         }
     }
 }

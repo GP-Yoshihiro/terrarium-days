@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using TerrariumDays.Core;
 using TerrariumDays.Gameplay;
+using UnityEngine.TestTools;
 
 namespace TerrariumDays.Tests
 {
@@ -192,6 +194,81 @@ namespace TerrariumDays.Tests
             Assert.That(report.SexReveals[0], Is.SameAs(pet));
             Assert.That(report.HasEvents, Is.True);
             Assert.That(pet.SexKnown, Is.True);
+        }
+
+        [Test]
+        public void Load_StocksTheShopAndANewGameMonthRestocksIt()
+        {
+            var session = NewSession();
+            var first = session.Load();
+
+            Assert.That(first.Restocked, Is.True);
+            Assert.That(session.Colony.Shop.Offers.Count, Is.InRange(ShopStockGenerator.MinOffers, ShopStockGenerator.MaxOffers));
+            var month = session.Colony.Shop.StockMonthIndex;
+
+            Assert.That(session.SimulateGameTime(GameCalendar.RealTimeFor(1d)).Restocked, Is.False);
+            var next = session.SimulateGameTime(GameCalendar.RealTimeFor(30d));
+
+            Assert.That(next.Restocked, Is.True);
+            Assert.That(next.HasEvents, Is.True);
+            Assert.That(session.Colony.Shop.StockMonthIndex, Is.EqualTo(month + 1));
+        }
+
+        [Test]
+        public void ABoughtAnimal_RevealsItsPersonalityAfterSevenGameDays()
+        {
+            var session = NewSession();
+            session.Load();
+            session.Colony.AddCage(CageSize.Standard);
+            session.Colony.Wallet.Money = 1_000_000;
+            var offer = session.Colony.Shop.Offers[0];
+
+            Assert.That(new ShopService(economy, care).BuyAnimal(session.Colony, offer.OfferId, session.GameNowUtc), Is.EqualTo(ShopResult.Ok));
+
+            Assert.That(session.SimulateGameTime(GameCalendar.RealTimeFor(6.9d)).PersonalityReveals, Is.Empty);
+            var later = session.SimulateGameTime(GameCalendar.RealTimeFor(0.2d));
+
+            Assert.That(later.PersonalityReveals, Is.EquivalentTo(new[] { offer.Animal }));
+            Assert.That(offer.Animal.PersonalityKnown, Is.True);
+            Assert.That(later.HasEvents, Is.True);
+        }
+
+        [Test]
+        public void Load_WhenTheCorruptBackupCannotBeWritten_BlocksSavingSoTheFileSurvives()
+        {
+            File.WriteAllText(path, "not json");
+            var backupPath = ColonySaveService.CorruptBackupPathFor(path, Start);
+            Directory.CreateDirectory(backupPath);
+            LogAssert.Expect(UnityEngine.LogType.Error, new Regex(".*Could not back up.*"));
+            LogAssert.Expect(UnityEngine.LogType.Error, new Regex(".*could not be loaded.*"));
+            try
+            {
+                var session = NewSession();
+                session.Load();
+                session.Save();
+
+                Assert.That(session.SaveBlocked, Is.True);
+                Assert.That(File.ReadAllText(path), Is.EqualTo("not json"));
+            }
+            finally
+            {
+                Directory.Delete(backupPath);
+            }
+        }
+
+        [Test]
+        public void Load_ReportsWhenDecorWasMovedToTheInventory()
+        {
+            File.WriteAllText(path,
+                "{\"schemaVersion\":2,\"lastSavedAtUtc\":\"2026-09-25T11:00:00.0000000+00:00\",\"hunger\":70,\"hydration\":60," +
+                "\"cleanliness\":50,\"health\":90,\"growth\":50,\"growthStage\":\"Juvenile\",\"selectedDecorId\":\"plant_01\"," +
+                "\"unlockedDecorIds\":[\"rock_01\",\"plant_01\"]}");
+
+            var session = NewSession();
+            session.Load();
+
+            Assert.That(session.DecorMovedToInventory, Is.True);
+            Assert.That(session.SaveBlocked, Is.False);
         }
     }
 }

@@ -27,6 +27,8 @@ namespace TerrariumDays.UI
         private const string RefusePreShedMessage = "脱皮が近くて食欲がないみたい…";
         private const string RefusePreGrowthMessage = "成長前で食欲がないみたい…";
         private const float ClockRefreshSeconds = 1f;
+        public const string DecorMovedMessage = "装飾を所持品に移しました。ケージの「そうしょく」から置けます";
+        public const string SaveBlockedMessage = "セーブデータを読めず、控えも作れませんでした。空き容量を確かめてアプリを開き直してください";
 
         private PetState state;
         private CareTuning tuning;
@@ -343,6 +345,15 @@ namespace TerrariumDays.UI
             {
                 ShowFeedback("データを新しい形式に移しました（ケージ1）");
             }
+
+            if (session.SaveBlocked)
+            {
+                ShowFeedback(SaveBlockedMessage);
+            }
+            else if (session.DecorMovedToInventory)
+            {
+                ShowFeedback(DecorMovedMessage);
+            }
         }
 
         /// <summary>
@@ -408,6 +419,11 @@ namespace TerrariumDays.UI
             {
                 // Overrides the shed feedback above when both happen on the same tick.
                 ShowFeedback(CageStatusText.SexRevealMessage(state));
+            }
+
+            if (state != null && report.PersonalityReveals.Contains(state))
+            {
+                ShowFeedback(PersonalityReveal.Message(state));
             }
 
             if (state != null && (report.AppliedElapsed > TimeSpan.Zero || report.HasEvents))

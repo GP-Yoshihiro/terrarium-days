@@ -14,6 +14,7 @@ namespace TerrariumDays.Core
     {
         public const int CurrentSchemaVersion = 3;
         public const int CurrentGenomeVersion = 1;
+        public const int CurrentInventoryVersion = 1;
         private const string TimestampFormat = "o";
 
         private readonly CareTuning care;
@@ -30,6 +31,12 @@ namespace TerrariumDays.Core
         /// <summary>True when the previous LoadOrCreate found an unreadable save and backed it up instead of starting fresh over it.</summary>
         public bool LastLoadFailed { get; private set; }
 
+        /// <summary>True when the previous LoadOrCreate moved decor from animals'/legacy unlockedDecorIds into the shared inventory.</summary>
+        public bool LastLoadMovedDecor { get; private set; }
+
+        /// <summary>True when the previous LoadOrCreate found an unreadable save AND could not even make a backup copy of it.</summary>
+        public bool LastLoadBackupFailed { get; private set; }
+
         public static string BackupPathFor(string path) => path + ".v2.bak";
 
         public static string CorruptBackupPathFor(string path, DateTimeOffset nowUtc) => path + ".corrupt-" + nowUtc.UtcTicks + ".bak";
@@ -38,6 +45,8 @@ namespace TerrariumDays.Core
         {
             LastLoadMigrated = false;
             LastLoadFailed = false;
+            LastLoadMovedDecor = false;
+            LastLoadBackupFailed = false;
             if (!File.Exists(path))
             {
                 var created = Colony.CreateNew(nowUtc, economy, care, random);
@@ -62,6 +71,11 @@ namespace TerrariumDays.Core
                     throw new InvalidDataException("Empty save.");
                 }
 
+                if (probe.schemaVersion <= 0 && !(json.Contains("\"lastSavedAtUtc\"") && json.Contains("\"growthStage\"")))
+                {
+                    throw new InvalidDataException("No schema version and not a schema-1 pet save.");
+                }
+
                 if (probe.schemaVersion >= CurrentSchemaVersion)
                 {
                     return FromSaveData(JsonUtility.FromJson<ColonySaveData>(json), nowUtc, random);
@@ -82,6 +96,7 @@ namespace TerrariumDays.Core
                 }
                 catch (Exception backupEx)
                 {
+                    LastLoadBackupFailed = true;
                     Debug.LogError($"Could not back up unreadable save at '{path}' ({backupEx.Message}).");
                 }
 
@@ -160,6 +175,11 @@ namespace TerrariumDays.Core
             };
             StarterGenetics.Apply(pet, random);
             colony.AddAnimal(pet, cage);
+
+            MoveUnlockedDecorToInventory(colony, data.unlockedDecorIds);
+            LastLoadMovedDecor = true;
+            colony.Shop.Seed = random.Next();
+
             return colony;
         }
 
@@ -174,10 +194,21 @@ namespace TerrariumDays.Core
                 LastBilledMonthIndex = data.lastBilledMonthIndex,
             };
             colony.Incubators.Clear();
-            for (var i = 0; i < data.incubatorCount; i++)
+            if (data.incubators != null && data.incubators.Count > 0)
             {
-                colony.Incubators.Add(IncubatorModel.Simple);
+                foreach (var incubator in data.incubators)
+                {
+                    colony.Incubators.Add(Enum.TryParse(incubator, out IncubatorModel model) ? model : IncubatorModel.Simple);
+                }
             }
+            else
+            {
+                for (var i = 0; i < data.incubatorCount; i++)
+                {
+                    colony.Incubators.Add(IncubatorModel.Simple);
+                }
+            }
+
             colony.Wallet.Money = data.money;
             foreach (var entry in data.ledger)
             {
@@ -192,75 +223,7 @@ namespace TerrariumDays.Core
 
             foreach (var a in data.animals)
             {
-                var pet = new PetState
-                {
-                    Id = a.id,
-                    Name = a.name,
-                    Sex = Enum.TryParse(a.sex, out Sex sex) ? sex : Sex.Female,
-                    WeightGrams = a.weightGrams,
-                    HatchedAtUtc = Parse(a.hatchedAtUtc, nowUtc),
-                    Stage = Enum.TryParse(a.stage, out GrowthStage stage) ? stage : GrowthStage.Baby,
-                    StageUpDueAtUtc = string.IsNullOrEmpty(a.stageUpDueAtUtc) ? (DateTimeOffset?)null : Parse(a.stageUpDueAtUtc, nowUtc),
-                    Hunger = a.hunger,
-                    Hydration = a.hydration,
-                    Cleanliness = a.cleanliness,
-                    Health = a.health,
-                    SelectedDecorId = string.IsNullOrEmpty(a.selectedDecorId) ? PetState.DefaultDecorId : a.selectedDecorId,
-                    UnlockedDecorIds = a.unlockedDecorIds ?? new List<string> { PetState.DefaultDecorId },
-                    LastSavedAtUtc = Parse(a.lastSavedAtUtc, nowUtc),
-                    LastShedAtUtc = Parse(a.lastShedAtUtc, nowUtc),
-                    NextShedAtUtc = Parse(a.nextShedAtUtc, nowUtc),
-                    SexRevealed = a.sexRevealed,
-                };
-
-                if (a.genomeVersion >= 1)
-                {
-                    var genotype = Genotype.Normal(a.hypo, a.tangerine);
-                    if (a.genes != null)
-                    {
-                        foreach (var g in a.genes)
-                        {
-                            if (Enum.TryParse(g.gene, out GeneId geneId))
-                            {
-                                genotype.Set(geneId, g.copies);
-                            }
-                        }
-                    }
-
-                    pet.Genotype = genotype;
-
-                    var known = new KnownGenetics { HetsUnknown = a.hetsUnknown };
-                    if (a.hets != null)
-                    {
-                        foreach (var h in a.hets)
-                        {
-                            if (Enum.TryParse(h.gene, out GeneId geneId))
-                            {
-                                known.SetHet(geneId, h.probability);
-                            }
-                        }
-                    }
-
-                    pet.Known = known;
-
-                    pet.Personality = Enum.TryParse(a.personality, out Personality personality) ? personality : PersonalityTraits.Roll(random);
-                    pet.PersonalityKnown = a.personalityKnown;
-                }
-                else
-                {
-                    StarterGenetics.Apply(pet, random);
-
-                    // Phase-1 schema-3 saves predate genome tracking but not sex reveal:
-                    // players already saw ♂/♀ for anything past Baby, so keep it revealed
-                    // on migration. Schema-1/2 saves go through MigrateLegacy instead and
-                    // stay SexRevealed = false there (spec).
-                    if (pet.Stage != GrowthStage.Baby)
-                    {
-                        pet.SexRevealed = true;
-                    }
-                }
-
-                colony.Animals.Add(pet);
+                colony.Animals.Add(FromAnimalSaveData(a, nowUtc, random, owned: true));
             }
 
             foreach (var c in data.cages)
@@ -270,10 +233,145 @@ namespace TerrariumDays.Core
                     Id = c.id,
                     Size = Enum.TryParse(c.size, out CageSize size) ? size : CageSize.Standard,
                     AnimalId = c.animalId,
+                    DecorIds = data.inventoryVersion >= CurrentInventoryVersion && c.decorIds != null
+                        ? new List<string>(c.decorIds)
+                        : new List<string>(),
                 });
             }
 
+            if (data.inventoryVersion >= CurrentInventoryVersion)
+            {
+                if (data.inventory != null)
+                {
+                    foreach (var item in data.inventory)
+                    {
+                        if (!string.IsNullOrEmpty(item.id) && item.count > 0)
+                        {
+                            colony.Inventory.Add(item.id, item.count);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                foreach (var a in data.animals)
+                {
+                    MoveUnlockedDecorToInventory(colony, a.unlockedDecorIds);
+                }
+
+                LastLoadMovedDecor = true;
+            }
+
+            colony.Shop.Seed = data.shopSeed;
+            colony.Shop.StockMonthIndex = data.shopStocked ? data.shopMonthIndex : ShopStock.NeverStocked;
+            if (data.shopOffers != null)
+            {
+                foreach (var offer in data.shopOffers)
+                {
+                    if (offer.animal == null)
+                    {
+                        continue;
+                    }
+
+                    colony.Shop.Offers.Add(new ShopOffer
+                    {
+                        OfferId = offer.offerId,
+                        Animal = FromAnimalSaveData(offer.animal, nowUtc, random, owned: false),
+                    });
+                }
+            }
+
             return colony;
+        }
+
+        private static void MoveUnlockedDecorToInventory(Colony colony, List<string> unlockedDecorIds)
+        {
+            foreach (var id in unlockedDecorIds ?? new List<string> { DecorItems.StarterDecorId })
+            {
+                if (DecorItems.IsDecor(id))
+                {
+                    colony.Inventory.Add(id, 1);
+                }
+            }
+        }
+
+        private PetState FromAnimalSaveData(AnimalSaveData a, DateTimeOffset nowUtc, System.Random random, bool owned)
+        {
+            var pet = new PetState
+            {
+                Id = a.id,
+                Name = a.name,
+                Sex = Enum.TryParse(a.sex, out Sex sex) ? sex : Sex.Female,
+                WeightGrams = a.weightGrams,
+                HatchedAtUtc = Parse(a.hatchedAtUtc, nowUtc),
+                Stage = Enum.TryParse(a.stage, out GrowthStage stage) ? stage : GrowthStage.Baby,
+                StageUpDueAtUtc = string.IsNullOrEmpty(a.stageUpDueAtUtc) ? (DateTimeOffset?)null : Parse(a.stageUpDueAtUtc, nowUtc),
+                Hunger = a.hunger,
+                Hydration = a.hydration,
+                Cleanliness = a.cleanliness,
+                Health = a.health,
+                SelectedDecorId = string.IsNullOrEmpty(a.selectedDecorId) ? PetState.DefaultDecorId : a.selectedDecorId,
+                UnlockedDecorIds = a.unlockedDecorIds ?? new List<string> { PetState.DefaultDecorId },
+                LastSavedAtUtc = Parse(a.lastSavedAtUtc, nowUtc),
+                LastShedAtUtc = Parse(a.lastShedAtUtc, nowUtc),
+                NextShedAtUtc = Parse(a.nextShedAtUtc, nowUtc),
+                SexRevealed = a.sexRevealed,
+            };
+
+            if (a.genomeVersion >= 1)
+            {
+                var genotype = Genotype.Normal(a.hypo, a.tangerine);
+                if (a.genes != null)
+                {
+                    foreach (var g in a.genes)
+                    {
+                        if (Enum.TryParse(g.gene, out GeneId geneId))
+                        {
+                            genotype.Set(geneId, g.copies);
+                        }
+                    }
+                }
+
+                pet.Genotype = genotype;
+
+                var known = new KnownGenetics { HetsUnknown = a.hetsUnknown };
+                if (a.hets != null)
+                {
+                    foreach (var h in a.hets)
+                    {
+                        if (Enum.TryParse(h.gene, out GeneId geneId))
+                        {
+                            known.SetHet(geneId, h.probability);
+                        }
+                    }
+                }
+
+                pet.Known = known;
+
+                pet.Personality = Enum.TryParse(a.personality, out Personality personality) ? personality : PersonalityTraits.Roll(random);
+                pet.PersonalityKnown = a.personalityKnown;
+            }
+            else
+            {
+                StarterGenetics.Apply(pet, random);
+
+                // Phase-1 schema-3 saves predate genome tracking but not sex reveal:
+                // players already saw ♂/♀ for anything past Baby, so keep it revealed
+                // on migration. Schema-1/2 saves go through MigrateLegacy instead and
+                // stay SexRevealed = false there (spec).
+                if (pet.Stage != GrowthStage.Baby)
+                {
+                    pet.SexRevealed = true;
+                }
+            }
+
+            pet.PersonalityRevealAtUtc = string.IsNullOrEmpty(a.personalityRevealAtUtc) ? (DateTimeOffset?)null : Parse(a.personalityRevealAtUtc, nowUtc);
+            if (owned && !pet.PersonalityKnown && !pet.PersonalityRevealAtUtc.HasValue)
+            {
+                pet.PersonalityRevealAtUtc = nowUtc + GameCalendar.RealTimeFor(care.PersonalityRevealGameDays);
+            }
+
+            return pet;
         }
 
         private static ColonySaveData ToSaveData(Colony colony)
@@ -288,7 +386,16 @@ namespace TerrariumDays.Core
                 nextAnimalId = colony.NextAnimalId,
                 nextCageId = colony.NextCageId,
                 lastBilledMonthIndex = colony.LastBilledMonthIndex,
+                inventoryVersion = CurrentInventoryVersion,
+                shopSeed = colony.Shop.Seed,
+                shopStocked = colony.Shop.StockMonthIndex != ShopStock.NeverStocked,
+                shopMonthIndex = colony.Shop.StockMonthIndex,
             };
+            foreach (var incubator in colony.Incubators)
+            {
+                data.incubators.Add(incubator.ToString());
+            }
+
             foreach (var entry in colony.Wallet.Ledger)
             {
                 data.ledger.Add(new LedgerSaveData
@@ -302,59 +409,81 @@ namespace TerrariumDays.Core
 
             foreach (var a in colony.Animals)
             {
-                var genes = new List<GeneSaveData>();
-                var hets = new List<HetSaveData>();
-                foreach (var gene in Genes.All)
-                {
-                    var copies = a.Genotype.Copies(gene);
-                    if (copies >= 1)
-                    {
-                        genes.Add(new GeneSaveData { gene = gene.ToString(), copies = copies });
-                    }
-
-                    var probability = a.Known.HetProbability(gene);
-                    if (probability > 0d)
-                    {
-                        hets.Add(new HetSaveData { gene = gene.ToString(), probability = probability });
-                    }
-                }
-
-                data.animals.Add(new AnimalSaveData
-                {
-                    id = a.Id,
-                    name = a.Name,
-                    sex = a.Sex.ToString(),
-                    weightGrams = a.WeightGrams,
-                    hatchedAtUtc = Format(a.HatchedAtUtc),
-                    stage = a.Stage.ToString(),
-                    stageUpDueAtUtc = a.StageUpDueAtUtc.HasValue ? Format(a.StageUpDueAtUtc.Value) : string.Empty,
-                    hunger = a.Hunger,
-                    hydration = a.Hydration,
-                    cleanliness = a.Cleanliness,
-                    health = a.Health,
-                    selectedDecorId = a.SelectedDecorId,
-                    unlockedDecorIds = a.UnlockedDecorIds,
-                    lastSavedAtUtc = Format(a.LastSavedAtUtc),
-                    lastShedAtUtc = Format(a.LastShedAtUtc),
-                    nextShedAtUtc = Format(a.NextShedAtUtc),
-                    genomeVersion = CurrentGenomeVersion,
-                    genes = genes,
-                    hypo = a.Genotype.Hypo,
-                    tangerine = a.Genotype.Tangerine,
-                    hets = hets,
-                    hetsUnknown = a.Known.HetsUnknown,
-                    personality = a.Personality.ToString(),
-                    personalityKnown = a.PersonalityKnown,
-                    sexRevealed = a.SexRevealed,
-                });
+                data.animals.Add(ToAnimalSaveData(a));
             }
 
             foreach (var c in colony.Cages)
             {
-                data.cages.Add(new CageSaveData { id = c.Id, size = c.Size.ToString(), animalId = c.AnimalId });
+                data.cages.Add(new CageSaveData
+                {
+                    id = c.Id,
+                    size = c.Size.ToString(),
+                    animalId = c.AnimalId,
+                    decorIds = new List<string>(c.DecorIds),
+                });
+            }
+
+            foreach (var item in colony.Inventory.Items)
+            {
+                data.inventory.Add(new InventorySaveData { id = item.Key, count = item.Value });
+            }
+
+            foreach (var offer in colony.Shop.Offers)
+            {
+                data.shopOffers.Add(new ShopOfferSaveData { offerId = offer.OfferId, animal = ToAnimalSaveData(offer.Animal) });
             }
 
             return data;
+        }
+
+        private static AnimalSaveData ToAnimalSaveData(PetState a)
+        {
+            var genes = new List<GeneSaveData>();
+            var hets = new List<HetSaveData>();
+            foreach (var gene in Genes.All)
+            {
+                var copies = a.Genotype.Copies(gene);
+                if (copies >= 1)
+                {
+                    genes.Add(new GeneSaveData { gene = gene.ToString(), copies = copies });
+                }
+
+                var probability = a.Known.HetProbability(gene);
+                if (probability > 0d)
+                {
+                    hets.Add(new HetSaveData { gene = gene.ToString(), probability = probability });
+                }
+            }
+
+            return new AnimalSaveData
+            {
+                id = a.Id,
+                name = a.Name,
+                sex = a.Sex.ToString(),
+                weightGrams = a.WeightGrams,
+                hatchedAtUtc = Format(a.HatchedAtUtc),
+                stage = a.Stage.ToString(),
+                stageUpDueAtUtc = a.StageUpDueAtUtc.HasValue ? Format(a.StageUpDueAtUtc.Value) : string.Empty,
+                hunger = a.Hunger,
+                hydration = a.Hydration,
+                cleanliness = a.Cleanliness,
+                health = a.Health,
+                selectedDecorId = a.SelectedDecorId,
+                unlockedDecorIds = a.UnlockedDecorIds,
+                lastSavedAtUtc = Format(a.LastSavedAtUtc),
+                lastShedAtUtc = Format(a.LastShedAtUtc),
+                nextShedAtUtc = Format(a.NextShedAtUtc),
+                genomeVersion = CurrentGenomeVersion,
+                genes = genes,
+                hypo = a.Genotype.Hypo,
+                tangerine = a.Genotype.Tangerine,
+                hets = hets,
+                hetsUnknown = a.Known.HetsUnknown,
+                personality = a.Personality.ToString(),
+                personalityKnown = a.PersonalityKnown,
+                sexRevealed = a.SexRevealed,
+                personalityRevealAtUtc = a.PersonalityRevealAtUtc.HasValue ? Format(a.PersonalityRevealAtUtc.Value) : string.Empty,
+            };
         }
 
         private static string Format(DateTimeOffset value) => value.ToString(TimestampFormat, CultureInfo.InvariantCulture);
