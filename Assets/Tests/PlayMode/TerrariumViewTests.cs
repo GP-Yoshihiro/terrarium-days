@@ -342,7 +342,9 @@ namespace TerrariumDays.Tests
 
             view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
 
-            Assert.That(feedbackLabel.text, Is.EqualTo("データを新しい形式に移しました（ケージ1）"));
+            // Migration also moves the legacy unlockedDecorIds into the shared inventory, whose
+            // feedback message is shown after (and overrides) the migration message (task 5 spec).
+            Assert.That(feedbackLabel.text, Is.EqualTo(TerrariumView.DecorMovedMessage));
         }
 
         [Test]
