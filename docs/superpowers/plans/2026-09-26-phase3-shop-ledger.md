@@ -40,7 +40,10 @@
 | ショップの種は新規ゲーム・旧形式の移行で `random.Next()`。スターター遺伝子の後に引く。既存のスキーマ3のセーブは種0 | 既存のテストの乱数の並びを変えない |
 | 性格の判明は「購入時刻（ゲームの時計）＋ゲーム内7日」を `PetState.PersonalityRevealAtUtc` に持ち、時間の適用で判明させる。判明時に「○○の性格は「おっとり」のようです」と出す | 利用者の決定（7日）。デバッグの早送りの後に保存で時計が戻る既知の問題（段階4の前に直す）があり、早送り中は判明が遅れることがある |
 | 生体を買うには空きケージが要る。最初の空きケージ（番号順）に入れる。名前は購入時に「レオパN」 | 1ケージ1匹（§1）。入れ先を選ぶ画面は段階3では作らない |
-| 最後の1匹は卸売りできない | ケージの詳細画面と多くの処理が「選択中の個体がいる」前提。個体0匹の状態は段階3の範囲外 |
+| 最後の1匹も卸売りできる（個体0匹を許す）。0匹のときは、ホームと一覧はすべて空きケージ、ケージの詳細には入れない（◀▶ は何もしない）、一括の世話は「個体がいません。ショップで迎えましょう」、台帳の個体欄も同じ文、選択中の個体はなし（`state == null`）。0匹のセーブも読み書きできる。ショップで買えば元に戻る | 利用者の決定（HQ 経由、2026-09-26）。行き詰まりはない（卸売りの代金と所持金で買い直せる） |
+| 孵卵器と産卵床は段階3で売り、ショップの行に「段階N で使えます」と書く | 利用者の承認（HQ 経由、2026-09-26） |
+| 新規ゲームはケージ1に岩を1つ置いた状態で始める | 利用者の承認（HQ 経由、2026-09-26） |
+| スキーマ番号のない JSON の扱い（下の行の規則） | 利用者の承認（HQ 経由、2026-09-26） |
 | 装飾は1つのケージに同じ物を1つまで。置く場所は枠の番号で決める（床：枠0＝左奥 X0.15・奥行0.45、枠1＝右手前 X0.85・0.6、枠2＝中央奥 X0.5・0.38）。吊り下げ（保温ランプ）は自分の X を使う。隠れ家は枠の順で最初の床の装飾。装飾がなければ隠れ家なし | 今の装飾ごとの位置（岩・植物・流木が左に重なる）のままだと3つ置いたとき重なる。枠の位置は画面キャプチャで確かめて調整してよい |
 | 装飾の値段：岩1,000・水入れ1,000・観葉植物1,500・流木2,000・保温ランプ3,000。産卵床1,500（§9）。孵卵器は §8 の標準15,000・高級40,000。ラックは最大4台（16ケージ） | 仕様は「各1,000〜3,000」とだけ定める。見た目の大きさ・効果の順。ラックの上限はホーム画面の縦の長さのため |
 | 旧データの装飾の移行：各個体の解放済みの装飾を1つずつ所持品に入れ（個体の数だけ足す）、置いていた装飾は外す（ケージは空）。`inventoryVersion` で一度だけ行い、移したときは「装飾を所持品に移しました。ケージの「そうしょく」から置けます」と出す | 利用者の決定。1匹ごとの水槽にあった物をどのケージにも置き直せるよう、個体ごとに数える |
@@ -1622,7 +1625,7 @@ git commit -m "Generate a seeded monthly shop stock of mostly baby animals with 
 
 **Interfaces:**
 - Consumes: Task 1〜3 のすべて
-- Produces: `ShopItemKind`・`ShopItem`（`Id`・`Label`・`Price`・`Kind`・`CageSize`・`Incubator`・`UsableFromPhase`）、`ShopCatalog.NestBoxId/Items(EconomyTuning)/Find(string, EconomyTuning)`、`ShopResult`（`Ok, NotFound, NotEnoughMoney, NoEmptyCage, NoRackSpace, RackLimit, LastAnimal`）、`ShopService(EconomyTuning, CareTuning)`・`PriceOf(ShopOffer)`・`MarketOf(PetState)`・`WholesalePriceOf(PetState)`・`BuyAnimal(Colony, int offerId, DateTimeOffset)`・`BuyItem(Colony, string itemId, DateTimeOffset)`・`Wholesale(Colony, int animalId, DateTimeOffset)`、`PetState.PersonalityRevealAtUtc`、`CareTuning.PersonalityRevealGameDays`、`PersonalityReveal.ApplyIfDue(PetState, DateTimeOffset) → bool`・`PersonalityReveal.Message(PetState)`
+- Produces: `ShopItemKind`・`ShopItem`（`Id`・`Label`・`Price`・`Kind`・`CageSize`・`Incubator`・`UsableFromPhase`）、`ShopCatalog.NestBoxId/Items(EconomyTuning)/Find(string, EconomyTuning)`、`ShopResult`（`Ok, NotFound, NotEnoughMoney, NoEmptyCage, NoRackSpace, RackLimit`）、`ShopService(EconomyTuning, CareTuning)`・`PriceOf(ShopOffer)`・`MarketOf(PetState)`・`WholesalePriceOf(PetState)`・`BuyAnimal(Colony, int offerId, DateTimeOffset)`・`BuyItem(Colony, string itemId, DateTimeOffset)`・`Wholesale(Colony, int animalId, DateTimeOffset)`、`PetState.PersonalityRevealAtUtc`、`CareTuning.PersonalityRevealGameDays`、`PersonalityReveal.ApplyIfDue(PetState, DateTimeOffset) → bool`・`PersonalityReveal.Message(PetState)`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1815,13 +1818,28 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void Wholesale_TheLastAnimalIsRefused()
+        public void Wholesale_TheLastAnimalCanBeSoldLeavingAnEmptyRoom()
         {
             var colony = ColonyWithOffer(out _);
+            var cage = colony.Cages[0];
 
-            Assert.That(shop.Wholesale(colony, colony.Animals[0].Id, Now), Is.EqualTo(ShopResult.LastAnimal));
-            Assert.That(colony.Animals, Has.Count.EqualTo(1));
+            Assert.That(shop.Wholesale(colony, colony.Animals[0].Id, Now), Is.EqualTo(ShopResult.Ok));
+
+            Assert.That(colony.Animals, Is.Empty);
+            Assert.That(cage.IsEmpty, Is.True);
+            Assert.That(colony.OccupiedCages(), Is.Empty);
             Assert.That(shop.Wholesale(colony, 99, Now), Is.EqualTo(ShopResult.NotFound));
+        }
+
+        [Test]
+        public void AfterSellingEverything_AnAnimalCanBeBoughtBack()
+        {
+            var colony = ColonyWithOffer(out var offer);
+            shop.Wholesale(colony, colony.Animals[0].Id, Now);
+            colony.Wallet.Money = 1_000_000;
+
+            Assert.That(shop.BuyAnimal(colony, offer.OfferId, Now), Is.EqualTo(ShopResult.Ok));
+            Assert.That(colony.AnimalIn(colony.Cages[0]), Is.SameAs(offer.Animal));
         }
 
         [Test]
@@ -2027,8 +2045,7 @@ namespace TerrariumDays.Core
         NotEnoughMoney,
         NoEmptyCage,
         NoRackSpace,
-        RackLimit,
-        LastAnimal
+        RackLimit
     }
 
     /// <summary>
@@ -2127,18 +2144,13 @@ namespace TerrariumDays.Core
             return ShopResult.Ok;
         }
 
-        /// <summary>Sells one of the player's animals to the shop at 40% of the market. The last animal cannot be sold.</summary>
+        /// <summary>Sells one of the player's animals to the shop at 40% of the market. Selling the last one is allowed (§ planner: 0 animals).</summary>
         public ShopResult Wholesale(Colony colony, int animalId, DateTimeOffset nowUtc)
         {
             var pet = colony.AnimalById(animalId);
             if (pet == null)
             {
                 return ShopResult.NotFound;
-            }
-
-            if (colony.Animals.Count <= 1)
-            {
-                return ShopResult.LastAnimal;
             }
 
             var pay = WholesalePriceOf(pet);
@@ -2299,6 +2311,22 @@ git commit -m "Add shop purchases, wholesale and delayed personality reveal, all
             Assert.That(loaded.Cages[1].DecorIds, Is.EqualTo(new[] { "driftwood_01" }));
             Assert.That(loaded.Incubators, Is.EqualTo(new[] { IncubatorModel.Simple, IncubatorModel.Luxury }));
             Assert.That(loaded.Animals[0].PersonalityRevealAtUtc, Is.EqualTo(Now.AddHours(3)));
+        }
+
+        [Test]
+        public void AColonyWithNoAnimals_SavesAndLoads()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            colony.RemoveAnimal(colony.Animals[0]);
+
+            service.Save(path, colony);
+            var loaded = service.LoadOrCreate(path, Now, new Random(2));
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(loaded.Animals, Is.Empty);
+            Assert.That(loaded.Cages, Has.Count.EqualTo(1));
+            Assert.That(loaded.Cages[0].IsEmpty, Is.True);
+            Assert.That(loaded.NextAnimalId, Is.EqualTo(2));
         }
 
         [Test]
@@ -2873,7 +2901,6 @@ namespace TerrariumDays.Tests
             Assert.That(ShopText.FailureMessage(ShopResult.NoEmptyCage), Is.EqualTo("空きケージがありません（先にケージを買ってください）"));
             Assert.That(ShopText.FailureMessage(ShopResult.NoRackSpace), Is.EqualTo("ラックに空きがありません（先にラックを買ってください）"));
             Assert.That(ShopText.FailureMessage(ShopResult.RackLimit), Is.EqualTo("ラックはこれ以上置けません"));
-            Assert.That(ShopText.FailureMessage(ShopResult.LastAnimal), Is.EqualTo("最後の1匹は卸せません"));
             Assert.That(ShopText.FailureMessage(ShopResult.NotFound), Is.EqualTo("もう売り切れました"));
             Assert.That(ShopText.FailureMessage(ShopResult.Ok), Is.EqualTo(string.Empty));
         }
@@ -2910,7 +2937,7 @@ PlayMode（`TerrariumViewTests.cs`）：
 - 空きケージがないとき「買う」→「はい」で `shop-message-label` が `FailureMessage(NoEmptyCage)` で何も変わらない。
 - 「いいえ」では何も変わらない。
 - 用品の区分で「標準ケージ」を買うとケージが増え、ホーム（タブバーからホーム）で空きケージの枠が増えている。
-- 卸売りの区分：個体が2匹のとき、選択中でない方を卸すと1匹になり、所持金が卸値だけ増える。選択中の個体を卸したときは、別の個体のケージが選ばれる（ケージの詳細が消えた個体を表示しない）。1匹のときボタンは押せない（`SetEnabled(false)`）。
+- 卸売りの区分：個体が2匹のとき、選択中でない方を卸すと1匹になり、所持金が卸値だけ増える。選択中の個体を卸したときは、別の個体のケージが選ばれる（ケージの詳細が消えた個体を表示しない）。1匹のときも卸せ、確認の文に `ShopText.LastAnimalWarning` が付く。
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -2960,8 +2987,6 @@ namespace TerrariumDays.UI
                     return "ラックに空きがありません（先にラックを買ってください）";
                 case ShopResult.RackLimit:
                     return "ラックはこれ以上置けません";
-                case ShopResult.LastAnimal:
-                    return "最後の1匹は卸せません";
                 case ShopResult.NotFound:
                     return "もう売り切れました";
                 default:
@@ -2972,6 +2997,9 @@ namespace TerrariumDays.UI
         public static string ConfirmBuy(string what, long yen) => $"{what}を{Yen(yen)}で買いますか？";
 
         public static string ConfirmWholesale(PetState pet, long yen) => $"{pet.Name}を{Yen(yen)}で卸しますか？\n（相場の40%。取り消せません）";
+
+        /// <summary>Shown when the last animal is being sold, appended to the confirmation.</summary>
+        public const string LastAnimalWarning = "\nこれで個体がいなくなります（ショップで迎え直せます）";
 
         public static string BoughtAnimalMessage(PetState pet, Cage cage) => $"{pet.Name}を迎えました（ケージ{cage.Id}）";
 
@@ -2996,14 +3024,20 @@ namespace TerrariumDays.UI
 2. `ShopView` の行：
    - 生体：サムネイル（`MorphSprites.Thumbnail`）・語（`ProfileTokens` のうち性格の語を除いたもの。性格は `OfferDetail` に含まれる）・`OfferDetail`・価格・「買う」ボタン → `OfferBuyRequested(offerId)`。在庫が0のときは「今月の入荷は売り切れました」。
    - 用品：`ItemLabel`・価格・「買う」→ `ItemBuyRequested(id)`。所持数があるもの（装飾・産卵床）は「所持N」も出す。
-   - 卸売り：自分の個体ごとに、サムネイル・名前・語・`WholesaleLine(market, pay)`・「卸す」→ `WholesaleRequested(animalId)`。個体が1匹ならボタンは `SetEnabled(false)`。
+   - 卸売り：自分の個体ごとに、サムネイル・名前・語・`WholesaleLine(market, pay)`・「卸す」→ `WholesaleRequested(animalId)`（1匹だけのときも押せる。確認の文に `LastAnimalWarning` を付ける）。個体が0匹なら「個体がいません。ショップで迎えましょう」の1行。
 3. `TerrariumView`：`ShopService` を `LoadColony` で作る。3つのイベントを受けて `ConfirmDialog.Show(ShopText.ConfirmBuy(...) or ConfirmWholesale(...), onYes)`。「はい」で `shopService.BuyAnimal/BuyItem/Wholesale(session.Colony, ..., GameNowUtc())`、結果の文字を `shop-message-label` に、成功なら `SaveCurrentState()`・`ColonyChanged?.Invoke()`・`shopView.Invalidate()`。卸した個体が選択中だったら、最初の埋まったケージを `SelectCage`。`RefreshShell` でショップのタブが開いているときだけ `shopView.Render(...)`。`report.Restocked` のときも `shopView.Invalidate()`。
 4. `ShellNavigator`：`shop-panel`（と Task 9 の `ledger-panel`）を持ち、`ShowTab` で `SetDisplay(shop, tab == ShellTab.Shop)`。`placeholder-panel` は、そのタブのパネルがないときだけ表示（`var hasPanel = tab == ShellTab.Cages || (tab == ShellTab.Shop && shop != null) || (tab == ShellTab.Ledger && ledger != null);`）。`PlaceholderTextFor(Shop)` は削除してよい（テストも合わせる）。
 5. 購読は名前付きのメソッドにし、`OnDestroy` で外す（Task 7 の形）。
+6. **個体0匹への対応**（最後の1匹を卸せるため。利用者の決定）：
+   - `CageStatusText` に `public const string NoAnimalsMessage = "個体がいません。ショップで迎えましょう";` を加える。
+   - `TerrariumView` に `ClearSelection()`：`state = null`、`currentCage = null`、`petActor` を捨てて `petElement` と装飾の3枠を `display: none`、ケージの詳細を開いていたら `navigator.ShowCageList()`。卸売りで個体がいなくなったとき、`LoadColony` で埋まったケージがないとき（今は `session.Colony.Cages[0]` を選ぼうとして失敗する）に呼ぶ。個体を買ったとき・デバッグで個体を加えたときは、選択がなければその個体のケージを `SelectCage` する（詳細画面には移らない）。
+   - `state` を使うすべての処理（`Update` の毎フレームの処理、`HandleReport`、`Render`、世話のボタン、ペットのタップ、デバッグの各ボタンとスライダー、`RefreshShell` の見出し、`PlaceDecor`・装飾の引き出し）が `state == null` / `currentCage == null` で何もしないことを確かめる（`grep -n "state\." Assets/Scripts/UI/TerrariumView.cs` で1つずつ見る）。◀▶（`ShowCageStep`）は今のまま何もしない。
+   - 一括の世話（餌・水・掃除）は、個体が0匹なら何もせず `ShowFeedback(CageStatusText.NoAnimalsMessage)`。ケージの一覧は、0匹のとき一覧の上に同じ文のラベル（`cage-list-empty-label`、固定の高さで `visibility` 切り替え）を出す。
+   - テスト（PlayMode、`TerrariumViewTests.cs`）：新しいゲームでショップの卸売りから唯一の個体を卸す →（a）`session.Colony.Animals` が0、`view.State` が null、ケージの詳細が開いていない、（b）ホームを描いても例外がなく全スロットが「空きケージ」で押せない、（c）`OnFeedAllClicked`・`OnWaterAllClicked`・`OnCleanAllClicked` で例外がなくフィードバックが `NoAnimalsMessage`、所持金が変わらない、（d）`ShowCageStep(1)` で例外がない、（e）数フレーム（`yield return null` を数回）と `SimulateGameTime` を進めても例外がない、（f）保存して同じセーブで `LoadColony` し直しても例外がなく `State` が null、（g）ショップで生体を買うとそのケージが選ばれ、ケージの一覧から詳細を開ける。EditMode（`ShellTests`）：個体0匹の `Colony` で `HomeView.Render` が全スロットを「空きケージ」にし、`CageListSignature` が例外を出さない。
 
 - [ ] **Step 4: Run the tests and captures**
 
-Run: EditMode・PlayMode 全体 PASS。`ScreenCaptureTests` に生体・用品・卸売りの区分と確認のダイアログの撮影を加え（`Logs/Screens/shop-animals.png` など）、行が画面幅に収まり、長いモルフ名が語の単位で折り返し、ボタンが押せる大きさであることを確かめる。
+Run: EditMode・PlayMode 全体 PASS。0匹の状態のホーム・ケージの一覧・台帳の画面も撮る（`Logs/Screens/empty-home.png` など）。`ScreenCaptureTests` に生体・用品・卸売りの区分と確認のダイアログの撮影を加え（`Logs/Screens/shop-animals.png` など）、行が画面幅に収まり、長いモルフ名が語の単位で折り返し、ボタンが押せる大きさであることを確かめる。
 
 - [ ] **Step 5: Commit**
 
@@ -3211,7 +3245,7 @@ namespace TerrariumDays.UI
 画面：
 1. UXML：`tab-content` の中に `ledger-panel`（クラス `panel`）。区分のボタン `ledger-section-animals`「個体」・`ledger-section-money`「お金」、`ledger-summary-label`（お金の区分だけ）、`ledger-list`（ScrollView）。
 2. `LedgerView`：
-   - 個体：ケージの順に、サムネイル・名前・語（`ProfileTokens`、折り返さないラベル）・`AnimalDetail`。行のタップ → `AnimalTapped(animalId)`。
+   - 個体：ケージの順に、サムネイル・名前・語（`ProfileTokens`、折り返さないラベル）・`AnimalDetail`。行のタップ → `AnimalTapped(animalId)`。個体が0匹なら `CageStatusText.NoAnimalsMessage` の1行（PlayMode テストで確かめる）。
    - お金：`MonthSummary(MonthTotals(..., calendar.MonthIndexAt(now)))` と、`Recent` の各行（左に `EntryLine`、右に `SignedYen`。収入は緑系、支出は茶系の色）。
    - 署名：個体の区分は `HomeView.CageListSignature` に年齢の月数を足したもの、お金の区分は台帳の件数と所持金。変わったときだけ作り直す。
 3. `TerrariumView`：`AnimalTapped` で、その個体のケージを `SelectCage` → `navigator.ShowCageDetail()`。`RefreshShell` で台帳のタブが開いているときだけ `ledgerView.Render(...)`。購読は `OnDestroy` で外す。
