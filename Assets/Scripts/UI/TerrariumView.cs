@@ -1818,7 +1818,7 @@ namespace TerrariumDays.UI
                 return;
             }
 
-            var item = ShopCatalog.Find(itemId, economyTuning);
+            var item = ShopCatalog.Find(itemId, shopService.Economy);
             if (item == null)
             {
                 return;
@@ -1829,7 +1829,7 @@ namespace TerrariumDays.UI
 
         private void ConfirmBuyItem(string itemId)
         {
-            var item = ShopCatalog.Find(itemId, economyTuning);
+            var item = ShopCatalog.Find(itemId, shopService.Economy);
             var result = shopService.BuyItem(session.Colony, itemId, GameNowUtc());
             if (result == ShopResult.Ok)
             {

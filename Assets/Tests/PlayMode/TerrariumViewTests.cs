@@ -925,8 +925,17 @@ namespace TerrariumDays.Tests
         private ShopView ShopViewOf() =>
             (ShopView)typeof(TerrariumView).GetField("shopView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
 
+        /// <summary>
+        /// The very ShopService the view itself uses (built in LoadColony), rather than a
+        /// same-looking instance built fresh in the test — using our own copy would hide the
+        /// exact "ShopView could drift from the real ShopService.Economy" bug this test class
+        /// exists to catch.
+        /// </summary>
+        private ShopService ShopServiceOf() =>
+            (ShopService)typeof(TerrariumView).GetField("shopService", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+
         private void RenderShop() =>
-            ShopViewOf().Render(view.Session.Colony, new ShopService(new EconomyTuning(), view.Tuning), view.Session.Calendar, ShopNow);
+            ShopViewOf().Render(view.Session.Colony, ShopServiceOf(), view.Session.Calendar, ShopNow);
 
         /// <summary>UI Toolkit queues Button clicks and only pumps them on a real update tick,
         /// which EditMode/coroutine-less code never gets; invoke the wired Clickable action
@@ -963,7 +972,7 @@ namespace TerrariumDays.Tests
         {
             var path = CreateTempSavePath();
             view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
-            var shopService = new ShopService(new EconomyTuning(), view.Tuning);
+            var shopService = ShopServiceOf();
 
             RenderShop();
 
@@ -988,7 +997,7 @@ namespace TerrariumDays.Tests
             var moneyBefore = view.Session.Colony.Wallet.Money;
             var animalsBefore = view.Session.Colony.Animals.Count;
             var offer = view.Session.Colony.Shop.Offers[0];
-            var shopService = new ShopService(new EconomyTuning(), view.Tuning);
+            var shopService = ShopServiceOf();
             var price = shopService.PriceOf(offer);
 
             view.OnShopOfferBuyRequested(offer.OfferId);
@@ -1072,7 +1081,7 @@ namespace TerrariumDays.Tests
             view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
             var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
             var moneyBefore = view.Session.Colony.Wallet.Money;
-            var shopService = new ShopService(new EconomyTuning(), view.Tuning);
+            var shopService = ShopServiceOf();
             var pay = shopService.WholesalePriceOf(second);
             var selectedBefore = view.State;
 

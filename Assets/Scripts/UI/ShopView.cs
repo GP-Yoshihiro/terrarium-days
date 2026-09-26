@@ -16,13 +16,12 @@ namespace TerrariumDays.UI
     /// <summary>
     /// The shop tab (§9): animals for sale this month, supplies, and wholesaling the player's
     /// own animals. Draws its rows in code (like HomeView) and skips rebuilding when nothing
-    /// shown has changed. Prices always come through <see cref="ShopService"/>; this view owns
-    /// no economy rules, only the catalog's own default prices for supplies (the colony never
-    /// customises <see cref="EconomyTuning"/>).
+    /// shown has changed. Prices always come through <see cref="ShopService"/>, including its
+    /// <see cref="ShopService.Economy"/> for the supply catalog, so there is no second
+    /// <see cref="EconomyTuning"/> instance that could drift from the one actually priced with.
     /// </summary>
     public sealed class ShopView
     {
-        private readonly EconomyTuning economy = new EconomyTuning();
         private readonly Button animalsButton;
         private readonly Button suppliesButton;
         private readonly Button wholesaleButton;
@@ -178,7 +177,7 @@ namespace TerrariumDays.UI
 
                     break;
                 case ShopSection.Supplies:
-                    foreach (var item in ShopCatalog.Items(economy))
+                    foreach (var item in ShopCatalog.Items(shopService.Economy))
                     {
                         sb.Append(';').Append(item.Id).Append(':').Append(colony.Inventory.Count(item.Id));
                     }
@@ -256,7 +255,7 @@ namespace TerrariumDays.UI
 
         private void RenderSupplies()
         {
-            foreach (var item in ShopCatalog.Items(economy))
+            foreach (var item in ShopCatalog.Items(shopService.Economy))
             {
                 list.Add(ItemRow(item));
             }
