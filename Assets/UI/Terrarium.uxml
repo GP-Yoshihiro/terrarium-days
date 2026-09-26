@@ -97,6 +97,14 @@
                     <ui:Label name="shop-message-label" text="" class="shop-message-label" />
                     <ui:ScrollView name="shop-list" class="shop-list" />
                 </ui:VisualElement>
+                <ui:VisualElement name="ledger-panel" class="panel">
+                    <ui:VisualElement class="shop-section-bar">
+                        <ui:Button name="ledger-section-animals" text="個体" class="shop-section-button" />
+                        <ui:Button name="ledger-section-money" text="お金" class="shop-section-button" />
+                    </ui:VisualElement>
+                    <ui:Label name="ledger-summary-label" text="" class="ledger-summary-label" />
+                    <ui:ScrollView name="ledger-list" class="ledger-list" />
+                </ui:VisualElement>
                 <ui:VisualElement name="placeholder-panel" class="panel">
                     <ui:Label name="placeholder-label" text="" class="placeholder-label" />
                 </ui:VisualElement>

@@ -67,5 +67,76 @@ namespace TerrariumDays.Tests
             Assert.That(ShopText.NextRestock(calendar, Epoch), Is.EqualTo("次の入荷 5月1日"));
             Assert.That(ShopText.NextRestock(calendar, Epoch + GameCalendar.RealTimeFor(45d)), Is.EqualTo("次の入荷 6月1日"));
         }
+
+        [Test]
+        public void CategoryLabels()
+        {
+            Assert.That(LedgerText.CategoryLabel(LedgerCategory.Food), Is.EqualTo("餌代"));
+            Assert.That(LedgerText.CategoryLabel(LedgerCategory.Electricity), Is.EqualTo("電気代"));
+            Assert.That(LedgerText.CategoryLabel(LedgerCategory.BoothFee), Is.EqualTo("出店料"));
+            Assert.That(LedgerText.CategoryLabel(LedgerCategory.Purchase), Is.EqualTo("用品"));
+            Assert.That(LedgerText.CategoryLabel(LedgerCategory.AnimalPurchase), Is.EqualTo("生体の購入"));
+            Assert.That(LedgerText.CategoryLabel(LedgerCategory.EventSale), Is.EqualTo("イベント売上"));
+            Assert.That(LedgerText.CategoryLabel(LedgerCategory.Wholesale), Is.EqualTo("卸売り"));
+            Assert.That(LedgerText.CategoryLabel(LedgerCategory.Other), Is.EqualTo("その他"));
+        }
+
+        [Test]
+        public void SignedYen_UsesAnAsciiMinus()
+        {
+            Assert.That(LedgerText.SignedYen(1600), Is.EqualTo("+¥1,600"));
+            Assert.That(LedgerText.SignedYen(-30), Is.EqualTo("-¥30"));
+            Assert.That(LedgerText.SignedYen(0), Is.EqualTo("+¥0"));
+        }
+
+        [Test]
+        public void EntryLine_ShowsTheGameDateCategoryAndNote()
+        {
+            var calendar = new GameCalendar(Epoch);
+            var entry = new LedgerEntry { AtUtc = Epoch + GameCalendar.RealTimeFor(2.5d), Category = LedgerCategory.Food, Amount = -30, Note = "レオパ1の餌" };
+
+            Assert.That(LedgerText.EntryLine(entry, calendar), Is.EqualTo("4月3日　餌代　レオパ1の餌"));
+        }
+
+        [Test]
+        public void MonthTotals_SplitIncomeAndExpenseForThatGameMonthOnly()
+        {
+            var calendar = new GameCalendar(Epoch);
+            var inApril = Epoch + GameCalendar.RealTimeFor(3d);
+            var inMay = Epoch + GameCalendar.RealTimeFor(33d);
+            var ledger = new[]
+            {
+                new LedgerEntry { AtUtc = inApril, Amount = -300 },
+                new LedgerEntry { AtUtc = inMay, Amount = -30 },
+                new LedgerEntry { AtUtc = inMay, Amount = 1600 },
+                new LedgerEntry { AtUtc = inMay, Amount = -4800 },
+            };
+
+            Assert.That(LedgerText.MonthTotals(ledger, calendar, 1), Is.EqualTo((1600L, 4830L)));
+            Assert.That(LedgerText.MonthSummary(1600, 4830), Is.EqualTo("今月　収入 ¥1,600　支出 ¥4,830　差引 -¥3,230"));
+        }
+
+        [Test]
+        public void Recent_IsNewestFirstAndCapped()
+        {
+            var ledger = new System.Collections.Generic.List<LedgerEntry>();
+            for (var i = 0; i < LedgerText.MaxEntriesShown + 5; i++)
+            {
+                ledger.Add(new LedgerEntry { Amount = i });
+            }
+
+            var recent = LedgerText.Recent(ledger);
+
+            Assert.That(recent.Count, Is.EqualTo(LedgerText.MaxEntriesShown));
+            Assert.That(recent[0].Amount, Is.EqualTo(LedgerText.MaxEntriesShown + 4));
+        }
+
+        [Test]
+        public void AnimalDetail_ShowsSexStageWeightAndAge()
+        {
+            var pet = new PetState { Sex = Sex.Male, SexRevealed = true, Stage = GrowthStage.Juvenile, WeightGrams = 22.04d, HatchedAtUtc = Epoch.AddDays(-5.5d) };
+
+            Assert.That(LedgerText.AnimalDetail(pet, Epoch), Is.EqualTo("♂オス・ヤング・22.0g・生後5か月"));
+        }
     }
 }

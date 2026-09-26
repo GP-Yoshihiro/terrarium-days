@@ -797,3 +797,113 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Ledger tab (§6.2): the animal list and money in/out. Reuses .shop-section-bar/-button for
+   its own section buttons (see Terrarium.uxml). */
+.ledger-summary-label {
+    height: 20px;
+    min-height: 20px;
+    flex-shrink: 0;
+    margin: 6px 16px 0;
+    font-size: 13px;
+    color: rgb(90, 62, 40);
+}
+
+.ledger-list {
+    flex-grow: 1;
+    padding: 0 12px;
+}
+
+/* Same column-card shape as .shop-row: thumbnail+name on a header line, then the
+   non-wrapping profile words, then the age/weight detail line. */
+.ledger-row {
+    flex-direction: column;
+    min-height: 72px;
+    margin: 0 0 8px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgba(90, 62, 40, 0.08);
+}
+
+.ledger-row-header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.ledger-row-thumb {
+    width: 64px;
+    height: 36px;
+    margin-right: 10px;
+    flex-shrink: 0;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.ledger-row-name-label {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    white-space: normal;
+}
+
+/* The morph/personality words must stay on one line each (no mid-word breaks), so unlike
+   the detail label below this one does not wrap. */
+.ledger-row-profile-label {
+    font-size: 12px;
+    color: rgb(120, 90, 60);
+    white-space: nowrap;
+    margin-bottom: 2px;
+}
+
+.ledger-row-detail-label {
+    font-size: 12px;
+    color: rgb(120, 90, 60);
+    white-space: normal;
+}
+
+/* One money-in/out line: the note wraps and gets the row's space, the amount stays put on
+   the right so every row's yen figures line up. */
+.ledger-money-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 40px;
+    margin: 0 0 6px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgba(90, 62, 40, 0.08);
+}
+
+.ledger-money-row .ledger-row-detail-label {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    margin-right: 10px;
+}
+
+.ledger-money-amount-label {
+    flex-shrink: 0;
+    font-size: 14px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-right;
+}
+
+.ledger-money-income {
+    color: rgb(76, 140, 74);
+}
+
+.ledger-money-expense {
+    color: rgb(140, 90, 60);
+}
+
+.ledger-empty-label {
+    margin: 24px 8px;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    -unity-text-align: middle-center;
+    white-space: normal;
+}

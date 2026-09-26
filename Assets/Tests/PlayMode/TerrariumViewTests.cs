@@ -58,6 +58,11 @@ namespace TerrariumDays.Tests
         private Label shopRestockLabel;
         private Label shopMessageLabel;
         private ScrollView shopList;
+        private VisualElement ledgerPanel;
+        private Button ledgerSectionAnimalsButton;
+        private Button ledgerSectionMoneyButton;
+        private Label ledgerSummaryLabel;
+        private ScrollView ledgerList;
         private VisualElement confirmModal;
         private Label confirmMessageLabel;
         private Button confirmYesButton;
@@ -169,6 +174,16 @@ namespace TerrariumDays.Tests
             shopPanel.Add(shopMessageLabel);
             shopPanel.Add(shopList);
 
+            ledgerPanel = new VisualElement { name = "ledger-panel" };
+            ledgerSectionAnimalsButton = new Button { name = "ledger-section-animals" };
+            ledgerSectionMoneyButton = new Button { name = "ledger-section-money" };
+            ledgerSummaryLabel = new Label { name = "ledger-summary-label" };
+            ledgerList = new ScrollView { name = "ledger-list" };
+            ledgerPanel.Add(ledgerSectionAnimalsButton);
+            ledgerPanel.Add(ledgerSectionMoneyButton);
+            ledgerPanel.Add(ledgerSummaryLabel);
+            ledgerPanel.Add(ledgerList);
+
             confirmModal = new VisualElement { name = "confirm-modal" };
             confirmMessageLabel = new Label { name = "confirm-message-label" };
             confirmYesButton = new Button { name = "confirm-yes-button" };
@@ -202,6 +217,7 @@ namespace TerrariumDays.Tests
             root.Add(decorButton);
             root.Add(decorDrawer);
             root.Add(shopPanel);
+            root.Add(ledgerPanel);
             root.Add(confirmModal);
             root.Add(cageListEmptyLabel);
             root.Add(topBar);
@@ -1194,6 +1210,131 @@ namespace TerrariumDays.Tests
             var row = cageListRoot.Query<Button>(className: "cage-row").ToList()[0];
             FindClickAction(row.clickable)();
             Assert.That(openedCageId, Is.EqualTo(boughtCage.Id));
+        }
+
+        // ---- Ledger tab (§6.2): every animal, and money in and out. ----
+
+        private static readonly DateTimeOffset LedgerNow = new DateTimeOffset(2026, 9, 26, 0, 0, 0, TimeSpan.Zero);
+
+        private LedgerView LedgerViewOf() =>
+            (LedgerView)typeof(TerrariumView).GetField("ledgerView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+
+        private void RenderLedger() =>
+            LedgerViewOf().Render(view.Session.Colony, view.Session.Calendar, LedgerNow);
+
+        [Test]
+        public void LedgerAnimalsSection_ListsOneRowPerAnimalWithItsNameAndDetail()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            view.Session.Colony.AddAnimal(new PetState
+            {
+                Name = "ふたり目",
+                Stage = GrowthStage.Juvenile,
+                WeightGrams = 22.04d,
+                SexRevealed = true,
+                Sex = Sex.Male,
+                HatchedAtUtc = LedgerNow.AddDays(-5.5d),
+            }, view.Session.Colony.AddCage(CageSize.Standard));
+
+            RenderLedger();
+
+            var occupied = view.Session.Colony.OccupiedCages();
+            var names = ledgerList.Query<Label>(className: "ledger-row-name-label").ToList();
+            var details = ledgerList.Query<Label>(className: "ledger-row-detail-label").ToList();
+            Assert.That(names.Count, Is.EqualTo(occupied.Count));
+            Assert.That(details.Count, Is.EqualTo(occupied.Count));
+            for (var i = 0; i < occupied.Count; i++)
+            {
+                var pet = view.Session.Colony.AnimalIn(occupied[i]);
+                Assert.That(names[i].text, Is.EqualTo(pet.Name));
+                Assert.That(details[i].text, Is.EqualTo(LedgerText.AnimalDetail(pet, LedgerNow)));
+            }
+
+            var secondPet = view.Session.Colony.Animals.Last();
+            Assert.That(details.Last().text, Is.EqualTo("♂オス・ヤング・22.0g・生後5か月"));
+        }
+
+        [Test]
+        public void LedgerAnimalsSection_WithNoAnimals_ShowsTheNoAnimalsMessage()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            view.Session.Colony.RemoveAnimal(view.Session.Colony.Animals[0]);
+
+            RenderLedger();
+
+            var empty = ledgerList.Query<Label>(className: "ledger-empty-label").ToList();
+            Assert.That(empty.Count, Is.EqualTo(1));
+            Assert.That(empty[0].text, Is.EqualTo(CageStatusText.NoAnimalsMessage));
+        }
+
+        [Test]
+        public void LedgerAnimalRow_Tapped_OpensThatAnimalsCageDetail()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
+
+            view.OnLedgerAnimalTapped(second.Id);
+
+            Assert.That(view.State, Is.SameAs(second));
+            Assert.That(view.CurrentCage, Is.SameAs(view.Session.Colony.CageOf(second)));
+        }
+
+        [Test]
+        public void LedgerMoneySection_AfterFeeding_TheNewestRowIsTheFoodCharge()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+
+            view.OnFeedClicked();
+            RenderLedger();
+            ClickNamed("ledger-section-money");
+            RenderLedger();
+
+            var lastEntry = view.Session.Colony.Wallet.Ledger.Last();
+            Assert.That(lastEntry.Category, Is.EqualTo(LedgerCategory.Food));
+            Assert.That(lastEntry.Amount, Is.EqualTo(-30));
+
+            var noteLabels = ledgerList.Query<Label>(className: "ledger-row-detail-label").ToList();
+            var amountLabels = ledgerList.Query<Label>(className: "ledger-money-amount-label").ToList();
+            Assert.That(noteLabels[0].text, Is.EqualTo(LedgerText.EntryLine(lastEntry, view.Session.Calendar)));
+            Assert.That(amountLabels[0].text, Is.EqualTo("-¥30"));
+
+            var calendar = view.Session.Calendar;
+            var totals = LedgerText.MonthTotals(view.Session.Colony.Wallet.Ledger, calendar, calendar.MonthIndexAt(LedgerNow));
+            Assert.That(ledgerSummaryLabel.text, Is.EqualTo(LedgerText.MonthSummary(totals.Income, totals.Expense)));
+        }
+
+        [Test]
+        public void LedgerMoneySection_AfterBuyingAnAnimal_ShowsTheAnimalPurchaseRow()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            view.Session.Colony.AddCage(CageSize.Standard);
+            view.Session.Colony.Wallet.Money = 1_000_000;
+            var offer = view.Session.Colony.Shop.Offers[0];
+
+            view.OnShopOfferBuyRequested(offer.OfferId);
+            ClickConfirmYes();
+
+            ClickNamed("ledger-section-money");
+            RenderLedger();
+
+            var lastEntry = view.Session.Colony.Wallet.Ledger.Last();
+            Assert.That(lastEntry.Category, Is.EqualTo(LedgerCategory.AnimalPurchase));
+            var noteLabels = ledgerList.Query<Label>(className: "ledger-row-detail-label").ToList();
+            Assert.That(noteLabels[0].text, Is.EqualTo(LedgerText.EntryLine(lastEntry, view.Session.Calendar)));
+        }
+
+        private void ClickNamed(string buttonName)
+        {
+            var button = ledgerPanel.Q<Button>(buttonName);
+            Assert.That(button, Is.Not.Null, buttonName);
+            var action = FindClickAction(button.clickable);
+            Assert.That(action, Is.Not.Null, $"{buttonName} has no click action wired up");
+            action();
         }
     }
 }

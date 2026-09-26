@@ -178,6 +178,47 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "shop-confirm-dialog");
         }
 
+        /// <summary>
+        /// Captures the ledger tab's two sections into Logs/Screens/ledger-*.png: the money
+        /// figures must line up on the right and a long ledger note must wrap rather than run
+        /// off the screen.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureLedgerScreens()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var colony = view.Session.Colony;
+            colony.Wallet.Money = 1_000_000;
+            var secondCage = colony.AddCage(CageSize.Standard);
+            colony.AddAnimal(new PetState
+            {
+                Name = "ふたり目",
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                SexRevealed = true,
+                Sex = Sex.Female,
+                Genotype = StarterGenetics.Showcase[StarterGenetics.Showcase.Count - 1].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, secondCage);
+
+            // A long note so wrapping (not overflow) can be checked.
+            colony.Wallet.Charge(1200, LedgerCategory.Purchase, "観葉植物と流木と小型ケージをまとめて購入しました", view.Session.GameNowUtc);
+
+            var navigator = NavigatorOf(view);
+            navigator.ShowTab(ShellTab.Ledger);
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "ledger-animals");
+
+            var document = view.GetComponent<UIDocument>();
+            ClickNamed(document, "ledger-section-money");
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "ledger-money");
+        }
+
         [TearDown]
         public void TearDown()
         {

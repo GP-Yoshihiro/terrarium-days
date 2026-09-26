@@ -13,7 +13,7 @@ namespace TerrariumDays.Tests
         private static VisualElement BuildShell()
         {
             var root = new VisualElement();
-            foreach (var name in new[] { "home-screen", "main-screen", "cage-list-panel", "cage-detail-panel", "shop-panel", "placeholder-panel" })
+            foreach (var name in new[] { "home-screen", "main-screen", "cage-list-panel", "cage-detail-panel", "shop-panel", "ledger-panel", "placeholder-panel" })
             {
                 root.Add(new VisualElement { name = name });
             }
@@ -70,6 +70,18 @@ namespace TerrariumDays.Tests
 
             Assert.That(Display(root, "placeholder-panel"), Is.EqualTo(DisplayStyle.Flex));
             Assert.That(root.Q<Label>("placeholder-label").text, Is.EqualTo("イベントは段階6で追加されます"));
+        }
+
+        [Test]
+        public void ShowTab_Ledger_ShowsTheLedgerPanelInsteadOfThePlaceholder()
+        {
+            var root = BuildShell();
+            var nav = new ShellNavigator(root);
+
+            nav.ShowTab(ShellTab.Ledger);
+
+            Assert.That(Display(root, "ledger-panel"), Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(Display(root, "placeholder-panel"), Is.EqualTo(DisplayStyle.None));
         }
 
         [Test]

@@ -131,6 +131,7 @@ namespace TerrariumDays.UI
         private HomeView homeView;
         private CageListView cageListView;
         private ShopView shopView;
+        private LedgerView ledgerView;
         private ConfirmDialog confirmDialog;
         private Label shopMessageLabel;
         private Label cageListEmptyLabel;
@@ -188,6 +189,11 @@ namespace TerrariumDays.UI
                 shopView.OfferBuyRequested += OnShopOfferBuyRequested;
                 shopView.ItemBuyRequested += OnShopItemBuyRequested;
                 shopView.WholesaleRequested += OnShopWholesaleRequested;
+            }
+
+            if (ledgerView != null)
+            {
+                ledgerView.AnimalTapped += OnLedgerAnimalTapped;
             }
 
             homeButton.clicked += OnHomeButtonClicked;
@@ -545,7 +551,23 @@ namespace TerrariumDays.UI
                 ShowShopMessage(string.Empty);
             }
 
+            if (tab == ShellTab.Ledger)
+            {
+                ledgerView?.Invalidate();
+            }
+
             RefreshShell();
+        }
+
+        /// <summary>Tapping an animal row on the ledger's Animals section opens its cage detail, same as tapping it from the cage list.</summary>
+        public void OnLedgerAnimalTapped(int animalId)
+        {
+            var pet = session?.Colony.AnimalById(animalId);
+            var cage = pet != null ? session.Colony.CageOf(pet) : null;
+            if (cage != null && SelectCage(cage.Id))
+            {
+                navigator?.ShowCageDetail();
+            }
         }
 
         public void OnFeedAllClicked() => OnBulkCare(() => colonyCare.FeedAll(session.Colony, GameNowUtc()).ToMessage());
@@ -686,6 +708,12 @@ namespace TerrariumDays.UI
                 shopView.ItemBuyRequested -= OnShopItemBuyRequested;
                 shopView.WholesaleRequested -= OnShopWholesaleRequested;
                 shopView.Dispose();
+            }
+
+            if (ledgerView != null)
+            {
+                ledgerView.AnimalTapped -= OnLedgerAnimalTapped;
+                ledgerView.Dispose();
             }
 
             confirmDialog?.Dispose();
@@ -951,6 +979,9 @@ namespace TerrariumDays.UI
             var shopPanel = root.Q<VisualElement>("shop-panel");
             shopView = shopPanel != null ? new ShopView(shopPanel) : null;
             shopMessageLabel = root.Q<Label>("shop-message-label");
+
+            var ledgerPanel = root.Q<VisualElement>("ledger-panel");
+            ledgerView = ledgerPanel != null ? new LedgerView(ledgerPanel) : null;
             cageListEmptyLabel = root.Q<Label>("cage-list-empty-label");
 
             var confirmModal = root.Q<VisualElement>("confirm-modal");
@@ -1091,6 +1122,11 @@ namespace TerrariumDays.UI
             if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Shop)
             {
                 shopView?.Render(session.Colony, shopService, session.Calendar, now);
+            }
+
+            if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Ledger)
+            {
+                ledgerView?.Render(session.Colony, session.Calendar, now);
             }
         }
 
