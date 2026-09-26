@@ -1212,6 +1212,59 @@ namespace TerrariumDays.Tests
             Assert.That(openedCageId, Is.EqualTo(boughtCage.Id));
         }
 
+        [Test]
+        public void ShopBuyAnimal_MonthRollsOverWhileConfirmationIsOpen_AbortsAndBuysNothing()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            view.Session.Colony.AddCage(CageSize.Standard);
+            view.Session.Colony.Wallet.Money = 1_000_000;
+            var animalsBefore = view.Session.Colony.Animals.Count;
+            var offerBefore = view.Session.Colony.Shop.Offers[0];
+
+            // Open the confirmation for this month's offer...
+            view.OnShopOfferBuyRequested(offerBefore.OfferId);
+            Assert.That(confirmModal.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+
+            // ...then time passes (LiveTickLoop / OnApplicationPause->Resume keep ticking while
+            // the dialog is open) past the next restock, which reuses the same OfferIds (1, 2, ...)
+            // for a different set of animals at different prices (ShopStockGenerator). This also
+            // bills a month of electricity, so compare money against the point right after the
+            // time jump (not before it) to isolate whatever the confirmation itself does.
+            view.Session.SimulateGameTime(TimeSpan.FromDays(GameCalendar.DaysPerMonth + 1));
+            Assert.That(view.Session.Colony.Shop.Offers, Has.None.SameAs(offerBefore), "the month must have restocked with brand new offer objects");
+            var moneyAfterRestock = view.Session.Colony.Wallet.Money;
+
+            // Confirming now must not buy whatever animal happens to occupy the old OfferId today.
+            ClickConfirmYes();
+
+            Assert.That(view.Session.Colony.Animals.Count, Is.EqualTo(animalsBefore));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyAfterRestock));
+            Assert.That(shopMessageLabel.text, Is.EqualTo(ShopText.OfferChangedMessage));
+        }
+
+        [Test]
+        public void ShopWholesale_AnimalSoldWhileConfirmationIsOpen_AbortsAndPaysNothing()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
+            var shopService = ShopServiceOf();
+            var moneyBefore = view.Session.Colony.Wallet.Money;
+
+            view.OnShopWholesaleRequested(second.Id);
+            Assert.That(confirmModal.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+
+            // The animal is sold through some other path while the dialog is still open.
+            shopService.Wholesale(view.Session.Colony, second.Id, ShopNow);
+            Assert.That(view.Session.Colony.Animals, Has.None.SameAs(second));
+
+            ClickConfirmYes();
+
+            Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyBefore + shopService.WholesalePriceOf(second)), "the second wholesale must be a no-op, not a double payout");
+            Assert.That(shopMessageLabel.text, Is.EqualTo(ShopText.OfferChangedMessage));
+        }
+
         // ---- Ledger tab (§6.2): every animal, and money in and out. ----
 
         private static readonly DateTimeOffset LedgerNow = new DateTimeOffset(2026, 9, 26, 0, 0, 0, TimeSpan.Zero);
@@ -1220,7 +1273,7 @@ namespace TerrariumDays.Tests
             (LedgerView)typeof(TerrariumView).GetField("ledgerView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
 
         private void RenderLedger() =>
-            LedgerViewOf().Render(view.Session.Colony, view.Session.Calendar, LedgerNow);
+            LedgerViewOf().Render(view.Session.Colony, view.Session.Calendar, LedgerNow, view.Tuning);
 
         [Test]
         public void LedgerAnimalsSection_ListsOneRowPerAnimalWithItsNameAndDetail()

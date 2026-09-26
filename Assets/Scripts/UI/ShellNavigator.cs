@@ -69,8 +69,6 @@ namespace TerrariumDays.UI
                     return "孵卵器は段階5で追加されます";
                 case ShellTab.Events:
                     return "イベントは段階6で追加されます";
-                case ShellTab.Ledger:
-                    return "台帳は段階3で追加されます";
                 default:
                     return string.Empty;
             }

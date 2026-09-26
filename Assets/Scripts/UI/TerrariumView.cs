@@ -51,7 +51,6 @@ namespace TerrariumDays.UI
 
         private Label growthStageLabel;
         private VisualElement profileChips;
-        private readonly List<Label> profileChipLabels = new List<Label>();
         private string lastProfileChipsSignature;
         private VisualElement growthGaugeFill;
 
@@ -890,7 +889,6 @@ namespace TerrariumDays.UI
         {
             growthStageLabel = root.Q<Label>("growth-stage-label");
             profileChips = root.Q<VisualElement>("profile-chips");
-            profileChipLabels.Clear();
             lastProfileChipsSignature = null;
             growthGaugeFill = root.Q<VisualElement>("growth-gauge-fill");
 
@@ -1126,7 +1124,7 @@ namespace TerrariumDays.UI
 
             if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Ledger)
             {
-                ledgerView?.Render(session.Colony, session.Calendar, now);
+                ledgerView?.Render(session.Colony, session.Calendar, now, tuning);
             }
         }
 
@@ -1818,12 +1816,21 @@ namespace TerrariumDays.UI
 
             var price = shopService.PriceOf(offer);
             var what = MorphNamer.VisualName(offer.Animal.Genotype);
-            confirmDialog?.Show(ShopText.ConfirmBuy(what, price), () => ConfirmBuyAnimal(offerId));
+            confirmDialog?.Show(ShopText.ConfirmBuy(what, price), () => ConfirmBuyAnimal(offer, price));
         }
 
-        private void ConfirmBuyAnimal(int offerId)
+        /// <summary>Confirms against the exact offer shown (not just its id) and its price: time keeps passing while the dialog is open (§7), and next month's stock reuses the same offer ids for different animals (see ShopStockGenerator).</summary>
+        private void ConfirmBuyAnimal(ShopOffer offer, long expectedPrice)
         {
-            var result = shopService.BuyAnimal(session.Colony, offerId, GameNowUtc());
+            if (!session.Colony.Shop.Offers.Contains(offer) || shopService.PriceOf(offer) != expectedPrice)
+            {
+                ShowShopMessage(ShopText.OfferChangedMessage);
+                shopView?.Invalidate();
+                RefreshShell();
+                return;
+            }
+
+            var result = shopService.BuyAnimal(session.Colony, offer.OfferId, GameNowUtc());
             if (result == ShopResult.Ok)
             {
                 var pet = session.Colony.Animals[session.Colony.Animals.Count - 1];
@@ -1897,27 +1904,30 @@ namespace TerrariumDays.UI
             }
 
             var pay = shopService.WholesalePriceOf(pet);
-            var message = ShopText.ConfirmWholesale(pet, pay);
+            var message = ShopText.ConfirmWholesale(pet, pay, shopService.Economy);
             if (session.Colony.Animals.Count == 1)
             {
                 message += ShopText.LastAnimalWarning;
             }
 
-            confirmDialog?.Show(message, () => ConfirmWholesale(animalId));
+            confirmDialog?.Show(message, () => ConfirmWholesale(pet, pay));
         }
 
-        private void ConfirmWholesale(int animalId)
+        /// <summary>Confirms against the exact animal shown and its payout: time keeps passing while the dialog is open (§7), so the animal could be sold or its market price could shift before "はい".</summary>
+        private void ConfirmWholesale(PetState pet, long expectedPay)
         {
-            var pet = session.Colony.AnimalById(animalId);
-            if (pet == null)
+            if (!session.Colony.Animals.Contains(pet) || shopService.WholesalePriceOf(pet) != expectedPay)
             {
+                ShowShopMessage(ShopText.OfferChangedMessage);
+                shopView?.Invalidate();
+                RefreshShell();
                 return;
             }
 
             var name = pet.Name;
-            var pay = shopService.WholesalePriceOf(pet);
+            var pay = expectedPay;
             var wasSelected = state == pet;
-            var result = shopService.Wholesale(session.Colony, animalId, GameNowUtc());
+            var result = shopService.Wholesale(session.Colony, pet.Id, GameNowUtc());
             if (result == ShopResult.Ok)
             {
                 ShowShopMessage(ShopText.WholesaleMessage(name, pay));
@@ -1983,13 +1993,11 @@ namespace TerrariumDays.UI
 
             lastProfileChipsSignature = signature;
             profileChips.Clear();
-            profileChipLabels.Clear();
             foreach (var token in tokens)
             {
                 var label = new Label(token) { pickingMode = PickingMode.Ignore };
                 label.AddToClassList("profile-chip");
                 profileChips.Add(label);
-                profileChipLabels.Add(label);
             }
         }
 

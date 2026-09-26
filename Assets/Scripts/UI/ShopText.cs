@@ -45,10 +45,16 @@ namespace TerrariumDays.UI
 
         public static string ConfirmBuy(string what, long yen) => $"{what}を{Yen(yen)}で買いますか？";
 
-        public static string ConfirmWholesale(PetState pet, long yen) => $"{pet.Name}を{Yen(yen)}で卸しますか？\n（相場の40%。取り消せません）";
+        public static string ConfirmWholesale(PetState pet, long yen, EconomyTuning economy) =>
+            $"{pet.Name}を{Yen(yen)}で卸しますか？\n（相場の{WholesaleRatePercent(economy)}%。取り消せません）";
+
+        private static string WholesaleRatePercent(EconomyTuning economy) => (economy.WholesaleRate * 100d).ToString("0.#");
 
         /// <summary>Shown when the last animal is being sold, appended to the confirmation.</summary>
         public const string LastAnimalWarning = "\nこれで個体がいなくなります（ショップで迎え直せます）";
+
+        /// <summary>Shown when a confirmation dialog's "はい" no longer matches the current offer/animal or its price (e.g. the shop restocked while the dialog was open).</summary>
+        public const string OfferChangedMessage = "内容が変わりました。もう一度お確かめください";
 
         public static string BoughtAnimalMessage(PetState pet, Cage cage) => $"{pet.Name}を迎えました（ケージ{cage.Id}）";
 

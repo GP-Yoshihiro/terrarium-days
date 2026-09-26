@@ -58,9 +58,11 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 ## 8. MVP screens
 1. **Terrarium** — pet, status bars, three care buttons, growth stage, selected decor.
 2. **Care feedback** — a small text/animation confirmation after an action.
-3. **Decor drawer** — select from decor owned but not yet placed, limited by that cage's decor slots (see §13).
+3. **Decor drawer** — lists every decor item, owned or not (an unowned item shows as "未所持（ショップで購入）"), limited by that cage's decor slots (see §13).
 4. **Milestone modal** — shown on each growth-stage change and at Adult completion.
 5. **Developer panel** — time multiplier, simulate elapsed time, edit status values, clear save.
+6. **Shop** — buy animals and supplies, wholesale animals, priced from the market (see §13).
+7. **Ledger** — every animal at a glance and every money movement (see §13).
 
 ## 9. MVP feature checklist
 - [ ] One 2D terrarium scene and one pet placeholder sprite

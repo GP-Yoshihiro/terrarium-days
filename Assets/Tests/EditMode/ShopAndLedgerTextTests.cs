@@ -51,12 +51,22 @@ namespace TerrariumDays.Tests
         public void ConfirmationsAndResults()
         {
             var pet = new PetState { Name = "レオパ2" };
+            var economy = new EconomyTuning();
 
             Assert.That(ShopText.ConfirmBuy("マックスノー", 12000), Is.EqualTo("マックスノーを¥12,000で買いますか？"));
-            Assert.That(ShopText.ConfirmWholesale(pet, 1600), Is.EqualTo("レオパ2を¥1,600で卸しますか？\n（相場の40%。取り消せません）"));
+            Assert.That(ShopText.ConfirmWholesale(pet, 1600, economy), Is.EqualTo("レオパ2を¥1,600で卸しますか？\n（相場の40%。取り消せません）"));
             Assert.That(ShopText.BoughtAnimalMessage(pet, new Cage { Id = 3 }), Is.EqualTo("レオパ2を迎えました（ケージ3）"));
             Assert.That(ShopText.WholesaleMessage("レオパ2", 1600), Is.EqualTo("レオパ2を¥1,600で卸しました"));
             Assert.That(ShopText.WholesaleLine(4000, 1600), Is.EqualTo("相場 ¥4,000 → 卸値 ¥1,600"));
+        }
+
+        [Test]
+        public void ConfirmWholesale_ReflectsTheEconomyTuningsWholesaleRate()
+        {
+            var pet = new PetState { Name = "レオパ2" };
+            var economy = new EconomyTuning { WholesaleRate = 0.5d };
+
+            Assert.That(ShopText.ConfirmWholesale(pet, 2000, economy), Is.EqualTo("レオパ2を¥2,000で卸しますか？\n（相場の50%。取り消せません）"));
         }
 
         [Test]

@@ -22,11 +22,11 @@ namespace TerrariumDays.UI
         private readonly Button moneyButton;
         private readonly Label summaryLabel;
         private readonly ScrollView list;
-        private readonly CareTuning tuning = new CareTuning();
 
         private Colony colony;
         private GameCalendar calendar;
         private DateTimeOffset nowUtc;
+        private CareTuning tuning;
         private string lastSignature;
 
         public LedgerView(VisualElement root)
@@ -59,11 +59,12 @@ namespace TerrariumDays.UI
             lastSignature = null;
         }
 
-        public void Render(Colony renderColony, GameCalendar renderCalendar, DateTimeOffset renderNowUtc)
+        public void Render(Colony renderColony, GameCalendar renderCalendar, DateTimeOffset renderNowUtc, CareTuning renderTuning)
         {
             colony = renderColony;
             calendar = renderCalendar;
             nowUtc = renderNowUtc;
+            tuning = renderTuning;
             RenderInternal();
         }
 
