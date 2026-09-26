@@ -31,6 +31,9 @@ namespace TerrariumDays.Core
         /// <summary>False for a bought animal until it has been kept a while (§5.2); own hatchlings know it.</summary>
         public bool PersonalityKnown { get; set; } = true;
 
+        /// <summary>For a bought animal: when its personality becomes known (game clock). Null otherwise.</summary>
+        public DateTimeOffset? PersonalityRevealAtUtc { get; set; }
+
         /// <summary>True genes; hidden from the player except what shows.</summary>
         public Genotype Genotype { get; set; } = Genotype.Normal();
 

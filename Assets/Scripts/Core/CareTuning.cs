@@ -45,5 +45,8 @@ namespace TerrariumDays.Core
 
         public double MaxOfflineProgressHours { get; set; } = 12d;
         public double OfflineProgressStepMinutes { get; set; } = 1d;
+
+        /// <summary>A bought animal's personality shows after it has been kept this many game days (§5.2, §9).</summary>
+        public double PersonalityRevealGameDays { get; set; } = 7d;
     }
 }
