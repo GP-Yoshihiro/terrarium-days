@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using TerrariumDays.Core;
 using TerrariumDays.Gameplay;
@@ -16,7 +17,7 @@ namespace TerrariumDays.Tests
         private TerrariumView view;
 
         private Label growthStageLabel;
-        private Label profileLabel;
+        private VisualElement profileChips;
         private VisualElement growthGaugeFill;
         private VisualElement hungerBarFill;
         private Label hungerValueLabel;
@@ -56,6 +57,8 @@ namespace TerrariumDays.Tests
             return path;
         }
 
+        private string ProfileChipsText() => string.Concat(profileChips.Query<Label>().ToList().Select(l => l.text));
+
         private string SaveColonyWith(PetState pet, DateTimeOffset nowUtc)
         {
             var path = CreateTempSavePath();
@@ -83,7 +86,7 @@ namespace TerrariumDays.Tests
             var root = new VisualElement();
 
             growthStageLabel = new Label { name = "growth-stage-label" };
-            profileLabel = new Label { name = "profile-label" };
+            profileChips = new VisualElement { name = "profile-chips" };
             growthGaugeFill = new VisualElement { name = "growth-gauge-fill" };
             hungerBarFill = new VisualElement { name = "hunger-bar-fill" };
             hungerValueLabel = new Label { name = "hunger-value-label" };
@@ -138,7 +141,7 @@ namespace TerrariumDays.Tests
             petElement = new VisualElement { name = "pet-image" };
 
             root.Add(growthStageLabel);
-            root.Add(profileLabel);
+            root.Add(profileChips);
             root.Add(growthGaugeFill);
             root.Add(hungerBarFill);
             root.Add(hungerValueLabel);
@@ -826,7 +829,7 @@ namespace TerrariumDays.Tests
 
             view.LoadColony(path, DateTimeOffset.UtcNow);
 
-            StringAssert.StartsWith("ノーマル（ヘテロ不明）・", profileLabel.text);
+            StringAssert.StartsWith("ノーマル（ヘテロ不明）", ProfileChipsText());
         }
 
         [Test]
@@ -845,7 +848,7 @@ namespace TerrariumDays.Tests
             var selected = view.SelectCage(secondCage.Id);
 
             Assert.That(selected, Is.True);
-            StringAssert.StartsWith("トレンパーアルビノ", profileLabel.text);
+            StringAssert.StartsWith("トレンパーアルビノ", ProfileChipsText());
             Assert.That(petElement.style.backgroundImage.value.texture, Is.Not.SameAs(firstFrame),
                 "a different morph must render with a different recoloured texture");
         }

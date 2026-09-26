@@ -13,7 +13,7 @@
         <ui:VisualElement name="home-screen" class="screen">
             <ui:Label text="飼育部屋" class="screen-title" />
             <ui:ScrollView name="rack-list" class="rack-list" />
-            <ui:Button name="home-incubator-button" text="孵卵器（段階5で使えるようになります）" class="home-incubator" />
+            <ui:Button name="home-incubator-button" text="孵卵器" class="home-incubator" />
         </ui:VisualElement>
         <ui:VisualElement name="main-screen" class="screen">
             <ui:VisualElement name="tab-content" class="tab-content">
@@ -33,7 +33,7 @@
                             <ui:Button name="next-cage-button" text="▶" class="cage-nav-button" />
                         </ui:VisualElement>
                         <ui:Label name="growth-stage-label" text="ベビー 3.0g" class="growth-stage-label" />
-                        <ui:Label name="profile-label" text="" class="profile-label" />
+                        <ui:VisualElement name="profile-chips" class="profile-chips" />
                         <ui:VisualElement name="growth-gauge-track" class="gauge-track">
                             <ui:VisualElement name="growth-gauge-fill" class="gauge-fill" />
                         </ui:VisualElement>
@@ -90,13 +90,13 @@
                     <ui:Label name="placeholder-label" text="" class="placeholder-label" />
                 </ui:VisualElement>
             </ui:VisualElement>
-            <ui:VisualElement name="tab-bar" class="tab-bar">
-                <ui:Button name="tab-cages" text="ケージ" class="tab-button" />
-                <ui:Button name="tab-incubator" text="孵卵器" class="tab-button" />
-                <ui:Button name="tab-shop" text="ショップ" class="tab-button" />
-                <ui:Button name="tab-events" text="イベント" class="tab-button" />
-                <ui:Button name="tab-ledger" text="台帳" class="tab-button" />
-            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="tab-bar" class="tab-bar">
+            <ui:Button name="tab-cages" text="ケージ" class="tab-button" />
+            <ui:Button name="tab-incubator" text="孵卵器" class="tab-button" />
+            <ui:Button name="tab-shop" text="ショップ" class="tab-button" />
+            <ui:Button name="tab-events" text="イベント" class="tab-button" />
+            <ui:Button name="tab-ledger" text="台帳" class="tab-button" />
         </ui:VisualElement>
         <ui:VisualElement name="milestone-modal" class="milestone-modal-overlay">
             <ui:VisualElement class="milestone-modal-card">

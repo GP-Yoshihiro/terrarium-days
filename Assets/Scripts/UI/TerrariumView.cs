@@ -49,7 +49,9 @@ namespace TerrariumDays.UI
         public event Action ColonyChanged;
 
         private Label growthStageLabel;
-        private Label profileLabel;
+        private VisualElement profileChips;
+        private readonly List<Label> profileChipLabels = new List<Label>();
+        private string lastProfileChipsSignature;
         private VisualElement growthGaugeFill;
 
         private VisualElement hungerBarFill;
@@ -130,6 +132,13 @@ namespace TerrariumDays.UI
         private Label moneyLabel;
         private Label gameDateLabel;
         private Label cageTitleLabel;
+        private Button homeButton;
+        private Button prevCageButton;
+        private Button nextCageButton;
+        private Button feedAllButton;
+        private Button waterAllButton;
+        private Button cleanAllButton;
+        private Button homeIncubatorButton;
         private const float SwipeThresholdPixels = 60f;
         private Vector2? swipeStartPosition;
         private bool suppressNextPetTap;
@@ -159,29 +168,29 @@ namespace TerrariumDays.UI
             moneyLabel = root.Q<Label>("money-label");
             gameDateLabel = root.Q<Label>("game-date-label");
             cageTitleLabel = root.Q<Label>("cage-title-label");
-            homeView.CageSelected += id => { if (SelectCage(id)) navigator.ShowCageDetail(); };
-            cageListView.CageSelected += id => { if (SelectCage(id)) navigator.ShowCageDetail(); };
-            root.Q<Button>("home-button").clicked += () =>
-            {
-                homeView.Invalidate();
-                navigator.ShowHome();
-                RefreshShell();
-            };
-            root.Q<Button>("prev-cage-button").clicked += () => ShowCageStep(-1);
-            root.Q<Button>("next-cage-button").clicked += () => ShowCageStep(1);
-            root.Q<Button>("feed-all-button").clicked += OnFeedAllClicked;
-            root.Q<Button>("water-all-button").clicked += OnWaterAllClicked;
-            root.Q<Button>("clean-all-button").clicked += OnCleanAllClicked;
-            ColonyChanged += RefreshShell;
-            navigator.TabChanged += tab =>
-            {
-                if (tab == ShellTab.Cages && !navigator.ShowingCageDetail)
-                {
-                    cageListView.Invalidate();
-                }
+            homeButton = root.Q<Button>("home-button");
+            prevCageButton = root.Q<Button>("prev-cage-button");
+            nextCageButton = root.Q<Button>("next-cage-button");
+            feedAllButton = root.Q<Button>("feed-all-button");
+            waterAllButton = root.Q<Button>("water-all-button");
+            cleanAllButton = root.Q<Button>("clean-all-button");
+            homeIncubatorButton = root.Q<Button>("home-incubator-button");
 
-                RefreshShell();
-            };
+            homeView.CageSelected += OnCageTapped;
+            cageListView.CageSelected += OnCageTapped;
+            homeButton.clicked += OnHomeButtonClicked;
+            prevCageButton.clicked += OnPrevCageButtonClicked;
+            nextCageButton.clicked += OnNextCageButtonClicked;
+            feedAllButton.clicked += OnFeedAllClicked;
+            waterAllButton.clicked += OnWaterAllClicked;
+            cleanAllButton.clicked += OnCleanAllClicked;
+            if (homeIncubatorButton != null)
+            {
+                homeIncubatorButton.clicked += OnHomeIncubatorButtonClicked;
+            }
+
+            ColonyChanged += RefreshShell;
+            navigator.TabChanged += OnTabChanged;
 
             terrariumViewElement?.RegisterCallback<PointerDownEvent>(OnTerrariumPointerDown);
             terrariumViewElement?.RegisterCallback<PointerUpEvent>(OnTerrariumPointerUp);
@@ -440,6 +449,37 @@ namespace TerrariumDays.UI
             }
         }
 
+        private void OnHomeButtonClicked()
+        {
+            homeView.Invalidate();
+            navigator.ShowHome();
+            RefreshShell();
+        }
+
+        private void OnPrevCageButtonClicked() => ShowCageStep(-1);
+
+        private void OnNextCageButtonClicked() => ShowCageStep(1);
+
+        private void OnHomeIncubatorButtonClicked() => navigator.ShowTab(ShellTab.Incubator);
+
+        private void OnCageTapped(int cageId)
+        {
+            if (SelectCage(cageId))
+            {
+                navigator.ShowCageDetail();
+            }
+        }
+
+        private void OnTabChanged(ShellTab tab)
+        {
+            if (tab == ShellTab.Cages && !navigator.ShowingCageDetail)
+            {
+                cageListView.Invalidate();
+            }
+
+            RefreshShell();
+        }
+
         public void OnFeedAllClicked() => OnBulkCare(() => colonyCare.FeedAll(session.Colony, GameNowUtc()).ToMessage());
 
         public void OnWaterAllClicked() => OnBulkCare(() => $"{colonyCare.RefreshWaterAll(session.Colony)}匹の水を替えました");
@@ -549,6 +589,57 @@ namespace TerrariumDays.UI
             terrariumViewElement?.UnregisterCallback<GeometryChangedEvent>(OnTerrariumGeometryChanged);
             terrariumViewElement?.UnregisterCallback<PointerDownEvent>(OnTerrariumPointerDown);
             terrariumViewElement?.UnregisterCallback<PointerUpEvent>(OnTerrariumPointerUp);
+
+            ColonyChanged -= RefreshShell;
+            if (navigator != null)
+            {
+                navigator.TabChanged -= OnTabChanged;
+            }
+
+            if (homeView != null)
+            {
+                homeView.CageSelected -= OnCageTapped;
+            }
+
+            if (cageListView != null)
+            {
+                cageListView.CageSelected -= OnCageTapped;
+            }
+
+            if (homeButton != null)
+            {
+                homeButton.clicked -= OnHomeButtonClicked;
+            }
+
+            if (prevCageButton != null)
+            {
+                prevCageButton.clicked -= OnPrevCageButtonClicked;
+            }
+
+            if (nextCageButton != null)
+            {
+                nextCageButton.clicked -= OnNextCageButtonClicked;
+            }
+
+            if (feedAllButton != null)
+            {
+                feedAllButton.clicked -= OnFeedAllClicked;
+            }
+
+            if (waterAllButton != null)
+            {
+                waterAllButton.clicked -= OnWaterAllClicked;
+            }
+
+            if (cleanAllButton != null)
+            {
+                cleanAllButton.clicked -= OnCleanAllClicked;
+            }
+
+            if (homeIncubatorButton != null)
+            {
+                homeIncubatorButton.clicked -= OnHomeIncubatorButtonClicked;
+            }
 
             if (feedButton != null)
             {
@@ -686,7 +777,9 @@ namespace TerrariumDays.UI
         public void BindElements(VisualElement root)
         {
             growthStageLabel = root.Q<Label>("growth-stage-label");
-            profileLabel = root.Q<Label>("profile-label");
+            profileChips = root.Q<VisualElement>("profile-chips");
+            profileChipLabels.Clear();
+            lastProfileChipsSignature = null;
             growthGaugeFill = root.Q<VisualElement>("growth-gauge-fill");
 
             hungerBarFill = root.Q<VisualElement>("hunger-bar-fill");
@@ -1544,10 +1637,7 @@ namespace TerrariumDays.UI
         public void Render(PetState petState, CareTuning careTuning)
         {
             growthStageLabel.text = $"{GrowthModel.StageLabel(petState.Stage)} {petState.WeightGrams:0.0}g";
-            if (profileLabel != null)
-            {
-                profileLabel.text = CageStatusText.ProfileFor(petState);
-            }
+            RenderProfileChips(petState);
 
             growthGaugeFill.style.width = new Length((float)(GrowthModel.ProgressToNextStage(petState, GameNowUtc(), careTuning) * 100d), LengthUnit.Percent);
 
@@ -1559,6 +1649,36 @@ namespace TerrariumDays.UI
             RenderDecorImages();
             petActor?.SetCondition(PetMoodEvaluator.Evaluate(petState, careTuning, petBehaviourTuning), petState.GrowthStage);
             petActor?.SetAppetite(AppetiteModel.Evaluate(petState, GameNowUtc(), careTuning));
+        }
+
+        /// <summary>
+        /// Rebuilds the profile word chips only when the words actually changed, so a
+        /// once-a-second Render does not tear down and recreate these Labels every tick.
+        /// </summary>
+        private void RenderProfileChips(PetState petState)
+        {
+            if (profileChips == null)
+            {
+                return;
+            }
+
+            var tokens = CageStatusText.ProfileTokens(petState);
+            var signature = string.Join("\u0001", tokens);
+            if (signature == lastProfileChipsSignature)
+            {
+                return;
+            }
+
+            lastProfileChipsSignature = signature;
+            profileChips.Clear();
+            profileChipLabels.Clear();
+            foreach (var token in tokens)
+            {
+                var label = new Label(token) { pickingMode = PickingMode.Ignore };
+                label.AddToClassList("profile-chip");
+                profileChips.Add(label);
+                profileChipLabels.Add(label);
+            }
         }
 
         private static void RenderStatusRow(VisualElement barFill, Label valueLabel, double value, CareTuning tuningForThresholds)

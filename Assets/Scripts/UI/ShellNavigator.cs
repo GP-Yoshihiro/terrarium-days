@@ -79,6 +79,10 @@ namespace TerrariumDays.UI
             Screen = ShellScreen.Home;
             SetDisplay(home, true);
             SetDisplay(main, false);
+            foreach (var pair in tabButtons)
+            {
+                pair.Value.RemoveFromClassList("tab-selected");
+            }
         }
 
         public void ShowCageDetail()

@@ -56,6 +56,16 @@ namespace TerrariumDays.UI
             return $"{MorphNamer.FullName(pet.Genotype, pet.Known)}・{personality}";
         }
 
+        /// <summary>The profile as words that must not be broken across lines (§4.2 name words, then the personality).</summary>
+        public static List<string> ProfileTokens(PetState pet)
+        {
+            var tokens = new List<string>(MorphNamer.FullName(pet.Genotype, pet.Known).Split(' '));
+            tokens.Add(pet.PersonalityKnown ? PersonalityTraits.Label(pet.Personality) : "性格不明");
+            return tokens;
+        }
+
+        public static string SexLabel(PetState pet) => !pet.SexKnown ? "性別不明" : pet.Sex == Sex.Female ? "♀メス" : "♂オス";
+
         /// <summary>Feedback text shown the moment a shed reveals the animal's sex.</summary>
         public static string SexRevealMessage(PetState pet) =>
             $"{pet.Name}は{(pet.Sex == Sex.Female ? "♀メス" : "♂オス")}でした";

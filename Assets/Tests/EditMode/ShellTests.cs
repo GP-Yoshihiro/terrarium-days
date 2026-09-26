@@ -205,6 +205,67 @@ namespace TerrariumDays.Tests
             Assert.That(rebuiltRow, Is.Not.SameAs(firstRow), "a changed alert must rebuild the row");
         }
 
+        [Test]
+        public void ProfileTokens_SplitTheNameIntoWordsThatMustNotBreak()
+        {
+            var pet = new PetState
+            {
+                Genotype = Genotype.Normal().Set(GeneId.Eclipse, 2),
+                Known = new KnownGenetics().SetHet(GeneId.TremperAlbino, 1d).SetHet(GeneId.Blizzard, 0.66d),
+                Personality = Personality.Curious,
+            };
+
+            Assert.That(CageStatusText.ProfileTokens(pet), Is.EqualTo(new[]
+            {
+                "エクリプス", "ヘテロトレンパーアルビノ", "66%ポッシブルヘテロブリザード", "好奇心旺盛",
+            }));
+        }
+
+        [Test]
+        public void ProfileTokens_KeepHetsUnknownWithTheNameAndHideAnUnknownPersonality()
+        {
+            var pet = new PetState { Known = KnownGenetics.Unknown(), PersonalityKnown = false };
+
+            Assert.That(CageStatusText.ProfileTokens(pet), Is.EqualTo(new[] { "ノーマル（ヘテロ不明）", "性格不明" }));
+        }
+
+        [Test]
+        public void SexLabel_HidesTheSexUntilItIsKnown()
+        {
+            Assert.That(CageStatusText.SexLabel(new PetState { Sex = Sex.Female, SexRevealed = false }), Is.EqualTo("性別不明"));
+            Assert.That(CageStatusText.SexLabel(new PetState { Sex = Sex.Female, SexRevealed = true }), Is.EqualTo("♀メス"));
+            Assert.That(CageStatusText.SexLabel(new PetState { Sex = Sex.Male, SexRevealed = true }), Is.EqualTo("♂オス"));
+        }
+
+        [Test]
+        public void ThumbnailCrop_IsTheBodyPlusPaddingWithYFromTheBottom()
+        {
+            var pet = new TerrariumArtLayout().Pet;
+
+            var rect = ThumbnailCrop.BodyRect(pet, 6f);
+            Assert.That((rect.X, rect.Y, rect.Width, rect.Height), Is.EqualTo((16f, 82f, 194f, 82f)));
+
+            var clamped = ThumbnailCrop.BodyRect(pet, 30f);
+            Assert.That((clamped.X, clamped.Y, clamped.Width, clamped.Height), Is.EqualTo((0f, 58f, 234f, 130f)));
+        }
+
+        [Test]
+        public void TheTabBarCanBeUsedFromHomeAndShowsNoSelectionThere()
+        {
+            var root = BuildShell();
+            var nav = new ShellNavigator(root);
+
+            nav.ShowTab(ShellTab.Ledger);
+            Assert.That(Display(root, "main-screen"), Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(root.Q<Button>("tab-ledger").ClassListContains("tab-selected"), Is.True);
+
+            nav.ShowHome();
+            foreach (var name in new[] { "tab-cages", "tab-incubator", "tab-shop", "tab-events", "tab-ledger" })
+            {
+                Assert.That(root.Q<Button>(name).ClassListContains("tab-selected"), Is.False, name);
+            }
+        }
+
         private static Action FindClickAction(Clickable clickable)
         {
             foreach (var field in typeof(Clickable).GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance))

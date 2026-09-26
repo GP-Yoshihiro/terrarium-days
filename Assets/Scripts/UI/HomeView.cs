@@ -89,10 +89,10 @@ namespace TerrariumDays.UI
             slot.SetEnabled(pet != null);
             var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
             thumb.AddToClassList("rack-thumb");
-            var frame = pet != null ? MorphSprites.For(pet).Frame(PetClip.Idle, 0) : null;
-            if (frame != null)
+            var thumbnail = pet != null ? MorphSprites.Thumbnail(pet) : null;
+            if (thumbnail != null)
             {
-                thumb.style.backgroundImage = new StyleBackground(frame);
+                thumb.style.backgroundImage = new StyleBackground(thumbnail);
             }
 
             slot.Add(thumb);
@@ -157,10 +157,10 @@ namespace TerrariumDays.UI
                 row.SetEnabled(pet != null);
                 var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
                 thumb.AddToClassList("cage-row-thumb");
-                var frame = pet != null ? MorphSprites.For(pet).Frame(PetClip.Idle, 0) : null;
-                if (frame != null)
+                var thumbnail = pet != null ? MorphSprites.Thumbnail(pet) : null;
+                if (thumbnail != null)
                 {
-                    thumb.style.backgroundImage = new StyleBackground(frame);
+                    thumb.style.backgroundImage = new StyleBackground(thumbnail);
                 }
 
                 row.Add(thumb);

@@ -18,12 +18,19 @@
     color: rgb(90, 62, 40);
 }
 
-.profile-label {
+.profile-chips {
     width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+}
+
+.profile-chip {
     font-size: 18px;
     color: rgb(110, 84, 60);
-    white-space: normal;
-    -unity-text-align: middle-center;
+    white-space: nowrap;
+    margin-right: 6px;
 }
 
 .gauge-track {
@@ -468,9 +475,11 @@
     border-color: rgba(90, 62, 40, 0.2);
 }
 
+/* Aspect close to the cropped thumbnail's ~194:82 ratio so the body fills the frame
+   instead of being letterboxed by scale-to-fit. */
 .rack-thumb {
     width: 100%;
-    height: 56px;
+    height: 36px;
     -unity-background-scale-mode: scale-to-fit;
 }
 
@@ -539,8 +548,10 @@
     background-color: rgba(90, 62, 40, 0.08);
 }
 
+/* Aspect close to the cropped thumbnail's ~194:82 ratio so the body fills the frame
+   instead of being letterboxed by scale-to-fit. */
 .cage-row-thumb {
-    width: 72px;
+    width: 132px;
     height: 56px;
     -unity-background-scale-mode: scale-to-fit;
 }
