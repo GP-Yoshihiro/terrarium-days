@@ -46,6 +46,7 @@ namespace TerrariumDays.Core
         public int NextAnimalId { get; set; } = 1;
         public int NextCageId { get; set; } = 1;
         public int LastBilledMonthIndex { get; set; }
+        public ShopStock Shop { get; set; } = new ShopStock();
 
         public int CageCapacity => RackCount * CagesPerRack;
 
@@ -126,6 +127,7 @@ namespace TerrariumDays.Core
             };
             StarterGenetics.Apply(pet, random);
             colony.AddAnimal(pet, cage);
+            colony.Shop.Seed = random.Next();
             return colony;
         }
     }
