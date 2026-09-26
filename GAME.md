@@ -20,7 +20,7 @@
 2. 餌やり、水の交換、掃除のいずれかをタップして世話する。
 3. 状態が良い時間ほど健康と成長が進む。
 4. アプリを閉じている間も状態は変化する。
-5. 成長段階または装飾を解放し、成体到達を目指す。
+5. 成長段階を進め、成体到達を目指す。
 
 ## 5. Player actions
 | Action | Immediate effect | Constraint |
@@ -28,7 +28,7 @@
 | Feed | Hunger increases | Cannot exceed maximum hunger |
 | Refresh water | Hydration increases | Cannot exceed maximum hydration |
 | Clean | Cleanliness increases | Cannot exceed maximum cleanliness |
-| Select decor | Changes only the terrarium appearance | Unlocked items only |
+| Select decor | Changes only the terrarium appearance | Owned (unplaced) items only, within that cage's decor slots |
 
 ## 6. State model
 All status values are clamped to 0–100.
@@ -58,7 +58,7 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 ## 8. MVP screens
 1. **Terrarium** — pet, status bars, three care buttons, growth stage, selected decor.
 2. **Care feedback** — a small text/animation confirmation after an action.
-3. **Decor drawer** — select from up to five unlocked placeholder decorations.
+3. **Decor drawer** — select from decor owned but not yet placed, limited by that cage's decor slots (see §13).
 4. **Milestone modal** — shown on each growth-stage change and at Adult completion.
 5. **Developer panel** — time multiplier, simulate elapsed time, edit status values, clear save.
 
@@ -69,7 +69,7 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 - [ ] Deterministic time-decay and offline-progress calculator
 - [ ] JSON save/load to `Application.persistentDataPath`
 - [ ] Growth stages and milestone modal
-- [ ] Five placeholder decorations and simple unlock rules
+- [ ] Placeholder decorations, bought in the shop and placed per cage (see §13)
 - [ ] Debug time controls
 - [ ] EditMode tests for offline progress and save round-trip
 - [ ] iOS development build runs on a device
@@ -91,5 +91,15 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 - **Personality**: one of 5 per animal, each with its own threat/walk/hide/fasting/weight-gain/price multipliers and a male×female compatibility table; a hatchling has a 20% chance each of taking a parent's personality, otherwise random. Animals hatched by the player know it from birth. Shop-bought animals revealing personality after purchase is planned but not yet implemented (段階6 ショップ) — today a bought animal's `PersonalityKnown` flag just stays as saved.
 - **Sex reveal**: a self-raised animal's sex is revealed the moment it becomes Young or older, since the stage-up always includes a shed. An animal that was already Young+ with unknown sex when loaded (e.g. migrated from an older save) instead reveals at its next shed thereafter.
 - **Visual differentiation**: the base sprite is recoloured at runtime from each morph's palette (colour swap, pattern removal, eye colour); recoloured frames are cached per palette (including the Tangerine blend, quantised to steps of 0.1), not per morph name alone.
+
+## 13. Economy, shop, and per-cage decor (phase 3)
+- **Money and ledger**: the colony has one wallet (yen) and every movement — feed cost, electricity, a shop purchase, an animal sale, a wholesale payout — is recorded as a ledger entry (date, category, amount, note) for the ledger screen. A bill such as electricity is charged even into the red; a purchase only succeeds if affordable.
+- **Market price (相場)**: an animal's reference price is its morph's base price (most expensive named element, ×1.3 per additional element) × a het bonus (proven hets, and possible hets scaled by their probability) × a polygenic bonus for high hypo/tangerine × a growth-stage multiplier × a female multiplier once sex is known × a personality multiplier once known, rounded to the nearest 100 yen. An event demand factor (0.8–1.3, boosted at big events for pricier morphs) multiplies this outside the shop; the shop and wholesale below use no event demand yet.
+- **Shop — stock and pricing**: the shop restocks 4–6 animals once per game month, deterministically from a seed (same seed and month always gives the same stock), mostly babies with a few juveniles, skewed toward common morphs; proven and possible hets are disclosed truthfully (at most two per animal). An animal sells for the market price × a shop markup; buying needs an empty cage and moves the animal into the colony.
+- **Shop — personality reveal**: a bought animal's personality is hidden at purchase and becomes known automatically some days later, without further action.
+- **Supplies**: the shop also sells cages (small/standard/large), racks (raise the cage limit, capped), decor, nest boxes, and incubators. Nest boxes and incubators are priced now but only usable once breeding and incubation are implemented (later phases).
+- **Wholesale**: any owned animal can be sold back to the shop for the market price × a wholesale rate (well below the shop's selling price); this is allowed even for the colony's last animal.
+- **Per-cage decor and slots**: decor is bought into a shared inventory, then placed into a specific cage's decor slots (small 1, standard 2, large 3; at most one of each item per cage) from that cage's own decor drawer. Removing a placed item returns it to the inventory.
+- **Decor migration**: a save from before per-cage decor existed has its previously "unlocked" decor moved into the shared inventory on first load, with an on-screen notice; the player then places it from a cage's decor drawer.
 
 Detailed spec: docs/superpowers/specs/2026-09-25-breeder-sim-design.md
