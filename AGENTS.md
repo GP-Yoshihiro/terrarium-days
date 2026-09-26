@@ -44,6 +44,7 @@ iOS build notes:
 - `Assets/Scripts/Core/GameCalendar.cs` — the in-game calendar (real 1 day = 1 in-game month) used for age and growth display
 - `Assets/Scripts/Gameplay/` — care actions, status, and growth
 - `Assets/Scripts/UI/` — views and input adapters only
+- Code map before reading code: `python3 ~/.claude/skills/minimal-read-edit/scripts/cs-outline.py Assets/Scripts` (types and methods with line numbers; ~21 KB vs 327 KB of source; add `--grep Word` to filter, pass one .cs file for its outline). Then Read only the line range you need (skill `minimal-read-edit`).
 - `Assets/Data/` — ScriptableObject tuning data
 - `Assets/Tests/EditMode/` — deterministic logic tests
 - `Assets/Tests/PlayMode/` — minimal scene integration tests
