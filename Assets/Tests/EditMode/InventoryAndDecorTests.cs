@@ -151,7 +151,7 @@ namespace TerrariumDays.Tests
             var layout = new TerrariumArtLayout();
 
             var rock = layout.PlacementFor("rock_01", 1);
-            Assert.That((rock.X, rock.Depth, rock.IsHanging), Is.EqualTo((0.85f, 0.6f, false)));
+            Assert.That((rock.X, rock.Depth, rock.IsHanging), Is.EqualTo((0.5f, 0.5f, false)));
             Assert.That(rock.BodyWidthFraction, Is.EqualTo(layout.Decor["rock_01"].BodyWidthFraction));
 
             var lamp = layout.PlacementFor("heat_lamp_01", 1);

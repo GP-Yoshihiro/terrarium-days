@@ -41,7 +41,9 @@
                     </ui:VisualElement>
                     <ui:VisualElement name="terrarium-view" class="terrarium-view">
                         <ui:VisualElement name="terrarium-background" class="terrarium-background" picking-mode="Ignore" />
-                        <ui:VisualElement name="decor-image" class="decor-image" />
+                        <ui:VisualElement name="decor-image-0" class="decor-image" />
+                        <ui:VisualElement name="decor-image-1" class="decor-image" />
+                        <ui:VisualElement name="decor-image-2" class="decor-image" />
                         <ui:VisualElement name="pet-image" class="pet-image" />
                         <ui:VisualElement name="terrarium-lighting" class="terrarium-lighting" picking-mode="Ignore" />
                         <ui:VisualElement name="terrarium-effects" class="terrarium-effects" picking-mode="Ignore" />
@@ -106,6 +108,7 @@
         <ui:VisualElement name="decor-drawer" class="milestone-modal-overlay">
             <ui:VisualElement class="milestone-modal-card">
                 <ui:Label text="そうしょくをえらぶ" class="decor-drawer-title" />
+                <ui:Label name="decor-slot-label" class="decor-status-label" />
                 <ui:VisualElement class="decor-list">
                     <ui:Button name="decor-row-rock_01" class="decor-row">
                         <ui:VisualElement name="decor-icon-rock_01" class="decor-icon decor-icon-rock_01" />

@@ -92,8 +92,6 @@ namespace TerrariumDays.Tests
             Assert.That(pet.Stage, Is.EqualTo(GrowthStage.Juvenile));
             Assert.That(pet.WeightGrams, Is.EqualTo(15d).Within(1e-9));
             Assert.That((pet.Hunger, pet.Hydration, pet.Cleanliness, pet.Health), Is.EqualTo((70d, 60d, 50d, 90d)));
-            Assert.That(pet.SelectedDecorId, Is.EqualTo("plant_01"));
-            Assert.That(pet.UnlockedDecorIds, Is.EquivalentTo(new[] { "rock_01", "plant_01" }));
             Assert.That(pet.HatchedAtUtc, Is.EqualTo(Now.AddDays(-5)));
             Assert.That(pet.NextShedAtUtc - Now, Is.LessThanOrEqualTo(SheddingModel.IntervalFor(GrowthStage.Juvenile, new CareTuning())),
                 "the old 60-real-day shed date is pulled into the new game-time cycle");

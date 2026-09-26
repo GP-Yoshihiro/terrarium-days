@@ -14,8 +14,6 @@ namespace TerrariumDays.Tests
             Assert.That(state.Hydration, Is.EqualTo(80d));
             Assert.That(state.Cleanliness, Is.EqualTo(80d));
             Assert.That(state.Health, Is.EqualTo(100d));
-            Assert.That(state.SelectedDecorId, Is.EqualTo("rock_01"));
-            Assert.That(state.UnlockedDecorIds, Is.EqualTo(new[] { "rock_01" }));
         }
 
         [Test]

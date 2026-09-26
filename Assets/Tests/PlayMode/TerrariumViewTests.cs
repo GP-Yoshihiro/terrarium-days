@@ -34,10 +34,11 @@ namespace TerrariumDays.Tests
         private Label milestoneStageLabel;
         private Label milestoneMessageLabel;
         private Button milestoneContinueButton;
-        private VisualElement decorImageElement;
+        private readonly VisualElement[] decorImageElements = new VisualElement[3];
         private Button decorButton;
         private VisualElement decorDrawer;
         private Button decorDrawerCloseButton;
+        private Label decorSlotLabel;
         private readonly Dictionary<string, Button> decorRowButtons = new Dictionary<string, Button>();
         private readonly Dictionary<string, Label> decorStatusLabels = new Dictionary<string, Label>();
         private VisualElement topBar;
@@ -104,13 +105,18 @@ namespace TerrariumDays.Tests
             milestoneModal.Add(milestoneMessageLabel);
             milestoneModal.Add(milestoneContinueButton);
 
-            decorImageElement = new VisualElement { name = "decor-image" };
+            for (var i = 0; i < decorImageElements.Length; i++)
+            {
+                decorImageElements[i] = new VisualElement { name = $"decor-image-{i}" };
+            }
             decorButton = new Button { name = "decor-button" };
             decorDrawer = new VisualElement { name = "decor-drawer" };
             decorDrawerCloseButton = new Button { name = "decor-drawer-close-button" };
+            decorSlotLabel = new Label { name = "decor-slot-label" };
+            decorDrawer.Add(decorSlotLabel);
             decorRowButtons.Clear();
             decorStatusLabels.Clear();
-            foreach (var decor in DecorCatalog.All)
+            foreach (var decor in DecorItems.All)
             {
                 var rowButton = new Button { name = $"decor-row-{decor.Id}" };
                 var statusLabel = new Label { name = $"decor-status-{decor.Id}" };
@@ -147,7 +153,10 @@ namespace TerrariumDays.Tests
             root.Add(waterButton);
             root.Add(cleanButton);
             root.Add(milestoneModal);
-            root.Add(decorImageElement);
+            foreach (var element in decorImageElements)
+            {
+                root.Add(element);
+            }
             root.Add(decorButton);
             root.Add(decorDrawer);
             root.Add(topBar);
@@ -400,33 +409,61 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void OnDecorButtonClicked_ALockedRowIsDisabledAndShowsItsUnlockCondition()
+        public void LoadColony_NewGame_ShowsTheStarterRockInTheFirstSlotOnly()
         {
+            var path = CreateTempSavePath();
+
+            view.LoadColony(path, DateTimeOffset.UtcNow);
+
+            Assert.That(decorImageElements[0].style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(decorImageElements[0].ClassListContains("decor-icon-rock_01"), Is.True);
+            Assert.That(decorImageElements[1].style.display.value, Is.EqualTo(DisplayStyle.None));
+            Assert.That(decorImageElements[2].style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
+        public void OnDecorRowClicked_ForAnOwnedItem_PlacesItInTheNextSlotAndUpdatesTheDrawer()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, DateTimeOffset.UtcNow);
+            view.Session.Colony.Inventory.Add("plant_01", 1);
+
+            view.OnDecorRowClicked("plant_01");
+
+            Assert.That(view.CurrentCage.DecorIds, Is.EqualTo(new[] { "rock_01", "plant_01" }));
+            Assert.That(decorImageElements[1].style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(decorImageElements[1].ClassListContains("decor-icon-plant_01"), Is.True);
+            Assert.That(view.Session.Colony.Inventory.Count("plant_01"), Is.EqualTo(0));
+            Assert.That(decorStatusLabels["plant_01"].text, Is.EqualTo("置いています（タップで外す）"));
+            Assert.That(decorSlotLabel.text, Is.EqualTo("装飾の枠 2/2"));
+        }
+
+        [Test]
+        public void OnDecorRowClicked_TappedAgain_RemovesItAndReturnsItToTheInventory()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, DateTimeOffset.UtcNow);
+            view.Session.Colony.Inventory.Add("plant_01", 1);
+            view.OnDecorRowClicked("plant_01");
+
+            view.OnDecorRowClicked("plant_01");
+
+            Assert.That(view.CurrentCage.DecorIds, Is.EqualTo(new[] { "rock_01" }));
+            Assert.That(decorImageElements[1].style.display.value, Is.EqualTo(DisplayStyle.None));
+            Assert.That(view.Session.Colony.Inventory.Count("plant_01"), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void OnDecorRowClicked_ForAnUnownedItem_DoesNothingAndShowsNotOwned()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, DateTimeOffset.UtcNow);
+
+            view.OnDecorRowClicked("water_dish_01");
             view.OnDecorButtonClicked();
 
-            var lockedRow = decorRowButtons["plant_01"];
-            Assert.That(lockedRow.enabledSelf, Is.False);
-            Assert.That(decorStatusLabels["plant_01"].text, Is.EqualTo($"{GrowthStage.Juvenile}で解放"));
-        }
-
-        [Test]
-        public void OnDecorRowClicked_ForALockedDecor_DoesNothing()
-        {
-            view.OnDecorRowClicked("plant_01");
-
-            Assert.That(view.State.SelectedDecorId, Is.EqualTo(PetState.DefaultDecorId));
-        }
-
-        [Test]
-        public void OnDecorRowClicked_ForAnUnlockedDecor_SelectsItAndUpdatesTheDecorImage()
-        {
-            DecorUnlockService.GrantUnlocksForStage(view.State, GrowthStage.Juvenile);
-
-            view.OnDecorRowClicked("plant_01");
-
-            Assert.That(view.State.SelectedDecorId, Is.EqualTo("plant_01"));
-            Assert.That(decorImageElement.ClassListContains("decor-icon-plant_01"), Is.True);
-            Assert.That(decorImageElement.ClassListContains($"decor-icon-{PetState.DefaultDecorId}"), Is.False);
+            Assert.That(view.CurrentCage.DecorIds, Is.EqualTo(new[] { "rock_01" }));
+            Assert.That(decorStatusLabels["water_dish_01"].text, Is.EqualTo("未所持（ショップで購入）"));
         }
 
         [Test]

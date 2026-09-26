@@ -99,6 +99,35 @@ namespace TerrariumDays.Tests
             }
         }
 
+        /// <summary>
+        /// Fills a large cage's three decor slots (two floor pieces at different depths plus
+        /// the hanging heat lamp) and captures it into Logs/Screens/decor-slots.png, so the
+        /// slot placement (TerrariumArtLayout.DecorSlotSpots) can be checked by eye: the floor
+        /// pieces must not overlap and the gecko must be sleeping right beside one of them.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureDecorSlots()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var colony = view.Session.Colony;
+            var cage = colony.Cages[0];
+            cage.Size = CageSize.Large;
+            cage.DecorIds.Clear();
+            cage.DecorIds.Add("rock_01");
+            cage.DecorIds.Add("driftwood_01");
+            cage.DecorIds.Add("heat_lamp_01");
+
+            var navigator = NavigatorOf(view);
+            view.SelectCage(cage.Id);
+            navigator.ShowCageDetail();
+            yield return new WaitForSeconds(1.5f);
+            yield return Capture(outputDir, "decor-slots");
+        }
+
         [TearDown]
         public void TearDown()
         {

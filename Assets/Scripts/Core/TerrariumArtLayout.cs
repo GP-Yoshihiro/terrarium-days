@@ -52,9 +52,9 @@ namespace TerrariumDays.Core
         /// </summary>
         public IReadOnlyList<(float X, float Depth)> DecorSlotSpots { get; set; } = new List<(float, float)>
         {
-            (0.15f, 0.45f),
-            (0.85f, 0.6f),
-            (0.5f, 0.38f),
+            (0.02f, 0.4f),
+            (0.5f, 0.5f),
+            (0.98f, 0.65f),
         };
 
         public DecorPlacement PlacementFor(string decorId, int slot)

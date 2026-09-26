@@ -1,13 +1,10 @@
 using System;
-using System.Collections.Generic;
 
 namespace TerrariumDays.Core
 {
     /// <summary>One animal: identity, body, care state and schedules. Plain data.</summary>
     public sealed class PetState
     {
-        public const string DefaultDecorId = "rock_01";
-
         private double hunger = 80d;
         private double hydration = 80d;
         private double cleanliness = 80d;
@@ -79,10 +76,6 @@ namespace TerrariumDays.Core
             get => health;
             set => health = StatusValue.Clamp(value);
         }
-
-        public string SelectedDecorId { get; set; } = DefaultDecorId;
-
-        public List<string> UnlockedDecorIds { get; set; } = new List<string> { DefaultDecorId };
 
         public DateTimeOffset LastSavedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 

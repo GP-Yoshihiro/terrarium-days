@@ -43,6 +43,9 @@ namespace TerrariumDays.UI
 
         public Cage CurrentCage => currentCage;
 
+        /// <summary>True while the pet has a floor decor to sleep beside. Exposed for tests only.</summary>
+        public bool PetHasShelter => petActor?.HasShelter ?? false;
+
         public event Action ColonyChanged;
 
         private Label growthStageLabel;
@@ -69,14 +72,15 @@ namespace TerrariumDays.UI
         private Label milestoneMessageLabel;
         private Button milestoneContinueButton;
 
-        private VisualElement decorImageElement;
+        private readonly VisualElement[] decorImageElements = new VisualElement[3];
+        private readonly string[] appliedDecorIconClasses = new string[3];
         private Button decorButton;
         private VisualElement decorDrawer;
         private Button decorDrawerCloseButton;
+        private Label decorSlotLabel;
         private readonly Dictionary<string, Button> decorRowButtons = new Dictionary<string, Button>();
         private readonly Dictionary<string, Label> decorStatusLabels = new Dictionary<string, Label>();
         private readonly Dictionary<string, Action> decorRowClickHandlers = new Dictionary<string, Action>();
-        private string appliedDecorIconClass;
 
         private VisualElement topBar;
         private Button debugButton;
@@ -400,7 +404,6 @@ namespace TerrariumDays.UI
 
             foreach (var (pet, stage) in report.StageUps)
             {
-                DecorUnlockService.GrantUnlocksForStage(pet, stage);
                 if (pet == state)
                 {
                     // The morph's look can change at this stage (e.g. Murphy patternless
@@ -723,14 +726,19 @@ namespace TerrariumDays.UI
 
             RebuildPetActor();
 
-            decorImageElement = root.Q<VisualElement>("decor-image");
+            for (var i = 0; i < decorImageElements.Length; i++)
+            {
+                decorImageElements[i] = root.Q<VisualElement>($"decor-image-{i}");
+            }
+
             decorButton = root.Q<Button>("decor-button");
             decorDrawer = root.Q<VisualElement>("decor-drawer");
             decorDrawerCloseButton = root.Q<Button>("decor-drawer-close-button");
+            decorSlotLabel = root.Q<Label>("decor-slot-label");
 
             decorRowButtons.Clear();
             decorStatusLabels.Clear();
-            foreach (var decor in DecorCatalog.All)
+            foreach (var decor in DecorItems.All)
             {
                 var rowButton = root.Q<Button>($"decor-row-{decor.Id}");
                 if (rowButton != null)
@@ -1072,65 +1080,75 @@ namespace TerrariumDays.UI
 
         public void OnDecorRowClicked(string decorId)
         {
-            if (state == null || !state.UnlockedDecorIds.Contains(decorId))
+            if (session == null || currentCage == null)
             {
                 return;
             }
 
-            state.SelectedDecorId = decorId;
-            RenderDecorImage(state);
+            var result = currentCage.DecorIds.Contains(decorId)
+                ? DecorSlots.Remove(session.Colony, currentCage, decorId)
+                : DecorSlots.Place(session.Colony, currentCage, decorId);
+
+            if (result != DecorResult.Ok)
+            {
+                return;
+            }
+
+            RenderDecorImages();
             RefreshDecorDrawer();
             SaveCurrentState();
         }
 
         private void RefreshDecorDrawer()
         {
-            if (state == null)
+            if (session == null || currentCage == null)
             {
                 return;
             }
 
-            foreach (var decor in DecorCatalog.All)
+            if (decorSlotLabel != null)
             {
-                var unlocked = state.UnlockedDecorIds.Contains(decor.Id);
+                decorSlotLabel.text = DecorSlots.SlotSummary(currentCage);
+            }
 
+            foreach (var decor in DecorItems.All)
+            {
                 if (decorStatusLabels.TryGetValue(decor.Id, out var statusLabel))
                 {
-                    if (!unlocked)
-                    {
-                        statusLabel.text = $"{decor.UnlockStage}で解放";
-                    }
-                    else if (state.SelectedDecorId == decor.Id)
-                    {
-                        statusLabel.text = "選択中";
-                    }
-                    else
-                    {
-                        statusLabel.text = string.Empty;
-                    }
-                }
-
-                if (decorRowButtons.TryGetValue(decor.Id, out var rowButton))
-                {
-                    rowButton.SetEnabled(unlocked);
+                    statusLabel.text = DecorSlots.StatusText(session.Colony, currentCage, decor.Id);
                 }
             }
         }
 
-        private void RenderDecorImage(PetState petState)
+        /// <summary>Returns the decor id in the given cage slot, or null when the slot is empty.</summary>
+        private string DecorIdAt(int slot) =>
+            currentCage != null && slot < currentCage.DecorIds.Count ? currentCage.DecorIds[slot] : null;
+
+        private void RenderDecorImages()
         {
-            if (decorImageElement == null)
+            for (var i = 0; i < decorImageElements.Length; i++)
             {
-                return;
+                var element = decorImageElements[i];
+                if (element == null)
+                {
+                    continue;
+                }
+
+                if (appliedDecorIconClasses[i] != null)
+                {
+                    element.RemoveFromClassList(appliedDecorIconClasses[i]);
+                    appliedDecorIconClasses[i] = null;
+                }
+
+                var id = DecorIdAt(i);
+                element.style.display = id == null ? DisplayStyle.None : DisplayStyle.Flex;
+                if (id != null)
+                {
+                    appliedDecorIconClasses[i] = $"decor-icon-{id}";
+                    element.AddToClassList(appliedDecorIconClasses[i]);
+                }
             }
 
-            if (appliedDecorIconClass != null)
-            {
-                decorImageElement.RemoveFromClassList(appliedDecorIconClass);
-            }
-
-            appliedDecorIconClass = $"decor-icon-{petState.SelectedDecorId}";
-            decorImageElement.AddToClassList(appliedDecorIconClass);
             PlaceDecor();
         }
 
@@ -1158,39 +1176,55 @@ namespace TerrariumDays.UI
         }
 
         /// <summary>
-        /// Stands the selected decor on the floor (or hangs it from the glass top) using the
-        /// same projection as the pet, so both line up with the background at any screen size.
+        /// Stands each of the current cage's decor pieces on the floor (or hangs it from the
+        /// glass top) in its own slot, using the same projection as the pet so everything lines
+        /// up with the background at any screen size.
         /// </summary>
         private void PlaceDecor()
         {
-            if (decorImageElement == null || state == null || terrariumProjection == null || !terrariumProjection.IsValid
-                || !artLayout.Decor.TryGetValue(state.SelectedDecorId, out var placement))
+            if (terrariumProjection == null || !terrariumProjection.IsValid)
             {
                 return;
             }
 
-            var bodyWidth = placement.BodyWidthFraction * terrariumProjection.ViewWidth;
-            var box = placement.IsHanging
-                ? terrariumProjection.PlaceHanging(placement.Sprite, placement.X, bodyWidth)
-                : terrariumProjection.PlaceOnFloor(placement.Sprite, placement.X, placement.Depth, bodyWidth);
+            string shelterFloorDecorId = null;
+            for (var i = 0; i < decorImageElements.Length; i++)
+            {
+                var element = decorImageElements[i];
+                var id = DecorIdAt(i);
+                if (element == null || id == null || !artLayout.Decor.ContainsKey(id))
+                {
+                    continue;
+                }
 
-            decorImageElement.style.left = box.Left;
-            decorImageElement.style.top = box.Top;
-            decorImageElement.style.width = box.Width;
-            decorImageElement.style.height = box.Height;
-            decorImageElement.style.bottom = StyleKeyword.Auto;
+                var placement = artLayout.PlacementFor(id, i);
+                var bodyWidth = placement.BodyWidthFraction * terrariumProjection.ViewWidth;
+                var box = placement.IsHanging
+                    ? terrariumProjection.PlaceHanging(placement.Sprite, placement.X, bodyWidth)
+                    : terrariumProjection.PlaceOnFloor(placement.Sprite, placement.X, placement.Depth, bodyWidth);
 
-            // Floor decor doubles as the gecko's hide: it sleeps right behind/beside it.
-            if (placement.IsHanging)
+                element.style.left = box.Left;
+                element.style.top = box.Top;
+                element.style.width = box.Width;
+                element.style.height = box.Height;
+                element.style.bottom = StyleKeyword.Auto;
+
+                // The first floor decor (in slot order) doubles as the gecko's hide: it sleeps
+                // right behind/beside it.
+                if (!placement.IsHanging && shelterFloorDecorId == null)
+                {
+                    shelterFloorDecorId = id;
+                    var pixels = box.Width / placement.Sprite.ImageWidth;
+                    var bodyCenterX = box.Left + (placement.Sprite.BodyLeft + placement.Sprite.BodyRight) / 2f * pixels;
+                    petActor?.SetShelterAt(bodyCenterX, placement.Depth);
+                }
+            }
+
+            if (shelterFloorDecorId == null)
             {
                 petActor?.ClearShelter();
             }
-            else
-            {
-                var pixels = box.Width / placement.Sprite.ImageWidth;
-                var bodyCenterX = box.Left + (placement.Sprite.BodyLeft + placement.Sprite.BodyRight) / 2f * pixels;
-                petActor?.SetShelterAt(bodyCenterX, placement.Depth);
-            }
+
             drawOrder?.Apply();
         }
 
@@ -1209,22 +1243,28 @@ namespace TerrariumDays.UI
 
             drawOrder = new TerrariumDrawOrder(terrariumViewElement);
             drawOrder.Register(terrariumBackgroundElement, () => new DrawSortKey(DrawLayer.Background, 0f, 0));
-            drawOrder.Register(decorImageElement, () => new DrawSortKey(DrawLayer.World, DecorSortDepth(), DrawTieBreak.Decor));
+            for (var i = 0; i < decorImageElements.Length; i++)
+            {
+                var slot = i;
+                drawOrder.Register(decorImageElements[slot], () => new DrawSortKey(DrawLayer.World, DecorSortDepth(slot), DrawTieBreak.Decor));
+            }
+
             drawOrder.Register(petElement, () => new DrawSortKey(DrawLayer.World, petActor?.Depth ?? 0f, DrawTieBreak.Pet));
             drawOrder.Register(lightingElement, () => new DrawSortKey(DrawLayer.Lighting, 0f, 0));
             drawOrder.Register(effectsLayerElement, () => new DrawSortKey(DrawLayer.Effects, 0f, 0));
             drawOrder.Apply();
         }
 
-        /// <summary>Floor depth of the selected decor's ground contact; hanging decor sorts behind the floor.</summary>
-        private float DecorSortDepth()
+        /// <summary>Floor depth of that slot's decor ground contact; hanging (or empty) decor sorts behind the floor.</summary>
+        private float DecorSortDepth(int slot)
         {
-            if (state == null || !artLayout.Decor.TryGetValue(state.SelectedDecorId, out var placement) || placement.IsHanging)
+            var id = DecorIdAt(slot);
+            if (id == null || !artLayout.Decor.TryGetValue(id, out var placement) || placement.IsHanging)
             {
                 return DrawSortKey.BehindFloor;
             }
 
-            return placement.Depth;
+            return artLayout.PlacementFor(id, slot).Depth;
         }
 
         /// <summary>
@@ -1516,7 +1556,7 @@ namespace TerrariumDays.UI
             RenderStatusRow(cleanlinessBarFill, cleanlinessValueLabel, petState.Cleanliness, careTuning);
             RenderStatusRow(healthBarFill, healthValueLabel, petState.Health, careTuning);
 
-            RenderDecorImage(petState);
+            RenderDecorImages();
             petActor?.SetCondition(PetMoodEvaluator.Evaluate(petState, careTuning, petBehaviourTuning), petState.GrowthStage);
             petActor?.SetAppetite(AppetiteModel.Evaluate(petState, GameNowUtc(), careTuning));
         }

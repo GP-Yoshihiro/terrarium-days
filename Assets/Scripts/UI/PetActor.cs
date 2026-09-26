@@ -117,6 +117,9 @@ namespace TerrariumDays.UI
             Behaviour.ClearShelter();
         }
 
+        /// <summary>Whether a decor slot is currently offered to this pet as a hide (see SetShelterAt/ClearShelter).</summary>
+        public bool HasShelter => hasShelter;
+
         private void UpdateShelter()
         {
             if (!hasShelter || projection == null || !projection.IsValid)
