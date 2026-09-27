@@ -852,11 +852,13 @@
     flex-grow: 1;
     flex-basis: 0;
     margin: 0;
+    padding: 4px 2px;
     border-width: 0;
     border-radius: 0;
     background-color: rgba(0, 0, 0, 0);
     color: rgb(140, 110, 80);
-    font-size: 12px;
+    font-size: 10px;
+    white-space: nowrap;
 }
 
 .tab-selected {
@@ -1004,4 +1006,106 @@
     color: rgb(90, 62, 40);
     -unity-text-align: middle-center;
     white-space: normal;
+}
+
+/* Breeding tab (Task 12 lays out the panel skeleton; Task 13 fills it with these
+   classes, so their look follows .shop-*/.ledger-* row conventions). */
+.breeding-season-label {
+    height: 20px;
+    min-height: 20px;
+    flex-shrink: 0;
+    margin: 6px 16px 0;
+    font-size: 13px;
+    color: rgb(90, 62, 40);
+}
+
+.breeding-message-label {
+    height: 24px;
+    min-height: 24px;
+    flex-shrink: 0;
+    margin: 4px 16px;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.breeding-list {
+    flex-grow: 1;
+    padding: 0 12px;
+}
+
+.breeding-section-title {
+    margin: 8px 16px 4px;
+    font-size: 13px;
+    color: rgb(140, 110, 80);
+    -unity-font-style: bold;
+}
+
+/* Same column-card shape as .shop-row/.ledger-row. */
+.breeding-row {
+    flex-direction: column;
+    min-height: 72px;
+    margin: 0 0 8px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgba(90, 62, 40, 0.08);
+}
+
+.breeding-row-selected {
+    background-color: rgba(255, 167, 38, 0.25);
+    border-width: 1px;
+    border-color: rgb(255, 140, 0);
+}
+
+.breeding-row-blocked {
+    background-color: rgba(90, 62, 40, 0.04);
+    opacity: 0.6;
+}
+
+.breeding-row-reason {
+    font-size: 12px;
+    color: rgb(229, 57, 53);
+    white-space: normal;
+    margin-top: 2px;
+}
+
+.breeding-line {
+    font-size: 12px;
+    color: rgb(120, 90, 60);
+    white-space: normal;
+}
+
+.breeding-forecast-line {
+    font-size: 12px;
+    color: rgb(90, 62, 40);
+    -unity-font-style: bold;
+    white-space: normal;
+    margin-top: 2px;
+}
+
+.breeding-start-button {
+    width: 96px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgb(255, 167, 38);
+    color: rgb(255, 255, 255);
+    font-size: 14px;
+    -unity-font-style: bold;
+}
+
+.breeding-cancel-button {
+    width: 96px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgba(90, 62, 40, 0.12);
+    color: rgb(90, 62, 40);
+    font-size: 14px;
 }

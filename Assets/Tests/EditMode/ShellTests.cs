@@ -13,13 +13,13 @@ namespace TerrariumDays.Tests
         private static VisualElement BuildShell()
         {
             var root = new VisualElement();
-            foreach (var name in new[] { "home-screen", "main-screen", "cage-list-panel", "cage-detail-panel", "shop-panel", "ledger-panel", "placeholder-panel" })
+            foreach (var name in new[] { "home-screen", "main-screen", "cage-list-panel", "cage-detail-panel", "shop-panel", "ledger-panel", "breeding-panel", "placeholder-panel" })
             {
                 root.Add(new VisualElement { name = name });
             }
 
             root.Add(new Label { name = "placeholder-label" });
-            foreach (var name in new[] { "tab-cages", "tab-incubator", "tab-shop", "tab-events", "tab-ledger" })
+            foreach (var name in new[] { "tab-cages", "tab-incubator", "tab-shop", "tab-events", "tab-ledger", "tab-breeding" })
             {
                 root.Add(new Button { name = name });
             }
@@ -82,6 +82,19 @@ namespace TerrariumDays.Tests
 
             Assert.That(Display(root, "ledger-panel"), Is.EqualTo(DisplayStyle.Flex));
             Assert.That(Display(root, "placeholder-panel"), Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
+        public void ShowTab_Breeding_ShowsTheBreedingPanelInsteadOfThePlaceholder()
+        {
+            var root = BuildShell();
+            var nav = new ShellNavigator(root);
+
+            nav.ShowTab(ShellTab.Breeding);
+
+            Assert.That(Display(root, "breeding-panel"), Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(Display(root, "placeholder-panel"), Is.EqualTo(DisplayStyle.None));
+            Assert.That(root.Q<Button>("tab-breeding").ClassListContains("tab-selected"), Is.True);
         }
 
         [Test]
@@ -363,7 +376,7 @@ namespace TerrariumDays.Tests
             Assert.That(root.Q<Button>("tab-ledger").ClassListContains("tab-selected"), Is.True);
 
             nav.ShowHome();
-            foreach (var name in new[] { "tab-cages", "tab-incubator", "tab-shop", "tab-events", "tab-ledger" })
+            foreach (var name in new[] { "tab-cages", "tab-incubator", "tab-shop", "tab-events", "tab-ledger", "tab-breeding" })
             {
                 Assert.That(root.Q<Button>(name).ClassListContains("tab-selected"), Is.False, name);
             }

@@ -399,6 +399,25 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "ledger-money");
         }
 
+        /// <summary>
+        /// Captures the empty breeding tab into Logs/Screens/breeding-empty.png so the tab
+        /// bar's now-six buttons (each label unclipped, at least 44px tall) can be checked by
+        /// eye alongside the placeholder-panel skeleton (Task 12; Task 13 fills the panel).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureBreedingEmpty()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var navigator = NavigatorOf(view);
+            navigator.ShowTab(ShellTab.Breeding);
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "breeding-empty");
+        }
+
         [TearDown]
         public void TearDown()
         {

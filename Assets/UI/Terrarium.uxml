@@ -109,6 +109,11 @@
                     <ui:Label name="ledger-summary-label" text="" class="ledger-summary-label" />
                     <ui:ScrollView name="ledger-list" class="ledger-list" />
                 </ui:VisualElement>
+                <ui:VisualElement name="breeding-panel" class="panel">
+                    <ui:Label name="breeding-season-label" text="" class="breeding-season-label" />
+                    <ui:Label name="breeding-message-label" text="" class="breeding-message-label" />
+                    <ui:ScrollView name="breeding-list" class="breeding-list" />
+                </ui:VisualElement>
                 <ui:VisualElement name="placeholder-panel" class="panel">
                     <ui:Label name="placeholder-label" text="" class="placeholder-label" />
                 </ui:VisualElement>
@@ -116,6 +121,7 @@
         </ui:VisualElement>
         <ui:VisualElement name="tab-bar" class="tab-bar">
             <ui:Button name="tab-cages" text="ケージ" class="tab-button" />
+            <ui:Button name="tab-breeding" text="繁殖" class="tab-button" />
             <ui:Button name="tab-incubator" text="孵卵器" class="tab-button" />
             <ui:Button name="tab-shop" text="ショップ" class="tab-button" />
             <ui:Button name="tab-events" text="イベント" class="tab-button" />

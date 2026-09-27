@@ -16,7 +16,8 @@ namespace TerrariumDays.UI
         Incubator,
         Shop,
         Events,
-        Ledger
+        Ledger,
+        Breeding
     }
 
     /// <summary>
@@ -31,6 +32,7 @@ namespace TerrariumDays.UI
         private readonly VisualElement cageDetail;
         private readonly VisualElement shop;
         private readonly VisualElement ledger;
+        private readonly VisualElement breeding;
         private readonly VisualElement placeholder;
         private readonly Label placeholderLabel;
         private readonly Dictionary<ShellTab, Button> tabButtons = new Dictionary<ShellTab, Button>();
@@ -43,6 +45,7 @@ namespace TerrariumDays.UI
             cageDetail = root.Q("cage-detail-panel");
             shop = root.Q("shop-panel");
             ledger = root.Q("ledger-panel");
+            breeding = root.Q("breeding-panel");
             placeholder = root.Q("placeholder-panel");
             placeholderLabel = root.Q<Label>("placeholder-label");
             Bind(root, "tab-cages", ShellTab.Cages);
@@ -50,6 +53,7 @@ namespace TerrariumDays.UI
             Bind(root, "tab-shop", ShellTab.Shop);
             Bind(root, "tab-events", ShellTab.Events);
             Bind(root, "tab-ledger", ShellTab.Ledger);
+            Bind(root, "tab-breeding", ShellTab.Breeding);
             ShowHome();
         }
 
@@ -107,7 +111,8 @@ namespace TerrariumDays.UI
             SetDisplay(cageList, tab == ShellTab.Cages && !ShowingCageDetail);
             SetDisplay(shop, tab == ShellTab.Shop);
             SetDisplay(ledger, tab == ShellTab.Ledger);
-            var hasPanel = tab == ShellTab.Cages || (tab == ShellTab.Shop && shop != null) || (tab == ShellTab.Ledger && ledger != null);
+            SetDisplay(breeding, tab == ShellTab.Breeding);
+            var hasPanel = tab == ShellTab.Cages || (tab == ShellTab.Shop && shop != null) || (tab == ShellTab.Ledger && ledger != null) || (tab == ShellTab.Breeding && breeding != null);
             SetDisplay(placeholder, !hasPanel);
             if (placeholderLabel != null)
             {
