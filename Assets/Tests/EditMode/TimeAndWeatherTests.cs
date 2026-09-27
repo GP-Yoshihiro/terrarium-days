@@ -79,5 +79,45 @@ namespace TerrariumDays.Tests
         {
             Assert.That(WeatherCodes.Label(code), Is.EqualTo(expected));
         }
+
+        [TestCase(12d, 18d)]
+        [TestCase(18d, 18d)]
+        [TestCase(26.4d, 26.4d)]
+        [TestCase(30d, 30d)]
+        [TestCase(35d, 30d)]
+        public void RoomTemperature_ClampsTheOutdoorTemperature(double outdoor, double room)
+        {
+            Assert.That(RoomTemperature.From(new WeatherReport(outdoor, 50d, 1)), Is.EqualTo(room).Within(1e-9));
+        }
+
+        [Test]
+        public void RoomTemperature_WithoutUsableWeather_Is24()
+        {
+            Assert.That(RoomTemperature.From(null), Is.EqualTo(24d));
+            Assert.That(RoomTemperature.From(new WeatherReport(double.NaN, 50d, 1)), Is.EqualTo(24d));
+        }
+
+        [Test]
+        public void RoomClimate_FollowsTheLatestReportAndFallsBackWhenItIsLost()
+        {
+            var room = new RoomClimate();
+            Assert.That((room.TemperatureC, room.Measured), Is.EqualTo((24d, false)));
+
+            room.Update(new WeatherReport(31d, 60d, 0));
+            Assert.That((room.TemperatureC, room.Measured), Is.EqualTo((30d, true)));
+
+            room.Update(null);
+            Assert.That((room.TemperatureC, room.Measured), Is.EqualTo((24d, false)));
+
+            room.Update(new WeatherReport(double.NaN, 60d, 0));
+            Assert.That((room.TemperatureC, room.Measured), Is.EqualTo((24d, false)));
+        }
+
+        [Test]
+        public void RoomTemperatureLabel_SaysWhenItIsTheFallback()
+        {
+            Assert.That(RoomTemperature.Label(27.4d, true), Is.EqualTo("室温27℃"));
+            Assert.That(RoomTemperature.Label(24d, false), Is.EqualTo("室温24℃（天気を取得できないため）"));
+        }
     }
 }

@@ -120,6 +120,7 @@ namespace TerrariumDays.UI
         private Label dayPhaseLabel;
         private Label weatherLabel;
         private readonly WeatherService weatherService = new WeatherService();
+        private WeatherReport? lastWeatherReport;
         private float clockTimer;
         private TerrariumDrawOrder drawOrder;
         private VisualElement safeAreaRoot;
@@ -318,7 +319,7 @@ namespace TerrariumDays.UI
             StartLiveTickIfNeeded();
 
             UpdateClock(DateTime.Now);
-            StartCoroutine(weatherService.Run(OnWeatherText));
+            StartCoroutine(weatherService.Run(OnWeatherText, OnWeatherReport));
         }
 
         /// <summary>
@@ -365,6 +366,7 @@ namespace TerrariumDays.UI
             tuning = new CareTuning();
             timeService = clock ?? new TimeService(() => nowUtc);
             session = new ColonySession(atSavePath, timeService, tuning, economyTuning, new System.Random());
+            session.Room.Update(lastWeatherReport);
             colonyCare = new ColonyCareService(tuning, economyTuning);
             careService = new CareService(tuning);
             shopService = new ShopService(economyTuning, tuning);
@@ -1194,6 +1196,12 @@ namespace TerrariumDays.UI
             {
                 weatherLabel.text = text;
             }
+        }
+
+        private void OnWeatherReport(WeatherReport? report)
+        {
+            lastWeatherReport = report;
+            session?.Room.Update(report);
         }
 
         public void OnRefreshWaterClicked()

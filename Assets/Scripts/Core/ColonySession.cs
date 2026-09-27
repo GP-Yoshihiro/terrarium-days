@@ -57,6 +57,9 @@ namespace TerrariumDays.Core
 
         public bool DecorMovedToInventory { get; private set; }
 
+        /// <summary>The room temperature for nest-box eggs (§7.7); the UI updates it from the weather.</summary>
+        public RoomClimate Room { get; } = new RoomClimate();
+
         public TimeService Clock => clock;
 
         public string SavePath => savePath;

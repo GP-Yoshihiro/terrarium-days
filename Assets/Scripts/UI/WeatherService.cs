@@ -24,20 +24,22 @@ namespace TerrariumDays.UI
         public const string OfflineText = "天気を取得できません（オフライン）";
         public const string LoadingText = "天気を取得中…";
 
-        public IEnumerator Run(Action<string> onText)
+        public IEnumerator Run(Action<string> onText, Action<WeatherReport?> onReport = null)
         {
             onText(Cached() ?? LoadingText);
+            var report = onReport ?? (_ => { });
             while (true)
             {
-                yield return FetchOnce(onText);
+                yield return FetchOnce(onText, report);
                 yield return new WaitForSecondsRealtime(RefreshSeconds);
             }
         }
 
-        private IEnumerator FetchOnce(Action<string> onText)
+        private IEnumerator FetchOnce(Action<string> onText, Action<WeatherReport?> onReport)
         {
             if (!Input.location.isEnabledByUser)
             {
+                onReport(null);
                 onText(Cached() ?? LocationOffText);
                 yield break;
             }
@@ -53,6 +55,7 @@ namespace TerrariumDays.UI
             if (Input.location.status != LocationServiceStatus.Running)
             {
                 Input.location.Stop();
+                onReport(null);
                 onText(Cached() ?? LocationFailedText);
                 yield break;
             }
@@ -68,6 +71,7 @@ namespace TerrariumDays.UI
                 if (request.result == UnityWebRequest.Result.Success
                     && OpenMeteo.TryParse(request.downloadHandler.text, out var report))
                 {
+                    onReport(report);
                     var text = report.ToDisplayText();
                     PlayerPrefs.SetString(CacheKey, text);
                     PlayerPrefs.Save();
@@ -75,6 +79,7 @@ namespace TerrariumDays.UI
                 }
                 else
                 {
+                    onReport(null);
                     var cached = Cached();
                     onText(cached != null ? cached + "（前回）" : OfflineText);
                 }
