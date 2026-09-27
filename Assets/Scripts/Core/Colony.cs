@@ -46,6 +46,12 @@ namespace TerrariumDays.Core
         public int NextAnimalId { get; set; } = 1;
         public int NextCageId { get; set; } = 1;
         public int LastBilledMonthIndex { get; set; }
+        /// <summary>
+        /// How far the game clock runs ahead of real time. Debug fast-forward (the multiplier or
+        /// "+12時間") adds to it and it is saved, so saving or reloading never rewinds the game
+        /// date or replays scheduled events. Never negative; only a fresh save resets it.
+        /// </summary>
+        public TimeSpan GameClockOffset { get; set; } = TimeSpan.Zero;
         public ShopStock Shop { get; set; } = new ShopStock();
 
         public int CageCapacity => RackCount * CagesPerRack;

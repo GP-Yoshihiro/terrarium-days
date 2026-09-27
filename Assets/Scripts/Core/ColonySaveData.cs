@@ -25,6 +25,7 @@ namespace TerrariumDays.Core
         public bool shopStocked;
         public int shopMonthIndex;
         public List<ShopOfferSaveData> shopOffers = new List<ShopOfferSaveData>();
+        public long gameClockOffsetTicks;
     }
 
     [Serializable]

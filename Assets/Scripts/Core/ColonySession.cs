@@ -68,15 +68,15 @@ namespace TerrariumDays.Core
 
         public ColonyTickReport Load()
         {
-            var nowUtc = clock.UtcNow();
-            Colony = saveService.LoadOrCreate(savePath, nowUtc, random);
+            var realNow = clock.UtcNow();
+            Colony = saveService.LoadOrCreate(savePath, realNow, random);
             Migrated = saveService.LastLoadMigrated;
             DecorMovedToInventory = saveService.LastLoadMovedDecor;
             SaveBlocked = saveService.LastLoadBackupFailed;
             Calendar = new GameCalendar(Colony.CalendarEpochUtc);
-            GameNowUtc = nowUtc;
-            var report = ApplyUntil(nowUtc);
-            Resync(nowUtc);
+            GameNowUtc = realNow + Colony.GameClockOffset;
+            var report = ApplyUntil(GameNowUtc);
+            Resync(realNow);
             if (!SaveBlocked)
             {
                 saveService.Save(savePath, Colony);
@@ -93,21 +93,32 @@ namespace TerrariumDays.Core
                 return new ColonyTickReport();
             }
 
+            if (scaled > realDelta)
+            {
+                // Only the part beyond real time is fast-forward; it is kept across saves.
+                Colony.GameClockOffset += scaled - realDelta;
+            }
+
             GameNowUtc += scaled;
             return ApplyUntil(GameNowUtc);
         }
 
         public ColonyTickReport Resume()
         {
-            var nowUtc = clock.UtcNow();
-            GameNowUtc = nowUtc;
-            var report = ApplyUntil(nowUtc);
+            GameNowUtc = clock.UtcNow() + Colony.GameClockOffset;
+            var report = ApplyUntil(GameNowUtc);
             Save();
             return report;
         }
 
         public ColonyTickReport SimulateGameTime(TimeSpan span)
         {
+            if (span <= TimeSpan.Zero)
+            {
+                return new ColonyTickReport();
+            }
+
+            Colony.GameClockOffset += span;
             GameNowUtc += span;
             return ApplyUntil(GameNowUtc);
         }
@@ -178,11 +189,13 @@ namespace TerrariumDays.Core
         }
 
         /// <summary>
-        /// Re-anchors every animal and the game clock on real time, keeping each animal's
-        /// sub-step remainder so a care action is never replayed away.
+        /// <summary>
+        /// Re-anchors every animal and the game clock on real time plus the saved offset,
+        /// keeping each animal's sub-step remainder so a care action is never replayed away.
         /// </summary>
-        private void Resync(DateTimeOffset nowUtc)
+        private void Resync(DateTimeOffset realNowUtc)
         {
+            var gameNow = realNowUtc + Colony.GameClockOffset;
             var step = TimeSpan.FromMinutes(care.OfflineProgressStepMinutes);
             foreach (var pet in Colony.Animals)
             {
@@ -192,10 +205,10 @@ namespace TerrariumDays.Core
                     pending = TimeSpan.Zero;
                 }
 
-                pet.LastSavedAtUtc = nowUtc - pending;
+                pet.LastSavedAtUtc = gameNow - pending;
             }
 
-            GameNowUtc = nowUtc;
+            GameNowUtc = gameNow;
         }
     }
 }

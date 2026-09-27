@@ -190,6 +190,7 @@ namespace TerrariumDays.Core
                 NextAnimalId = data.nextAnimalId,
                 NextCageId = data.nextCageId,
                 LastBilledMonthIndex = data.lastBilledMonthIndex,
+                GameClockOffset = TimeSpan.FromTicks(Math.Max(0L, data.gameClockOffsetTicks)),
             };
             colony.Incubators.Clear();
             if (data.incubators != null && data.incubators.Count > 0)
@@ -386,6 +387,7 @@ namespace TerrariumDays.Core
                 shopSeed = colony.Shop.Seed,
                 shopStocked = colony.Shop.StockMonthIndex != ShopStock.NeverStocked,
                 shopMonthIndex = colony.Shop.StockMonthIndex,
+                gameClockOffsetTicks = colony.GameClockOffset.Ticks,
             };
             foreach (var incubator in colony.Incubators)
             {

@@ -384,5 +384,16 @@ namespace TerrariumDays.Tests
                 Directory.Delete(backupPath);
             }
         }
+
+        [Test]
+        public void RoundTrip_KeepsTheGameClockOffset()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            colony.GameClockOffset = TimeSpan.FromHours(30);
+
+            service.Save(path, colony);
+
+            Assert.That(service.LoadOrCreate(path, Now, new Random(1)).GameClockOffset, Is.EqualTo(TimeSpan.FromHours(30)));
+        }
     }
 }

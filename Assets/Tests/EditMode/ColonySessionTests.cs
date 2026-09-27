@@ -270,5 +270,64 @@ namespace TerrariumDays.Tests
             Assert.That(session.DecorMovedToInventory, Is.True);
             Assert.That(session.SaveBlocked, Is.False);
         }
+
+        [Test]
+        public void DebugFastForward_IsKeptWhenSavingAndReloading()
+        {
+            var session = NewSession();
+            session.Load();
+            session.Colony.Animals[0].NextShedAtUtc = realNow.AddDays(30);
+            session.UseClock(new TimeService(() => realNow) { TimeMultiplier = 600d });
+
+            realNow += TimeSpan.FromSeconds(60);
+            session.Advance(TimeSpan.FromSeconds(60)); // 10 game-clock hours
+            var gameNow = session.GameNowUtc;
+            session.Save();
+
+            Assert.That(gameNow, Is.EqualTo(Start + TimeSpan.FromHours(10)));
+            Assert.That(session.GameNowUtc, Is.EqualTo(gameNow), "saving must not rewind the game clock");
+            Assert.That(session.Colony.GameClockOffset, Is.EqualTo(TimeSpan.FromHours(10) - TimeSpan.FromSeconds(60)));
+
+            var reloaded = NewSession();
+            reloaded.Load();
+
+            Assert.That(reloaded.GameNowUtc, Is.EqualTo(gameNow));
+            Assert.That(reloaded.Calendar.DateAt(reloaded.GameNowUtc).ToDisplayText(),
+                Is.EqualTo(session.Calendar.DateAt(gameNow).ToDisplayText()));
+        }
+
+        [Test]
+        public void AFastForwardedMonth_IsNotRewoundOrBilledAgainAfterSaving()
+        {
+            var session = NewSession();
+            session.Load();
+            session.Colony.Animals[0].NextShedAtUtc = realNow.AddDays(30);
+
+            var first = session.SimulateGameTime(TimeSpan.FromHours(25)); // into game month 1
+            session.Save();
+            var again = session.Resume();
+
+            Assert.That(first.ElectricityCharged, Is.EqualTo(MaintenanceCosts.MonthlyElectricity(1, 1, economy)));
+            Assert.That(again.ElectricityCharged, Is.EqualTo(0));
+            Assert.That(session.GameNowUtc, Is.EqualTo(Start + TimeSpan.FromHours(25)));
+            Assert.That(session.Calendar.MonthIndexAt(session.GameNowUtc), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Resume_AfterAFastForward_AppliesOnlyTheRealTimeAway()
+        {
+            var session = NewSession();
+            session.Load();
+            var pet = session.Colony.Animals[0];
+            pet.NextShedAtUtc = realNow.AddDays(30);
+            session.SimulateGameTime(TimeSpan.FromHours(2));
+            session.Save();
+
+            realNow += TimeSpan.FromHours(1);
+            session.Resume();
+
+            Assert.That(session.GameNowUtc, Is.EqualTo(realNow + TimeSpan.FromHours(2)));
+            Assert.That(pet.Hunger, Is.EqualTo(80d - care.HungerDecayPerHour * 3d).Within(1e-6));
+        }
     }
 }
