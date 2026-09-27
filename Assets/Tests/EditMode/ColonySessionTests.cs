@@ -323,36 +323,66 @@ namespace TerrariumDays.Tests
             male.SexRevealed = true;
             male.Stage = GrowthStage.Adult;
             male.WeightGrams = 55d;
-            male.HatchedAtUtc = realNow.AddDays(-200);
+            male.HatchedAtUtc = realNow.AddDays(-365);
+            male.PersonalityKnown = true;
+            male.NextShedAtUtc = realNow.AddDays(30);
             male.LastSavedAtUtc = realNow;
-            var maleCage = session.Colony.CageOf(male);
-            maleCage.HasNestBox = true;
             var female = session.Colony.AddAnimal(new PetState
             {
                 Sex = Sex.Female,
                 SexRevealed = true,
                 Stage = GrowthStage.Adult,
                 WeightGrams = 55d,
-                HatchedAtUtc = realNow.AddDays(-200),
+                HatchedAtUtc = realNow.AddDays(-365),
+                PersonalityKnown = true,
+                NextShedAtUtc = realNow.AddDays(30),
                 LastSavedAtUtc = realNow,
             }, session.Colony.AddCage(CageSize.Standard));
+            session.Colony.CageOf(female).HasNestBox = true;
+
+            void ResetCare()
+            {
+                foreach (var pet in session.Colony.Animals)
+                {
+                    pet.Hunger = 100d;
+                    pet.Hydration = 100d;
+                    pet.Cleanliness = 100d;
+                }
+            }
 
             Assert.That(session.Breeding.StartPairing(session.Colony, male.Id, female.Id, session.GameNowUtc, session.Calendar), Is.EqualTo(PairingProblem.None));
-            Assert.That(session.Colony.PairingOf(female), Is.Not.Null);
+            var pairing = session.Colony.PairingOf(female);
+            Assert.That(pairing, Is.Not.Null);
+            pairing.SuccessChance = 1d; // pin the mating roll to always succeed
 
-            var report = session.SimulateGameTime(GameCalendar.RealTimeFor(4d)); // past the 3-day pairing window
+            ResetCare();
+            var report = session.SimulateGameTime(GameCalendar.RealTimeFor(care.PairingGameDays)); // past the pairing window
 
-            Assert.That(report.Breeding.HasEvents, Is.True, "the pairing must be resolved, one way or another, by now");
+            Assert.That(report.Breeding.PairingsSucceeded, Has.Exactly(1)
+                .Matches<(PetState Female, PetState Male)>(p => p.Female == female && p.Male == male));
+            Assert.That(report.Breeding.HasEvents, Is.True);
             Assert.That(session.Colony.Pairings, Is.Empty);
-            var wasGravid = female.Gravid != null;
+            Assert.That(female.Gravid, Is.Not.Null);
 
             session.Save();
             var reloaded = NewSession();
             reloaded.Load();
 
             var reloadedFemale = reloaded.Colony.AnimalById(female.Id);
-            Assert.That((reloadedFemale.Gravid != null), Is.EqualTo(wasGravid));
-            Assert.That(reloaded.Colony.CageOf(reloaded.Colony.AnimalById(male.Id)).HasNestBox, Is.True);
+            Assert.That(reloadedFemale.Gravid, Is.Not.Null);
+            Assert.That(reloaded.Colony.CageOf(reloadedFemale).HasNestBox, Is.True);
+
+            var nextClutchAtUtc = female.Gravid.NextClutchAtUtc;
+            ResetCare();
+            var clutchReport = session.SimulateGameTime(nextClutchAtUtc - session.GameNowUtc);
+
+            Assert.That(clutchReport.Breeding.Clutches, Has.Count.EqualTo(1));
+            Assert.That(session.Colony.Eggs, Is.Not.Empty);
+
+            session.Save();
+            var reloadedAgain = NewSession();
+            reloadedAgain.Load();
+            Assert.That(reloadedAgain.Colony.Eggs, Is.Not.Empty);
         }
 
         [Test]
