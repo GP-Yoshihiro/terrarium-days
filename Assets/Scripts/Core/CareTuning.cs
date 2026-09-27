@@ -23,6 +23,12 @@ namespace TerrariumDays.Core
         public double HealthyCareThreshold { get; set; } = 40d;
         public double LowCareThreshold { get; set; } = 20d;
 
+        /// <summary>§5.5: health at or below this makes the animal weak (衰弱).</summary>
+        public double WeakHealthThreshold { get; set; } = 0d;
+
+        /// <summary>§5.5: a weak animal recovers once health is back to this.</summary>
+        public double WeakRecoveryHealth { get; set; } = 30d;
+
         // Body weight and growth stages (grams / game months). Stage-up needs these, then a
         // PreGrowthFastGameDays fast, then a shed.
         public double HatchlingWeightGrams { get; set; } = 3d;

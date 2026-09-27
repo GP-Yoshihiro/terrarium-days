@@ -77,6 +77,12 @@ namespace TerrariumDays.Core
             set => health = StatusValue.Clamp(value);
         }
 
+        /// <summary>
+        /// §5.5 衰弱: set when health reaches 0, cleared when it is back to 30. A weak animal
+        /// cannot breed and sells for ×0.3. Adults never die; this is the failure state.
+        /// </summary>
+        public bool Weak { get; set; }
+
         public DateTimeOffset LastSavedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
         /// <summary>When the pet last shed (脱皮). Default: never, i.e. at creation.</summary>

@@ -32,12 +32,22 @@ namespace TerrariumDays.Core
             var stageBefore = state.GrowthStage;
             var sheds = 0;
             var sexRevealed = false;
+            var weakBefore = state.Weak;
 
             for (var i = 0; i < stepCount; i++)
             {
                 var stepEndUtc = previousUtc + TimeSpan.FromTicks(step.Ticks * (i + 1));
                 var refusing = AppetiteModel.IsRefusingFood(state, stepEndUtc, tuning);
                 ApplyStep(state, refusing);
+
+                if (!state.Weak && state.Health <= tuning.WeakHealthThreshold)
+                {
+                    state.Weak = true;
+                }
+                else if (state.Weak && state.Health >= tuning.WeakRecoveryHealth)
+                {
+                    state.Weak = false;
+                }
 
                 if (refusing)
                 {
@@ -75,7 +85,8 @@ namespace TerrariumDays.Core
             var appliedElapsed = TimeSpan.FromMinutes(stepCount * tuning.OfflineProgressStepMinutes);
             var stageAfter = state.GrowthStage;
 
-            return new OfflineProgressResult(appliedElapsed, stageAfter != stageBefore ? stageAfter : (GrowthStage?)null, sheds, sexRevealed);
+            return new OfflineProgressResult(appliedElapsed, stageAfter != stageBefore ? stageAfter : (GrowthStage?)null, sheds, sexRevealed,
+                !weakBefore && state.Weak, weakBefore && !state.Weak);
         }
 
         private void ApplyStep(PetState state, bool refusingFood)

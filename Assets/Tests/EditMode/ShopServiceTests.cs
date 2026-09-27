@@ -268,5 +268,18 @@ namespace TerrariumDays.Tests
             Assert.That(PersonalityReveal.ApplyIfDue(pet, Now), Is.False);
             Assert.That(pet.PersonalityKnown, Is.False);
         }
+
+        [Test]
+        public void AWeakAnimal_IsPricedAtThirtyPercent()
+        {
+            var colony = Colony.CreateNew(Now, economy, care, new Random(1));
+            var pet = colony.Animals[0];
+            var healthy = shop.MarketOf(pet);
+
+            pet.Weak = true;
+
+            Assert.That(shop.MarketOf(pet), Is.EqualTo(MarketPrice.For(pet, weak: true)));
+            Assert.That(shop.MarketOf(pet), Is.LessThan(healthy));
+        }
     }
 }

@@ -98,7 +98,7 @@ namespace TerrariumDays.Core
 
         /// <summary>
         /// The market price of this animal. <paramref name="demand"/> is the event demand
-        /// (<see cref="EventDemand.None"/> outside events); <paramref name="weak"/> is §5.5 (phase 4).
+        /// (<see cref="EventDemand.None"/> outside events); <paramref name="weak"/> is §5.5.
         /// </summary>
         public static long For(PetState pet, double demand = 1d, bool weak = false)
         {

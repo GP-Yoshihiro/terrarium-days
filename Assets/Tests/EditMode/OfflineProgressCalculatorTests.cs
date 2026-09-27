@@ -148,5 +148,48 @@ namespace TerrariumDays.Tests
             Assert.That(result.NewGrowthStage, Is.EqualTo(GrowthStage.Juvenile));
             Assert.That(result.SexRevealed, Is.True);
         }
+
+        [Test]
+        public void HealthReachingZero_MakesTheAnimalWeak()
+        {
+            var state = new PetState
+            {
+                Hunger = 0d, Hydration = 0d, Cleanliness = 0d, Health = 4d,
+                HatchedAtUtc = Epoch, LastSavedAtUtc = Epoch, NextShedAtUtc = Epoch.AddDays(30),
+            };
+
+            var result = calculator.Apply(state, Epoch, Epoch.AddHours(1));
+
+            Assert.That(state.Health, Is.EqualTo(0d));
+            Assert.That(state.Weak, Is.True);
+            Assert.That(result.BecameWeak, Is.True);
+            Assert.That(result.RecoveredFromWeak, Is.False);
+        }
+
+        [Test]
+        public void AWeakAnimal_StaysWeakUntilHealthIsBackToThirty()
+        {
+            var state = new PetState
+            {
+                Hunger = 100d, Hydration = 100d, Cleanliness = 100d, Health = 0d, Weak = true,
+                HatchedAtUtc = Epoch, LastSavedAtUtc = Epoch, NextShedAtUtc = Epoch.AddDays(30),
+            };
+
+            var first = calculator.Apply(state, Epoch, Epoch.AddHours(12)); // +2 per hour
+
+            Assert.That(state.Health, Is.EqualTo(24d).Within(1e-6));
+            Assert.That(state.Weak, Is.True);
+            Assert.That(first.BecameWeak, Is.False);
+            Assert.That(first.RecoveredFromWeak, Is.False);
+
+            state.Hunger = 100d;
+            state.Hydration = 100d;
+            state.Cleanliness = 100d;
+            var second = calculator.Apply(state, Epoch.AddHours(12), Epoch.AddHours(15).AddMinutes(10));
+
+            Assert.That(state.Health, Is.GreaterThanOrEqualTo(30d));
+            Assert.That(state.Weak, Is.False);
+            Assert.That(second.RecoveredFromWeak, Is.True);
+        }
     }
 }

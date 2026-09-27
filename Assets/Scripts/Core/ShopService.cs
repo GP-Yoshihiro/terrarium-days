@@ -30,7 +30,7 @@ namespace TerrariumDays.Core
         /// <summary>The economy tuning this service prices against; UI code reads it here instead of holding a second instance that could drift from it.</summary>
         public EconomyTuning Economy => economy;
 
-        public long MarketOf(PetState pet) => MarketPrice.For(pet, EventDemand.None);
+        public long MarketOf(PetState pet) => MarketPrice.For(pet, EventDemand.None, pet.Weak);
 
         public long PriceOf(ShopOffer offer) => MarketPrice.ShopPrice(MarketOf(offer.Animal), economy);
 
