@@ -198,6 +198,20 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void AnAnimalInAPairing_CannotBeWholesaled()
+        {
+            var colony = ColonyWithOffer(out _);
+            var male = colony.Animals[0];
+            male.Sex = Sex.Male;
+            var female = colony.AddAnimal(new PetState { Sex = Sex.Female }, colony.AddCage(CageSize.Standard));
+            colony.Pairings.Add(new Pairing { Id = 1, MaleId = male.Id, FemaleId = female.Id, StartedAtUtc = Now, EndsAtUtc = Now.AddHours(6), SuccessChance = 0.5d });
+
+            Assert.That(shop.Wholesale(colony, male.Id, Now), Is.EqualTo(ShopResult.InPairing));
+            Assert.That(shop.Wholesale(colony, female.Id, Now), Is.EqualTo(ShopResult.InPairing));
+            Assert.That(colony.Animals, Has.Count.EqualTo(2));
+        }
+
+        [Test]
         public void AfterSellingEverything_AnAnimalCanBeBoughtBack()
         {
             var colony = ColonyWithOffer(out var offer);

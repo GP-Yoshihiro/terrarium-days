@@ -9,12 +9,15 @@ namespace TerrariumDays.Core
         public List<PetState> Sheds { get; } = new List<PetState>();
         public List<PetState> SexReveals { get; } = new List<PetState>();
         public List<PetState> PersonalityReveals { get; } = new List<PetState>();
+        public List<PetState> WeakStarted { get; } = new List<PetState>();
+        public List<PetState> WeakRecovered { get; } = new List<PetState>();
         public long ElectricityCharged { get; set; }
         public TimeSpan AppliedElapsed { get; set; }
         public bool Restocked { get; set; }
+        public BreedingReport Breeding { get; set; } = new BreedingReport();
 
         public bool HasEvents => StageUps.Count > 0 || Sheds.Count > 0 || SexReveals.Count > 0 || ElectricityCharged > 0
-            || PersonalityReveals.Count > 0 || Restocked;
+            || PersonalityReveals.Count > 0 || Restocked || WeakStarted.Count > 0 || WeakRecovered.Count > 0 || Breeding.HasEvents;
     }
 
     /// <summary>
@@ -31,6 +34,7 @@ namespace TerrariumDays.Core
         private readonly System.Random random;
         private readonly ColonySaveService saveService;
         private readonly OfflineProgressCalculator calculator;
+        private readonly BreedingService breeding;
         private TimeService clock;
 
         public ColonySession(string savePath, TimeService clock, CareTuning care, EconomyTuning economy, System.Random random)
@@ -42,6 +46,7 @@ namespace TerrariumDays.Core
             this.random = random;
             saveService = new ColonySaveService(care, economy);
             calculator = new OfflineProgressCalculator(care);
+            breeding = new BreedingService(care);
         }
 
         public Colony Colony { get; private set; }
@@ -63,6 +68,8 @@ namespace TerrariumDays.Core
         public TimeService Clock => clock;
 
         public string SavePath => savePath;
+
+        public BreedingService Breeding => breeding;
 
         public void UseClock(TimeService newClock)
         {
@@ -169,8 +176,19 @@ namespace TerrariumDays.Core
                 {
                     report.PersonalityReveals.Add(pet);
                 }
+
+                if (result.BecameWeak)
+                {
+                    report.WeakStarted.Add(pet);
+                }
+
+                if (result.RecoveredFromWeak)
+                {
+                    report.WeakRecovered.Add(pet);
+                }
             }
 
+            report.Breeding = breeding.Advance(Colony, targetUtc, Calendar, Room.TemperatureC);
             report.ElectricityCharged = BillElectricity(targetUtc);
             report.Restocked = Colony.Shop.EnsureStocked(Calendar.MonthIndexAt(targetUtc), targetUtc, care);
             return report;

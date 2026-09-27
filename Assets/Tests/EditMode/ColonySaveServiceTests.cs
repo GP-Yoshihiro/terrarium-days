@@ -386,6 +386,132 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void RoundTrip_KeepsPairingsGravidEggsNestBoxAndWeakness()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            var male = colony.Animals[0];
+            male.Sex = Sex.Male;
+            var maleCage = colony.Cages[0];
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = new PetState { Sex = Sex.Female, Weak = true };
+            colony.AddAnimal(female, femaleCage);
+            maleCage.HasNestBox = true;
+
+            colony.Pairings.Add(new Pairing
+            {
+                Id = 1,
+                MaleId = male.Id,
+                FemaleId = female.Id,
+                StartedAtUtc = Now,
+                EndsAtUtc = Now.AddHours(6),
+                SuccessChance = 0.5d,
+            });
+            maleCage.VisitorAnimalId = female.Id;
+            colony.NextPairingId = 2;
+
+            var gravidFemale = new PetState { Sex = Sex.Female };
+            colony.AddAnimal(gravidFemale, colony.AddCage(CageSize.Standard));
+            gravidFemale.Gravid = new GravidState
+            {
+                PairingId = 1,
+                FatherId = male.Id,
+                FatherName = male.Name,
+                FatherGenotype = Genotype.Normal(hypo: 40d, tangerine: 0d).Set(GeneId.MackSnow, 1),
+                FatherKnown = new KnownGenetics().SetHet(GeneId.Eclipse, 0.5d),
+                Compatibility = Compatibility.Good,
+                SeasonYear = 2026,
+                ClutchesPlanned = 3,
+                ClutchesLaid = 1,
+                NextClutchAtUtc = Now.AddDays(10),
+            };
+
+            colony.Eggs.Add(new Egg
+            {
+                Id = 1,
+                MotherId = gravidFemale.Id,
+                FatherId = male.Id,
+                CageId = femaleCage.Id,
+                LaidAtUtc = Now,
+                Place = EggPlace.NestBox,
+                Fertile = true,
+                ChildGenotype = Genotype.Normal(hypo: 20d, tangerine: 10d).Set(GeneId.Eclipse, 2),
+                ChildKnown = new KnownGenetics { HetsUnknown = true },
+                DevelopmentPercent = 12.5d,
+                MiddleThirdTemperatureSum = 300d,
+                MiddleThirdGameDays = 5d,
+                ColdGameDays = 1d,
+                Failure = EggFailure.None,
+                AppliedUntilUtc = Now,
+            });
+            colony.NextEggId = 2;
+
+            service.Save(path, colony);
+            var loaded = service.LoadOrCreate(path, Now, new Random(2));
+
+            Assert.That(loaded.Pairings, Has.Count.EqualTo(1));
+            var loadedPairing = loaded.Pairings[0];
+            Assert.That((loadedPairing.MaleId, loadedPairing.FemaleId, loadedPairing.SuccessChance), Is.EqualTo((male.Id, female.Id, 0.5d)));
+            Assert.That(loadedPairing.EndsAtUtc, Is.EqualTo(Now.AddHours(6)));
+            Assert.That(loaded.CageOf(loaded.AnimalById(male.Id)).VisitorAnimalId, Is.EqualTo(female.Id));
+            Assert.That(loaded.CageOf(loaded.AnimalById(male.Id)).HasNestBox, Is.True);
+            Assert.That(loaded.AnimalById(female.Id).Weak, Is.True);
+
+            var loadedGravid = loaded.AnimalById(gravidFemale.Id).Gravid;
+            Assert.That(loadedGravid, Is.Not.Null);
+            Assert.That((loadedGravid.FatherId, loadedGravid.FatherName, loadedGravid.Compatibility), Is.EqualTo((male.Id, male.Name, Compatibility.Good)));
+            Assert.That(loadedGravid.FatherGenotype.Copies(GeneId.MackSnow), Is.EqualTo(1));
+            Assert.That(loadedGravid.FatherKnown.HetProbability(GeneId.Eclipse), Is.EqualTo(0.5d).Within(1e-9));
+            Assert.That((loadedGravid.SeasonYear, loadedGravid.ClutchesPlanned, loadedGravid.ClutchesLaid), Is.EqualTo((2026, 3, 1)));
+
+            Assert.That(loaded.Eggs, Has.Count.EqualTo(1));
+            var loadedEgg = loaded.Eggs[0];
+            Assert.That((loadedEgg.MotherId, loadedEgg.FatherId, loadedEgg.Fertile, loadedEgg.Place), Is.EqualTo((gravidFemale.Id, male.Id, true, EggPlace.NestBox)));
+            Assert.That(loadedEgg.ChildGenotype.Copies(GeneId.Eclipse), Is.EqualTo(2));
+            Assert.That(loadedEgg.ChildKnown.HetsUnknown, Is.True);
+            Assert.That(loadedEgg.DevelopmentPercent, Is.EqualTo(12.5d));
+
+            Assert.That(loaded.NextPairingId, Is.EqualTo(2));
+            Assert.That(loaded.NextEggId, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void APhaseThreeSave_LoadsWithNoBreeding()
+        {
+            WriteSchemaThreeWithAnimal("{" + AnimalBase + "}");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(colony.Pairings, Is.Empty);
+            Assert.That(colony.Eggs, Is.Empty);
+            Assert.That(colony.Animals.TrueForAll(a => a.Gravid == null), Is.True);
+            Assert.That((colony.NextPairingId, colony.NextEggId), Is.EqualTo((1, 1)));
+        }
+
+        [Test]
+        public void APairingWithAMissingAnimal_IsDropped()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            var male = colony.Animals[0];
+            male.Sex = Sex.Male;
+
+            colony.Pairings.Add(new Pairing
+            {
+                Id = 1,
+                MaleId = male.Id,
+                FemaleId = 999,
+                StartedAtUtc = Now,
+                EndsAtUtc = Now.AddHours(6),
+                SuccessChance = 0.5d,
+            });
+
+            service.Save(path, colony);
+            var loaded = service.LoadOrCreate(path, Now, new Random(2));
+
+            Assert.That(loaded.Pairings, Is.Empty);
+        }
+
+        [Test]
         public void RoundTrip_KeepsTheGameClockOffset()
         {
             var colony = service.LoadOrCreate(path, Now, new Random(1));

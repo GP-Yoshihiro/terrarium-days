@@ -44,6 +44,7 @@ namespace TerrariumDays.Tests
             Assert.That(ShopText.FailureMessage(ShopResult.NoRackSpace), Is.EqualTo("ラックに空きがありません（先にラックを買ってください）"));
             Assert.That(ShopText.FailureMessage(ShopResult.RackLimit), Is.EqualTo("ラックはこれ以上置けません"));
             Assert.That(ShopText.FailureMessage(ShopResult.NotFound), Is.EqualTo("もう売り切れました"));
+            Assert.That(ShopText.FailureMessage(ShopResult.InPairing), Is.EqualTo("ペアリング中の個体は売れません"));
             Assert.That(ShopText.FailureMessage(ShopResult.Ok), Is.EqualTo(string.Empty));
         }
 

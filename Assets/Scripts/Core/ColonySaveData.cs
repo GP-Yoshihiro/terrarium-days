@@ -26,6 +26,64 @@ namespace TerrariumDays.Core
         public int shopMonthIndex;
         public List<ShopOfferSaveData> shopOffers = new List<ShopOfferSaveData>();
         public long gameClockOffsetTicks;
+        public int nextPairingId;
+        public int nextEggId;
+        public List<PairingSaveData> pairings = new List<PairingSaveData>();
+        public List<GravidSaveData> gravidStates = new List<GravidSaveData>();
+        public List<EggSaveData> eggs = new List<EggSaveData>();
+    }
+
+    [Serializable]
+    public sealed class PairingSaveData
+    {
+        public int id;
+        public int maleId;
+        public int femaleId;
+        public string startedAtUtc;
+        public string endsAtUtc;
+        public double successChance;
+    }
+
+    [Serializable]
+    public sealed class GravidSaveData
+    {
+        public int animalId;
+        public int pairingId;
+        public int fatherId;
+        public string fatherName;
+        public List<GeneSaveData> fatherGenes;
+        public double fatherHypo;
+        public double fatherTangerine;
+        public List<HetSaveData> fatherHets;
+        public bool fatherHetsUnknown;
+        public string compatibility;
+        public int seasonYear;
+        public int clutchesPlanned;
+        public int clutchesLaid;
+        public string nextClutchAtUtc;
+    }
+
+    [Serializable]
+    public sealed class EggSaveData
+    {
+        public int id;
+        public int motherId;
+        public int fatherId;
+        public int cageId;
+        public string laidAtUtc;
+        public string place;
+        public bool fertile;
+        public List<GeneSaveData> genes;
+        public double hypo;
+        public double tangerine;
+        public List<HetSaveData> hets;
+        public bool hetsUnknown;
+        public double developmentPercent;
+        public double middleThirdTemperatureSum;
+        public double middleThirdGameDays;
+        public double coldGameDays;
+        public string failure;
+        public string appliedUntilUtc;
     }
 
     [Serializable]
@@ -71,6 +129,7 @@ namespace TerrariumDays.Core
         public bool personalityKnown;
         public bool sexRevealed;
         public string personalityRevealAtUtc;
+        public bool weak;
     }
 
     [Serializable]
@@ -94,6 +153,7 @@ namespace TerrariumDays.Core
         public string size;
         public int animalId;
         public List<string> decorIds = new List<string>();
+        public bool hasNestBox;
     }
 
     [Serializable]

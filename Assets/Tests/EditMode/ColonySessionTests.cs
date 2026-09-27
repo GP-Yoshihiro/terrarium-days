@@ -314,6 +314,67 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void ABreedingPair_PairsLaysAndSurvivesReloads()
+        {
+            var session = NewSession();
+            session.Load();
+            var male = session.Colony.Animals[0];
+            male.Sex = Sex.Male;
+            male.SexRevealed = true;
+            male.Stage = GrowthStage.Adult;
+            male.WeightGrams = 55d;
+            male.HatchedAtUtc = realNow.AddDays(-200);
+            male.LastSavedAtUtc = realNow;
+            var maleCage = session.Colony.CageOf(male);
+            maleCage.HasNestBox = true;
+            var female = session.Colony.AddAnimal(new PetState
+            {
+                Sex = Sex.Female,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                HatchedAtUtc = realNow.AddDays(-200),
+                LastSavedAtUtc = realNow,
+            }, session.Colony.AddCage(CageSize.Standard));
+
+            Assert.That(session.Breeding.StartPairing(session.Colony, male.Id, female.Id, session.GameNowUtc, session.Calendar), Is.EqualTo(PairingProblem.None));
+            Assert.That(session.Colony.PairingOf(female), Is.Not.Null);
+
+            var report = session.SimulateGameTime(GameCalendar.RealTimeFor(4d)); // past the 3-day pairing window
+
+            Assert.That(report.Breeding.HasEvents, Is.True, "the pairing must be resolved, one way or another, by now");
+            Assert.That(session.Colony.Pairings, Is.Empty);
+            var wasGravid = female.Gravid != null;
+
+            session.Save();
+            var reloaded = NewSession();
+            reloaded.Load();
+
+            var reloadedFemale = reloaded.Colony.AnimalById(female.Id);
+            Assert.That((reloadedFemale.Gravid != null), Is.EqualTo(wasGravid));
+            Assert.That(reloaded.Colony.CageOf(reloaded.Colony.AnimalById(male.Id)).HasNestBox, Is.True);
+        }
+
+        [Test]
+        public void HealthReachingZero_IsReportedAsWeak()
+        {
+            var session = NewSession();
+            session.Load();
+            var pet = session.Colony.Animals[0];
+            pet.Health = 2d;
+            pet.Hunger = 0d;
+            pet.Hydration = 0d;
+            pet.Cleanliness = 0d;
+            pet.LastSavedAtUtc = realNow;
+
+            var report = session.SimulateGameTime(TimeSpan.FromHours(1));
+
+            Assert.That(report.WeakStarted, Is.EquivalentTo(new[] { pet }));
+            Assert.That(pet.Weak, Is.True);
+            Assert.That(report.HasEvents, Is.True);
+        }
+
+        [Test]
         public void Resume_AfterAFastForward_AppliesOnlyTheRealTimeAway()
         {
             var session = NewSession();

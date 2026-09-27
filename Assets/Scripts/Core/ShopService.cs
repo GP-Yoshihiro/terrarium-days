@@ -9,7 +9,8 @@ namespace TerrariumDays.Core
         NotEnoughMoney,
         NoEmptyCage,
         NoRackSpace,
-        RackLimit
+        RackLimit,
+        InPairing
     }
 
     /// <summary>
@@ -118,6 +119,11 @@ namespace TerrariumDays.Core
             if (pet == null)
             {
                 return ShopResult.NotFound;
+            }
+
+            if (colony.PairingOf(pet) != null)
+            {
+                return ShopResult.InPairing;
             }
 
             var pay = WholesalePriceOf(pet);

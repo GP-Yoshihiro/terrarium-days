@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 namespace TerrariumDays.Core
@@ -235,6 +236,7 @@ namespace TerrariumDays.Core
                     DecorIds = data.inventoryVersion >= CurrentInventoryVersion && c.decorIds != null
                         ? new List<string>(c.decorIds)
                         : new List<string>(),
+                    HasNestBox = c.hasNestBox,
                 });
             }
 
@@ -280,6 +282,98 @@ namespace TerrariumDays.Core
                 }
             }
 
+            if (data.pairings != null)
+            {
+                foreach (var p in data.pairings)
+                {
+                    var male = colony.AnimalById(p.maleId);
+                    var female = colony.AnimalById(p.femaleId);
+                    if (male == null || female == null || male.Id == female.Id)
+                    {
+                        continue;
+                    }
+
+                    var maleCage = colony.CageOf(male);
+                    var femaleCage = colony.CageOf(female);
+                    if (maleCage == null || femaleCage == null)
+                    {
+                        continue;
+                    }
+
+                    if (colony.PairingOf(male) != null || colony.PairingOf(female) != null)
+                    {
+                        continue;
+                    }
+
+                    colony.Pairings.Add(new Pairing
+                    {
+                        Id = p.id,
+                        MaleId = p.maleId,
+                        FemaleId = p.femaleId,
+                        StartedAtUtc = Parse(p.startedAtUtc, nowUtc),
+                        EndsAtUtc = Parse(p.endsAtUtc, nowUtc),
+                        SuccessChance = p.successChance,
+                    });
+                    maleCage.VisitorAnimalId = female.Id;
+                }
+            }
+
+            if (data.gravidStates != null)
+            {
+                foreach (var g in data.gravidStates)
+                {
+                    var animal = colony.AnimalById(g.animalId);
+                    if (animal == null || animal.Sex != Sex.Female)
+                    {
+                        continue;
+                    }
+
+                    animal.Gravid = new GravidState
+                    {
+                        PairingId = g.pairingId,
+                        FatherId = g.fatherId,
+                        FatherName = g.fatherName,
+                        FatherGenotype = GenotypeFrom(g.fatherGenes, g.fatherHypo, g.fatherTangerine),
+                        FatherKnown = KnownFrom(g.fatherHets, g.fatherHetsUnknown),
+                        Compatibility = TryParseDefined(g.compatibility, out Compatibility compatibility) ? compatibility : Compatibility.Normal,
+                        SeasonYear = g.seasonYear,
+                        ClutchesPlanned = g.clutchesPlanned,
+                        ClutchesLaid = g.clutchesLaid,
+                        NextClutchAtUtc = Parse(g.nextClutchAtUtc, nowUtc),
+                    };
+                }
+            }
+
+            if (data.eggs != null)
+            {
+                foreach (var e in data.eggs)
+                {
+                    colony.Eggs.Add(new Egg
+                    {
+                        Id = e.id,
+                        MotherId = e.motherId,
+                        FatherId = e.fatherId,
+                        CageId = e.cageId,
+                        LaidAtUtc = Parse(e.laidAtUtc, nowUtc),
+                        Place = TryParseDefined(e.place, out EggPlace place) ? place : EggPlace.NestBox,
+                        Fertile = e.fertile,
+                        ChildGenotype = GenotypeFrom(e.genes, e.hypo, e.tangerine),
+                        ChildKnown = KnownFrom(e.hets, e.hetsUnknown),
+                        DevelopmentPercent = e.developmentPercent,
+                        MiddleThirdTemperatureSum = e.middleThirdTemperatureSum,
+                        MiddleThirdGameDays = e.middleThirdGameDays,
+                        ColdGameDays = e.coldGameDays,
+                        Failure = TryParseDefined(e.failure, out EggFailure failure) ? failure : EggFailure.None,
+                        AppliedUntilUtc = Parse(e.appliedUntilUtc, nowUtc),
+                    });
+                }
+            }
+
+            var maxPairingId = colony.Pairings.Count > 0 ? colony.Pairings.Max(p => p.Id) : 0;
+            colony.NextPairingId = Math.Max(1, Math.Max(data.nextPairingId, maxPairingId + 1));
+            var maxEggId = colony.Eggs.Count > 0 ? colony.Eggs.Max(e => e.Id) : 0;
+            colony.NextEggId = Math.Max(1, Math.Max(data.nextEggId, maxEggId + 1));
+
             return colony;
         }
 
@@ -313,38 +407,13 @@ namespace TerrariumDays.Core
                 LastShedAtUtc = Parse(a.lastShedAtUtc, nowUtc),
                 NextShedAtUtc = Parse(a.nextShedAtUtc, nowUtc),
                 SexRevealed = a.sexRevealed,
+                Weak = a.weak,
             };
 
             if (a.genomeVersion >= 1)
             {
-                var genotype = Genotype.Normal(a.hypo, a.tangerine);
-                if (a.genes != null)
-                {
-                    foreach (var g in a.genes)
-                    {
-                        if (TryParseDefined(g.gene, out GeneId geneId))
-                        {
-                            genotype.Set(geneId, g.copies);
-                        }
-                    }
-                }
-
-                pet.Genotype = genotype;
-
-                var known = new KnownGenetics { HetsUnknown = a.hetsUnknown };
-                if (a.hets != null)
-                {
-                    foreach (var h in a.hets)
-                    {
-                        if (TryParseDefined(h.gene, out GeneId geneId))
-                        {
-                            known.SetHet(geneId, h.probability);
-                        }
-                    }
-                }
-
-                pet.Known = known;
-
+                pet.Genotype = GenotypeFrom(a.genes, a.hypo, a.tangerine);
+                pet.Known = KnownFrom(a.hets, a.hetsUnknown);
                 pet.Personality = TryParseDefined(a.personality, out Personality personality) ? personality : PersonalityTraits.Roll(random);
                 pet.PersonalityKnown = a.personalityKnown;
             }
@@ -388,6 +457,8 @@ namespace TerrariumDays.Core
                 shopStocked = colony.Shop.StockMonthIndex != ShopStock.NeverStocked,
                 shopMonthIndex = colony.Shop.StockMonthIndex,
                 gameClockOffsetTicks = colony.GameClockOffset.Ticks,
+                nextPairingId = colony.NextPairingId,
+                nextEggId = colony.NextEggId,
             };
             foreach (var incubator in colony.Incubators)
             {
@@ -418,6 +489,7 @@ namespace TerrariumDays.Core
                     size = c.Size.ToString(),
                     animalId = c.AnimalId,
                     decorIds = new List<string>(c.DecorIds),
+                    hasNestBox = c.HasNestBox,
                 });
             }
 
@@ -431,27 +503,78 @@ namespace TerrariumDays.Core
                 data.shopOffers.Add(new ShopOfferSaveData { offerId = offer.OfferId, animal = ToAnimalSaveData(offer.Animal) });
             }
 
+            foreach (var p in colony.Pairings)
+            {
+                data.pairings.Add(new PairingSaveData
+                {
+                    id = p.Id,
+                    maleId = p.MaleId,
+                    femaleId = p.FemaleId,
+                    startedAtUtc = Format(p.StartedAtUtc),
+                    endsAtUtc = Format(p.EndsAtUtc),
+                    successChance = p.SuccessChance,
+                });
+            }
+
+            foreach (var a in colony.Animals)
+            {
+                if (a.Gravid == null)
+                {
+                    continue;
+                }
+
+                var g = a.Gravid;
+                data.gravidStates.Add(new GravidSaveData
+                {
+                    animalId = a.Id,
+                    pairingId = g.PairingId,
+                    fatherId = g.FatherId,
+                    fatherName = g.FatherName,
+                    fatherGenes = GenesToSave(g.FatherGenotype),
+                    fatherHypo = g.FatherGenotype.Hypo,
+                    fatherTangerine = g.FatherGenotype.Tangerine,
+                    fatherHets = HetsToSave(g.FatherKnown),
+                    fatherHetsUnknown = g.FatherKnown.HetsUnknown,
+                    compatibility = g.Compatibility.ToString(),
+                    seasonYear = g.SeasonYear,
+                    clutchesPlanned = g.ClutchesPlanned,
+                    clutchesLaid = g.ClutchesLaid,
+                    nextClutchAtUtc = Format(g.NextClutchAtUtc),
+                });
+            }
+
+            foreach (var e in colony.Eggs)
+            {
+                data.eggs.Add(new EggSaveData
+                {
+                    id = e.Id,
+                    motherId = e.MotherId,
+                    fatherId = e.FatherId,
+                    cageId = e.CageId,
+                    laidAtUtc = Format(e.LaidAtUtc),
+                    place = e.Place.ToString(),
+                    fertile = e.Fertile,
+                    genes = GenesToSave(e.ChildGenotype),
+                    hypo = e.ChildGenotype.Hypo,
+                    tangerine = e.ChildGenotype.Tangerine,
+                    hets = HetsToSave(e.ChildKnown),
+                    hetsUnknown = e.ChildKnown.HetsUnknown,
+                    developmentPercent = e.DevelopmentPercent,
+                    middleThirdTemperatureSum = e.MiddleThirdTemperatureSum,
+                    middleThirdGameDays = e.MiddleThirdGameDays,
+                    coldGameDays = e.ColdGameDays,
+                    failure = e.Failure.ToString(),
+                    appliedUntilUtc = Format(e.AppliedUntilUtc),
+                });
+            }
+
             return data;
         }
 
         private static AnimalSaveData ToAnimalSaveData(PetState a)
         {
-            var genes = new List<GeneSaveData>();
-            var hets = new List<HetSaveData>();
-            foreach (var gene in Genes.All)
-            {
-                var copies = a.Genotype.Copies(gene);
-                if (copies >= 1)
-                {
-                    genes.Add(new GeneSaveData { gene = gene.ToString(), copies = copies });
-                }
-
-                var probability = a.Known.HetProbability(gene);
-                if (probability > 0d)
-                {
-                    hets.Add(new HetSaveData { gene = gene.ToString(), probability = probability });
-                }
-            }
+            var genes = GenesToSave(a.Genotype);
+            var hets = HetsToSave(a.Known);
 
             return new AnimalSaveData
             {
@@ -481,7 +604,72 @@ namespace TerrariumDays.Core
                 personalityKnown = a.PersonalityKnown,
                 sexRevealed = a.SexRevealed,
                 personalityRevealAtUtc = a.PersonalityRevealAtUtc.HasValue ? Format(a.PersonalityRevealAtUtc.Value) : string.Empty,
+                weak = a.Weak,
             };
+        }
+
+        private static List<GeneSaveData> GenesToSave(Genotype genotype)
+        {
+            var genes = new List<GeneSaveData>();
+            foreach (var gene in Genes.All)
+            {
+                var copies = genotype.Copies(gene);
+                if (copies >= 1)
+                {
+                    genes.Add(new GeneSaveData { gene = gene.ToString(), copies = copies });
+                }
+            }
+
+            return genes;
+        }
+
+        private static List<HetSaveData> HetsToSave(KnownGenetics known)
+        {
+            var hets = new List<HetSaveData>();
+            foreach (var gene in Genes.All)
+            {
+                var probability = known.HetProbability(gene);
+                if (probability > 0d)
+                {
+                    hets.Add(new HetSaveData { gene = gene.ToString(), probability = probability });
+                }
+            }
+
+            return hets;
+        }
+
+        private static Genotype GenotypeFrom(List<GeneSaveData> genes, double hypo, double tangerine)
+        {
+            var genotype = Genotype.Normal(hypo, tangerine);
+            if (genes != null)
+            {
+                foreach (var g in genes)
+                {
+                    if (TryParseDefined(g.gene, out GeneId geneId))
+                    {
+                        genotype.Set(geneId, g.copies);
+                    }
+                }
+            }
+
+            return genotype;
+        }
+
+        private static KnownGenetics KnownFrom(List<HetSaveData> hets, bool hetsUnknown)
+        {
+            var known = new KnownGenetics { HetsUnknown = hetsUnknown };
+            if (hets != null)
+            {
+                foreach (var h in hets)
+                {
+                    if (TryParseDefined(h.gene, out GeneId geneId))
+                    {
+                        known.SetHet(geneId, h.probability);
+                    }
+                }
+            }
+
+            return known;
         }
 
         private static string Format(DateTimeOffset value) => value.ToString(TimestampFormat, CultureInfo.InvariantCulture);

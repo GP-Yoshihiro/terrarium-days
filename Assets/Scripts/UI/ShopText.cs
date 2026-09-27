@@ -38,6 +38,8 @@ namespace TerrariumDays.UI
                     return "ラックはこれ以上置けません";
                 case ShopResult.NotFound:
                     return "もう売り切れました";
+                case ShopResult.InPairing:
+                    return "ペアリング中の個体は売れません";
                 default:
                     return string.Empty;
             }
