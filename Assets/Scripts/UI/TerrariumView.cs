@@ -53,6 +53,8 @@ namespace TerrariumDays.UI
         private VisualElement profileChips;
         private string lastProfileChipsSignature;
         private VisualElement growthGaugeFill;
+        private Label breedingStatusLabel;
+        private Button nestBoxButton;
 
         private VisualElement hungerBarFill;
         private Label hungerValueLabel;
@@ -95,6 +97,7 @@ namespace TerrariumDays.UI
         private Button debugClearSaveButton;
         private Button debugAddCageButton;
         private Button debugAddPetButton;
+        private Button debugAddPairButton;
         private Label debugAppliedElapsedLabel;
         private Slider debugHungerSlider;
         private Slider debugHydrationSlider;
@@ -299,6 +302,16 @@ namespace TerrariumDays.UI
                 debugAddPetButton.clicked += OnDebugAddPetClicked;
             }
 
+            if (debugAddPairButton != null)
+            {
+                debugAddPairButton.clicked += OnDebugAddPairClicked;
+            }
+
+            if (nestBoxButton != null)
+            {
+                nestBoxButton.clicked += OnNestBoxButtonClicked;
+            }
+
             debugHungerSliderCallback = evt => OnDebugHungerChanged(evt.newValue);
             debugHydrationSliderCallback = evt => OnDebugHydrationChanged(evt.newValue);
             debugCleanlinessSliderCallback = evt => OnDebugCleanlinessChanged(evt.newValue);
@@ -371,7 +384,7 @@ namespace TerrariumDays.UI
             careService = new CareService(tuning);
             shopService = new ShopService(economyTuning, tuning);
             var report = session.Load();
-            var first = session.Colony.OccupiedCages();
+            var first = session.Colony.ShownCages();
             if (first.Count > 0)
             {
                 SelectCage(first[0].Id);
@@ -405,7 +418,7 @@ namespace TerrariumDays.UI
         public bool SelectCage(int cageId)
         {
             var cage = session.Colony.Cages.Find(c => c.Id == cageId);
-            var pet = session.Colony.AnimalIn(cage);
+            var pet = session.Colony.ResidentShown(cage);
             if (pet == null)
             {
                 return false;
@@ -456,7 +469,7 @@ namespace TerrariumDays.UI
 
         public void ShowCageStep(int delta)
         {
-            var occupied = session.Colony.OccupiedCages();
+            var occupied = session.Colony.ShownCages();
             if (occupied.Count == 0)
             {
                 return;
@@ -500,6 +513,34 @@ namespace TerrariumDays.UI
             if (state != null && report.PersonalityReveals.Contains(state))
             {
                 ShowFeedback(PersonalityReveal.Message(state));
+            }
+
+            var breedingMessages = new List<string>();
+            foreach (var pet in report.WeakStarted)
+            {
+                breedingMessages.Add(BreedingText.WeakStartedMessage(pet, tuning));
+            }
+
+            foreach (var pet in report.WeakRecovered)
+            {
+                breedingMessages.Add(BreedingText.WeakRecoveredMessage(pet));
+            }
+
+            breedingMessages.AddRange(BreedingText.Messages(report.Breeding, tuning));
+            var breedingSummary = BreedingText.Summary(breedingMessages);
+            if (!string.IsNullOrEmpty(breedingSummary))
+            {
+                ShowFeedback(breedingSummary);
+            }
+
+            // The current selection went away (its pairing just started): follow her to the male's cage.
+            if (state != null && currentCage != null && session.Colony.ResidentShown(currentCage) == null)
+            {
+                var visitingCage = session.Colony.CageShowing(state);
+                if (visitingCage != null && visitingCage != currentCage)
+                {
+                    SelectCage(visitingCage.Id);
+                }
             }
 
             if (state != null && (report.AppliedElapsed > TimeSpan.Zero || report.HasEvents))
@@ -564,10 +605,39 @@ namespace TerrariumDays.UI
         public void OnLedgerAnimalTapped(int animalId)
         {
             var pet = session?.Colony.AnimalById(animalId);
-            var cage = pet != null ? session.Colony.CageOf(pet) : null;
+            var cage = pet != null ? session.Colony.CageShowing(pet) : null;
             if (cage != null && SelectCage(cage.Id))
             {
                 navigator?.ShowCageDetail();
+            }
+        }
+
+        /// <summary>Places or removes the current cage's nest box, based on whether it already has one.</summary>
+        public void OnNestBoxButtonClicked()
+        {
+            if (session == null || currentCage == null)
+            {
+                return;
+            }
+
+            var result = currentCage.HasNestBox
+                ? session.Breeding.RemoveNestBox(session.Colony, currentCage)
+                : session.Breeding.PlaceNestBox(session.Colony, currentCage);
+
+            if (result == NestBoxResult.Ok)
+            {
+                ShowFeedback(currentCage.HasNestBox ? BreedingText.NestBoxPlacedMessage : BreedingText.NestBoxRemovedMessage);
+                SaveCurrentState();
+                ColonyChanged?.Invoke();
+            }
+            else
+            {
+                ShowFeedback(BreedingText.NestBoxMessage(result));
+            }
+
+            if (state != null)
+            {
+                Render(state, tuning);
             }
         }
 
@@ -837,6 +907,16 @@ namespace TerrariumDays.UI
                 debugAddPetButton.clicked -= OnDebugAddPetClicked;
             }
 
+            if (debugAddPairButton != null)
+            {
+                debugAddPairButton.clicked -= OnDebugAddPairClicked;
+            }
+
+            if (nestBoxButton != null)
+            {
+                nestBoxButton.clicked -= OnNestBoxButtonClicked;
+            }
+
             if (debugHungerSliderCallback != null)
             {
                 debugHungerSlider?.UnregisterValueChangedCallback(debugHungerSliderCallback);
@@ -893,6 +973,8 @@ namespace TerrariumDays.UI
             profileChips = root.Q<VisualElement>("profile-chips");
             lastProfileChipsSignature = null;
             growthGaugeFill = root.Q<VisualElement>("growth-gauge-fill");
+            breedingStatusLabel = root.Q<Label>("breeding-status-label");
+            nestBoxButton = root.Q<Button>("nest-box-button");
 
             hungerBarFill = root.Q<VisualElement>("hunger-bar-fill");
             hungerValueLabel = root.Q<Label>("hunger-value-label");
@@ -969,6 +1051,7 @@ namespace TerrariumDays.UI
             debugClearSaveButton = root.Q<Button>("debug-clear-save-button");
             debugAddCageButton = root.Q<Button>("debug-add-cage-button");
             debugAddPetButton = root.Q<Button>("debug-add-pet-button");
+            debugAddPairButton = root.Q<Button>("debug-add-pair-button");
             debugAppliedElapsedLabel = root.Q<Label>("debug-applied-elapsed-label");
             debugHungerSlider = root.Q<Slider>("debug-hunger-slider");
             debugHydrationSlider = root.Q<Slider>("debug-hydration-slider");
@@ -1683,6 +1766,65 @@ namespace TerrariumDays.UI
             ColonyChanged?.Invoke();
         }
 
+        /// <summary>Debug helper: adds a breeding-ready adult male and female, adding cages as needed.</summary>
+        public void OnDebugAddPairClicked()
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            var empty = session.Colony.Cages.FindAll(c => c.IsEmpty);
+            while (empty.Count < 2)
+            {
+                var added = session.Colony.AddCage(CageSize.Standard);
+                if (added == null)
+                {
+                    ShowFeedback("ラックがいっぱいです");
+                    return;
+                }
+
+                empty.Add(added);
+            }
+
+            var now = GameNowUtc();
+            var hatchedAt = now - TimeSpan.FromDays(12);
+            var random = new System.Random();
+
+            var maleShowcase = StarterGenetics.Showcase[(session.Colony.NextAnimalId - 1) % StarterGenetics.Showcase.Count];
+            session.Colony.AddAnimal(new PetState
+            {
+                Name = $"レオパ{session.Colony.NextAnimalId}",
+                Sex = Sex.Male,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                HatchedAtUtc = hatchedAt,
+                LastSavedAtUtc = now,
+                PersonalityKnown = true,
+                Personality = PersonalityTraits.Roll(random),
+                Genotype = maleShowcase.Genotype.Clone(),
+            }, empty[0]);
+
+            var femaleShowcase = StarterGenetics.Showcase[(session.Colony.NextAnimalId - 1) % StarterGenetics.Showcase.Count];
+            session.Colony.AddAnimal(new PetState
+            {
+                Name = $"レオパ{session.Colony.NextAnimalId}",
+                Sex = Sex.Female,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                HatchedAtUtc = hatchedAt,
+                LastSavedAtUtc = now,
+                PersonalityKnown = true,
+                Personality = PersonalityTraits.Roll(random),
+                Genotype = femaleShowcase.Genotype.Clone(),
+            }, empty[1]);
+
+            SaveCurrentState();
+            ColonyChanged?.Invoke();
+        }
+
         public void OnDebugHungerChanged(double value)
         {
             if (state == null)
@@ -1941,7 +2083,7 @@ namespace TerrariumDays.UI
                 ShowShopMessage(ShopText.WholesaleMessage(name, pay));
                 if (wasSelected)
                 {
-                    var occupied = session.Colony.OccupiedCages();
+                    var occupied = session.Colony.ShownCages();
                     if (occupied.Count > 0)
                     {
                         SelectCage(occupied[0].Id);
@@ -1971,6 +2113,8 @@ namespace TerrariumDays.UI
 
             growthGaugeFill.style.width = new Length((float)(GrowthModel.ProgressToNextStage(petState, GameNowUtc(), careTuning) * 100d), LengthUnit.Percent);
 
+            RenderBreedingStatus(petState);
+
             RenderStatusRow(hungerBarFill, hungerValueLabel, petState.Hunger, careTuning);
             RenderStatusRow(hydrationBarFill, hydrationValueLabel, petState.Hydration, careTuning);
             RenderStatusRow(cleanlinessBarFill, cleanlinessValueLabel, petState.Cleanliness, careTuning);
@@ -1979,6 +2123,24 @@ namespace TerrariumDays.UI
             RenderDecorImages();
             petActor?.SetCondition(PetMoodEvaluator.Evaluate(petState, careTuning, petBehaviourTuning), petState.GrowthStage);
             petActor?.SetAppetite(AppetiteModel.Evaluate(petState, GameNowUtc(), careTuning));
+        }
+
+        /// <summary>Weakness/visitor/gravid/egg lines on the cage detail, and the nest box button's label.</summary>
+        private void RenderBreedingStatus(PetState petState)
+        {
+            if (breedingStatusLabel != null && currentCage != null && session != null)
+            {
+                var lines = BreedingText.CageDetailLines(session.Colony, currentCage, petState, session.Calendar, session.Room, GameNowUtc(), tuning);
+                var text = string.Join("\n", lines);
+                breedingStatusLabel.text = text;
+                breedingStatusLabel.style.visibility = lines.Count == 0 ? Visibility.Hidden : Visibility.Visible;
+                breedingStatusLabel.EnableInClassList("breeding-status-weak", lines.Count > 0 && lines[0] == BreedingText.WeakStatus);
+            }
+
+            if (nestBoxButton != null && currentCage != null && session != null)
+            {
+                nestBoxButton.text = BreedingText.NestBoxButtonLabel(currentCage, session.Colony.Inventory);
+            }
         }
 
         /// <summary>

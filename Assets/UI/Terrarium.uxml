@@ -35,6 +35,10 @@
                         </ui:VisualElement>
                         <ui:Label name="growth-stage-label" text="ベビー 3.0g" class="growth-stage-label" />
                         <ui:VisualElement name="profile-chips" class="profile-chips" />
+                        <ui:VisualElement name="breeding-row" class="breeding-row">
+                            <ui:Label name="breeding-status-label" text="" class="breeding-status-label" />
+                            <ui:Button name="nest-box-button" text="産卵床を置く" class="nest-box-button" />
+                        </ui:VisualElement>
                         <ui:VisualElement name="growth-gauge-track" class="gauge-track">
                             <ui:VisualElement name="growth-gauge-fill" class="gauge-fill" />
                         </ui:VisualElement>
@@ -200,6 +204,7 @@
                 <ui:VisualElement class="debug-multiplier-row">
                     <ui:Button name="debug-add-cage-button" text="ケージ追加" class="debug-small-button" />
                     <ui:Button name="debug-add-pet-button" text="個体追加" class="debug-small-button" />
+                    <ui:Button name="debug-add-pair-button" text="繁殖ペア追加" class="debug-small-button" />
                 </ui:VisualElement>
                 <ui:Button name="debug-clear-save-button" text="セーブデータ削除" class="debug-clear-save-button" />
                 <ui:Button name="debug-close-button" text="とじる" class="milestone-continue-button" />

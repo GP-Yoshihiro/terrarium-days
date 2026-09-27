@@ -158,6 +158,92 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "cage-list-breeding");
         }
 
+        /// <summary>
+        /// Captures the cage detail screen for a visiting pair and for a weak, gravid animal
+        /// whose eggs sit in the nest box, into Logs/Screens/cage-visiting.png and cage-eggs.png,
+        /// so breeding-status-label's wording, weak-red colour and layout (never overlapping the
+        /// terrarium or the care buttons, at most three lines) can be checked by eye.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureCageBreeding()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var colony = view.Session.Colony;
+            var showcase = StarterGenetics.Showcase;
+            colony.RackCount = Mathf.Max(colony.RackCount, Mathf.CeilToInt((colony.Cages.Count + 3) / (float)Colony.CagesPerRack));
+
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState
+            {
+                Name = "タロウ",
+                Sex = Sex.Male,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                Genotype = showcase[0].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, maleCage);
+
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = colony.AddAnimal(new PetState
+            {
+                Name = "ハナ",
+                Sex = Sex.Female,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 50d,
+                Genotype = showcase[1 % showcase.Count].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, femaleCage);
+            maleCage.VisitorAnimalId = female.Id;
+            var pairingNow = view.Session.GameNowUtc;
+            colony.Pairings.Add(new Pairing
+            {
+                Id = colony.NextPairingId++,
+                MaleId = male.Id,
+                FemaleId = female.Id,
+                StartedAtUtc = pairingNow,
+                EndsAtUtc = pairingNow.AddDays(3),
+            });
+
+            var navigator = NavigatorOf(view);
+            view.SelectCage(maleCage.Id);
+            navigator.ShowCageDetail();
+            yield return new WaitForSeconds(1.2f);
+            yield return Capture(outputDir, "cage-visiting");
+
+            var eggCage = colony.AddCage(CageSize.Standard);
+            eggCage.HasNestBox = true;
+            var eggMotherSeason = BreedingRules.SeasonOf(view.Session.Calendar.DateAt(pairingNow), view.Session.Breeding.Care);
+            var eggMother = colony.AddAnimal(new PetState
+            {
+                Name = "モモ",
+                Sex = Sex.Female,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 52d,
+                Weak = true,
+                Gravid = new GravidState
+                {
+                    SeasonYear = eggMotherSeason,
+                    ClutchesPlanned = 1,
+                    NextClutchAtUtc = pairingNow.AddDays(30),
+                },
+                Genotype = showcase[2 % showcase.Count].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, eggCage);
+            colony.Eggs.Add(new Egg { Id = colony.NextEggId++, MotherId = eggMother.Id, CageId = eggCage.Id, Place = EggPlace.NestBox });
+
+            view.SelectCage(eggCage.Id);
+            navigator.ShowCageDetail();
+            yield return new WaitForSeconds(1.2f);
+            yield return Capture(outputDir, "cage-eggs");
+        }
+
         /// <summary>One detail screen per showcase morph (grown, so murphy shows) into Logs/Screens/morph-*.png.</summary>
         [UnityTest]
         public IEnumerator CaptureMorphGallery()

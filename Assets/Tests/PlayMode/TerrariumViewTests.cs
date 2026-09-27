@@ -22,6 +22,8 @@ namespace TerrariumDays.Tests
         private Label growthStageLabel;
         private VisualElement profileChips;
         private VisualElement growthGaugeFill;
+        private Label breedingStatusLabel;
+        private Button nestBoxButton;
         private VisualElement hungerBarFill;
         private Label hungerValueLabel;
         private VisualElement hydrationBarFill;
@@ -108,6 +110,8 @@ namespace TerrariumDays.Tests
             growthStageLabel = new Label { name = "growth-stage-label" };
             profileChips = new VisualElement { name = "profile-chips" };
             growthGaugeFill = new VisualElement { name = "growth-gauge-fill" };
+            breedingStatusLabel = new Label { name = "breeding-status-label" };
+            nestBoxButton = new Button { name = "nest-box-button" };
             hungerBarFill = new VisualElement { name = "hunger-bar-fill" };
             hungerValueLabel = new Label { name = "hunger-value-label" };
             hydrationBarFill = new VisualElement { name = "hydration-bar-fill" };
@@ -197,6 +201,8 @@ namespace TerrariumDays.Tests
             root.Add(growthStageLabel);
             root.Add(profileChips);
             root.Add(growthGaugeFill);
+            root.Add(breedingStatusLabel);
+            root.Add(nestBoxButton);
             root.Add(hungerBarFill);
             root.Add(hungerValueLabel);
             root.Add(hydrationBarFill);
@@ -1415,6 +1421,152 @@ namespace TerrariumDays.Tests
             Assert.That(lastEntry.Category, Is.EqualTo(LedgerCategory.AnimalPurchase));
             var noteLabels = ledgerList.Query<Label>(className: "ledger-row-detail-label").ToList();
             Assert.That(noteLabels[0].text, Is.EqualTo(LedgerText.EntryLine(lastEntry, view.Session.Calendar)));
+        }
+
+        // ---- Breeding on the cage detail screen (§7, §11 Task 11): weakness, visitors, nest box, debug pair. ----
+
+        [Test]
+        public void Render_WhenTheAnimalIsWeak_ShowsTheWeakStatusInRedOnTheDetailScreen()
+        {
+            var nowUtc = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+            var pet = new PetState { Name = "レオパ1", Weak = true, LastSavedAtUtc = nowUtc, NextShedAtUtc = nowUtc.AddDays(3) };
+            var path = SaveColonyWith(pet, nowUtc);
+
+            view.LoadColony(path, nowUtc, new TimeService(() => nowUtc));
+
+            StringAssert.StartsWith(BreedingText.WeakStatus, breedingStatusLabel.text);
+            Assert.That(breedingStatusLabel.style.visibility.value, Is.EqualTo(Visibility.Visible));
+            Assert.That(breedingStatusLabel.ClassListContains("breeding-status-weak"), Is.True);
+        }
+
+        [Test]
+        public void SelectCage_ForAMalesCageWithAVisitor_ShowsTheVisitingLabel()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState { Name = "タロウ", Sex = Sex.Male, SexRevealed = true, Stage = GrowthStage.Adult, WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30) }, maleCage);
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = colony.AddAnimal(new PetState { Name = "ハナ", Sex = Sex.Female, SexRevealed = true, Stage = GrowthStage.Adult, WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30) }, femaleCage);
+            Assert.That(view.Session.Breeding.StartPairing(colony, male.Id, female.Id, ShopNow, view.Session.Calendar), Is.EqualTo(PairingProblem.None));
+
+            var selected = view.SelectCage(maleCage.Id);
+
+            Assert.That(selected, Is.True);
+            StringAssert.Contains("訪問中", breedingStatusLabel.text);
+            StringAssert.Contains("ハナ", breedingStatusLabel.text);
+        }
+
+        [Test]
+        public void ShowCageStep_SkipsAnAwayCageWhoseResidentIsVisitingAnotherCage()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var starterCage = colony.Cages[0];
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState { Name = "タロウ", Sex = Sex.Male, SexRevealed = true, Stage = GrowthStage.Adult, WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30) }, maleCage);
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = colony.AddAnimal(new PetState { Name = "ハナ", Sex = Sex.Female, SexRevealed = true, Stage = GrowthStage.Adult, WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30) }, femaleCage);
+            Assert.That(view.Session.Breeding.StartPairing(colony, male.Id, female.Id, ShopNow, view.Session.Calendar), Is.EqualTo(PairingProblem.None));
+            view.SelectCage(starterCage.Id);
+
+            view.ShowCageStep(1);
+
+            Assert.That(view.CurrentCage, Is.SameAs(maleCage), "the away femaleCage must be skipped");
+        }
+
+        [Test]
+        public void OnLedgerAnimalTapped_ForAVisitingFemale_OpensTheMalesCage()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState { Name = "タロウ", Sex = Sex.Male, SexRevealed = true, Stage = GrowthStage.Adult, WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30) }, maleCage);
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = colony.AddAnimal(new PetState { Name = "ハナ", Sex = Sex.Female, SexRevealed = true, Stage = GrowthStage.Adult, WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30) }, femaleCage);
+            Assert.That(view.Session.Breeding.StartPairing(colony, male.Id, female.Id, ShopNow, view.Session.Calendar), Is.EqualTo(PairingProblem.None));
+
+            view.OnLedgerAnimalTapped(female.Id);
+
+            Assert.That(view.CurrentCage, Is.SameAs(maleCage));
+            Assert.That(view.State, Is.SameAs(male));
+        }
+
+        [Test]
+        public void OnNestBoxButtonClicked_PlacesAndRemovesTheNestBoxUpdatingTheButtonAndInventory()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            view.Session.Colony.Inventory.Add(ShopCatalog.NestBoxId, 1);
+            var cage = view.CurrentCage;
+
+            view.OnNestBoxButtonClicked();
+
+            Assert.That(cage.HasNestBox, Is.True);
+            Assert.That(nestBoxButton.text, Is.EqualTo("産卵床を外す"));
+            Assert.That(view.Session.Colony.Inventory.Count(ShopCatalog.NestBoxId), Is.EqualTo(0));
+            Assert.That(feedbackLabel.text, Is.EqualTo(BreedingText.NestBoxPlacedMessage));
+
+            view.Session.Colony.Eggs.Add(new Egg { Id = 1, CageId = cage.Id, Place = EggPlace.NestBox });
+
+            view.OnNestBoxButtonClicked();
+
+            Assert.That(cage.HasNestBox, Is.True, "cannot remove a nest box with eggs inside");
+            Assert.That(feedbackLabel.text, Is.EqualTo(BreedingText.NestBoxMessage(NestBoxResult.EggsInside)));
+        }
+
+        [Test]
+        public void OnDebugSimulate12HoursClicked_RepeatedlyUntilPairingEnds_ShowsThePairingSuccessMessage()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState
+            {
+                Name = "タロウ", Sex = Sex.Male, SexRevealed = true, Stage = GrowthStage.Adult,
+                WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30), PersonalityKnown = true,
+            }, maleCage);
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = colony.AddAnimal(new PetState
+            {
+                Name = "ハナ", Sex = Sex.Female, SexRevealed = true, Stage = GrowthStage.Adult,
+                WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30), PersonalityKnown = true,
+            }, femaleCage);
+            Assert.That(view.Session.Breeding.StartPairing(colony, male.Id, female.Id, ShopNow, view.Session.Calendar), Is.EqualTo(PairingProblem.None));
+            colony.PairingOf(female).SuccessChance = 1d; // pin the mating roll to always succeed
+
+            for (var i = 0; i < 7 && female.Gravid == null; i++)
+            {
+                view.OnDebugSimulate12HoursClicked();
+            }
+
+            StringAssert.StartsWith("ペアリング成功！", feedbackLabel.text);
+            Assert.That(female.Gravid, Is.Not.Null);
+        }
+
+        [Test]
+        public void OnDebugAddPairClicked_AddsAnAdultMaleAndFemaleBothAbleToBreed()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var animalsBefore = colony.Animals.Count;
+
+            view.OnDebugAddPairClicked();
+
+            Assert.That(colony.Animals.Count, Is.EqualTo(animalsBefore + 2));
+            var added = colony.Animals.Skip(animalsBefore).ToList();
+            Assert.That(added.Count(a => a.Sex == Sex.Male), Is.EqualTo(1));
+            Assert.That(added.Count(a => a.Sex == Sex.Female), Is.EqualTo(1));
+            foreach (var pet in added)
+            {
+                Assert.That(pet.Stage, Is.EqualTo(GrowthStage.Adult));
+                Assert.That(view.Session.Breeding.CheckCandidate(colony, pet, ShopNow, view.Session.Calendar), Is.EqualTo(PairingProblem.None));
+            }
         }
 
         private void ClickNamed(string buttonName)
