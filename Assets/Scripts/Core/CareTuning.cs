@@ -54,5 +54,34 @@ namespace TerrariumDays.Core
 
         /// <summary>A bought animal's personality shows after it has been kept this many game days (§5.2, §9).</summary>
         public double PersonalityRevealGameDays { get; set; } = 7d;
+
+        // Breeding (§7), in game months / grams / game days.
+        public int BreedingSeasonFirstMonth { get; set; } = 3;
+        public int BreedingSeasonLastMonth { get; set; } = 9;
+        public double FemaleBreedingMinAgeMonths { get; set; } = 10d;
+        public double FemaleBreedingMinWeightGrams { get; set; } = 45d;
+        public double MaleBreedingMinAgeMonths { get; set; } = 8d;
+        public double MaleBreedingMinWeightGrams { get; set; } = 40d;
+        public double PairingGameDays { get; set; } = 3d;
+        public double BaseMatingSuccess { get; set; } = 0.7d;
+        public double MaxMatingSuccess { get; set; } = 0.95d;
+        public double FirstClutchMinGameDays { get; set; } = 21d;
+        public double FirstClutchMaxGameDays { get; set; } = 28d;
+        public double ClutchIntervalMinGameDays { get; set; } = 14d;
+        public double ClutchIntervalMaxGameDays { get; set; } = 28d;
+        public int MinClutches { get; set; } = 4;
+        public int MaxClutches { get; set; } = 8;
+        public double SingleEggChance { get; set; } = 0.1d;
+        public double ClutchWeightLossMinGrams { get; set; } = 3d;
+        public double ClutchWeightLossMaxGrams { get; set; } = 5d;
+        public double LayingStopWeightGrams { get; set; } = 40d;
+        public double Fertility { get; set; } = 0.9d;
+        public double BadMatchFertility { get; set; } = 0.75d;
+
+        /// <summary>§7.7: an egg laid without a nest box dries out after this many game days.</summary>
+        public double LooseEggDryGameDays { get; set; } = 2d;
+
+        /// <summary>Game days below 24 ℃ (in total) that kill a nest-box egg (planner's ruling).</summary>
+        public double EggColdFailGameDays { get; set; } = 3d;
     }
 }
