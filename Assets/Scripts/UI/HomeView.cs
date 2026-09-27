@@ -134,7 +134,8 @@ namespace TerrariumDays.UI
             }
 
             slot.Add(Label(pet == null ? "空きケージ" : shown != null ? shown.Name : string.Empty, "rack-name"));
-            slot.Add(Label(CageStatusText.AlertsFor(colony, cage, shown, nowUtc, tuning), "rack-alert"));
+            var alertText = shown != null ? CageStatusText.AlertsFor(colony, cage, shown, nowUtc, tuning) : string.Empty;
+            slot.Add(Label(alertText, "rack-alert"));
             return slot;
         }
 

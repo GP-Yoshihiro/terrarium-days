@@ -459,7 +459,7 @@
 
 .rack-slot {
     width: 23%;
-    height: 110px;
+    height: 120px;
     margin: 0;
     padding: 4px;
     border-radius: 8px;
@@ -542,12 +542,11 @@
 }
 
 .rack-alert {
-    height: 16px;
-    font-size: 10px;
+    height: 26px;
+    font-size: 9px;
     color: rgb(229, 57, 53);
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .home-incubator {
