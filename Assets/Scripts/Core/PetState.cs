@@ -83,6 +83,9 @@ namespace TerrariumDays.Core
         /// </summary>
         public bool Weak { get; set; }
 
+        /// <summary>Carrying eggs after a successful pairing (§7.4); null otherwise.</summary>
+        public GravidState Gravid { get; set; }
+
         public DateTimeOffset LastSavedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
         /// <summary>When the pet last shed (脱皮). Default: never, i.e. at creation.</summary>
