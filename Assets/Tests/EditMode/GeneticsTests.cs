@@ -141,5 +141,29 @@ namespace TerrariumDays.Tests
 
             Assert.That(a.Hypo, Is.EqualTo(b.Hypo));
         }
+
+        [Test]
+        public void AProbabilityThatIsOneUpToRoundingError_CountsAsAProvenHet()
+        {
+            var nearlyOne = 0.7d + 0.2d + 0.1d; // 0.9999999999999999 in doubles
+            Assert.That(nearlyOne, Is.LessThan(1d), "the test needs a real rounding error");
+
+            var known = new KnownGenetics().SetHet(GeneId.Eclipse, nearlyOne).SetHet(GeneId.Blizzard, 1e-17);
+
+            Assert.That(known.HetProbability(GeneId.Eclipse), Is.EqualTo(1d));
+            Assert.That(known.HetProbability(GeneId.Blizzard), Is.EqualTo(0d));
+            Assert.That(KnownGenetics.IsProvenHet(nearlyOne), Is.True);
+            Assert.That(KnownGenetics.IsProvenHet(0.99d), Is.False);
+            Assert.That(MorphNamer.FullName(Genotype.Normal(), known), Is.EqualTo("ノーマル ヘテロエクリプス"));
+            Assert.That(MarketPrice.HetMultiplier(Genotype.Normal(), known), Is.EqualTo(1.2d).Within(1e-9));
+        }
+
+        [Test]
+        public void ANaNProbability_IsTreatedAsNoHet()
+        {
+            var known = new KnownGenetics().SetHet(GeneId.Eclipse, double.NaN);
+
+            Assert.That(known.HetProbability(GeneId.Eclipse), Is.EqualTo(0d));
+        }
     }
 }

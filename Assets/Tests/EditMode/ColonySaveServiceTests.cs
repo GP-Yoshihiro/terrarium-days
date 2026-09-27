@@ -395,5 +395,88 @@ namespace TerrariumDays.Tests
 
             Assert.That(service.LoadOrCreate(path, Now, new Random(1)).GameClockOffset, Is.EqualTo(TimeSpan.FromHours(30)));
         }
+
+        private const string AnimalBase = "\"id\":1,\"name\":\"レオパ1\",\"sex\":\"Female\",\"weightGrams\":45.0,\"stage\":\"Adult\"," +
+            "\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100";
+
+        private void WriteSchemaThreeWithAnimal(string animalJson)
+        {
+            File.WriteAllText(path, "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":50000," +
+                "\"animals\":[" + animalJson + "]," +
+                "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1}],\"rackCount\":1,\"incubatorCount\":1,\"nextAnimalId\":2,\"nextCageId\":2}");
+        }
+
+        [Test]
+        public void GenomeVersionOne_WithHetsUnknown_KeepsHetsUnknown()
+        {
+            WriteSchemaThreeWithAnimal("{" + AnimalBase + ",\"genomeVersion\":1,\"genes\":[],\"hets\":[],\"hetsUnknown\":true," +
+                "\"personality\":\"Calm\",\"personalityKnown\":true}");
+
+            var pet = service.LoadOrCreate(path, Now, new Random(1)).Animals[0];
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(pet.Known.HetsUnknown, Is.True);
+            Assert.That(MorphNamer.FullName(pet.Genotype, pet.Known), Is.EqualTo("ノーマル（ヘテロ不明）"));
+        }
+
+        [Test]
+        public void UnknownAndNumericGeneNames_AreIgnored()
+        {
+            WriteSchemaThreeWithAnimal("{" + AnimalBase + ",\"genomeVersion\":1," +
+                "\"genes\":[{\"gene\":\"Eclipse\",\"copies\":2},{\"gene\":\"Lemonfrost\",\"copies\":2},{\"gene\":\"99\",\"copies\":2}]," +
+                "\"hets\":[{\"gene\":\"Blizzard\",\"probability\":1.0},{\"gene\":\"Lemonfrost\",\"probability\":1.0},{\"gene\":\"42\",\"probability\":0.5}]," +
+                "\"personality\":\"Calm\",\"personalityKnown\":true}");
+
+            var pet = service.LoadOrCreate(path, Now, new Random(1)).Animals[0];
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(MorphNamer.FullName(pet.Genotype, pet.Known), Is.EqualTo("エクリプス ヘテロブリザード"));
+        }
+
+        [Test]
+        public void MissingGeneAndHetLists_LoadAsNormalWithNoHets()
+        {
+            WriteSchemaThreeWithAnimal("{" + AnimalBase + ",\"genomeVersion\":1,\"hypo\":30,\"tangerine\":20," +
+                "\"personality\":\"Shy\",\"personalityKnown\":true}");
+
+            var pet = service.LoadOrCreate(path, Now, new Random(1)).Animals[0];
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(MorphNamer.FullName(pet.Genotype, pet.Known), Is.EqualTo("ノーマル"));
+            Assert.That(pet.Personality, Is.EqualTo(Personality.Shy));
+        }
+
+        [TestCase("Grumpy")]
+        [TestCase("42")]
+        [TestCase("")]
+        public void AnUnreadablePersonality_IsRolledFromTheDefinedOnes(string personality)
+        {
+            WriteSchemaThreeWithAnimal("{" + AnimalBase + ",\"genomeVersion\":1,\"personality\":\"" + personality + "\",\"personalityKnown\":true}");
+
+            var pet = service.LoadOrCreate(path, Now, new Random(1)).Animals[0];
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(Enum.IsDefined(typeof(Personality), pet.Personality), Is.True);
+        }
+
+        [Test]
+        public void NumericOrUnknownEnumNames_FallBackToDefaults()
+        {
+            File.WriteAllText(path, "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":50000," +
+                "\"ledger\":[{\"atUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"category\":\"77\",\"amount\":-30,\"note\":\"x\"}]," +
+                "\"animals\":[{\"id\":1,\"name\":\"レオパ1\",\"sex\":\"5\",\"weightGrams\":10.0,\"stage\":\"8\"," +
+                "\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100," +
+                "\"genomeVersion\":1,\"personality\":\"Calm\",\"personalityKnown\":true}]," +
+                "\"cages\":[{\"id\":1,\"size\":\"12\",\"animalId\":1}],\"rackCount\":1,\"incubators\":[\"9\"],\"nextAnimalId\":2,\"nextCageId\":2}");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(colony.Animals[0].Sex, Is.EqualTo(Sex.Female));
+            Assert.That(colony.Animals[0].Stage, Is.EqualTo(GrowthStage.Baby));
+            Assert.That(colony.Cages[0].Size, Is.EqualTo(CageSize.Standard));
+            Assert.That(colony.Incubators, Is.EqualTo(new[] { IncubatorModel.Simple }));
+            Assert.That(colony.Wallet.Ledger[0].Category, Is.EqualTo(LedgerCategory.Other));
+        }
     }
 }

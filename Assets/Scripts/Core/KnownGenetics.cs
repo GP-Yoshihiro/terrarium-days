@@ -14,13 +14,29 @@ namespace TerrariumDays.Core
         /// <summary>Hets were never tracked (e.g. the starting animal): shown as 「ヘテロ不明」.</summary>
         public bool HetsUnknown { get; set; }
 
+        /// <summary>Probabilities this close to 0 or 1 are snapped, so float error never reads "99%" for a proven het.</summary>
+        public const double SnapEpsilon = 1e-9;
+
         public double HetProbability(GeneId gene) => het[(int)gene];
 
         public KnownGenetics SetHet(GeneId gene, double probability)
         {
-            het[(int)gene] = Math.Max(0d, Math.Min(1d, probability));
+            var p = double.IsNaN(probability) ? 0d : Math.Max(0d, Math.Min(1d, probability));
+            if (p >= 1d - SnapEpsilon)
+            {
+                p = 1d;
+            }
+            else if (p <= SnapEpsilon)
+            {
+                p = 0d;
+            }
+
+            het[(int)gene] = p;
             return this;
         }
+
+        /// <summary>The one place that decides "proven het" (names, prices).</summary>
+        public static bool IsProvenHet(double probability) => probability >= 1d - SnapEpsilon;
 
         public KnownGenetics Clone()
         {

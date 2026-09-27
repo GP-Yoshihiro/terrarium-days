@@ -143,7 +143,7 @@ namespace TerrariumDays.Core
             var colony = new Colony { CalendarEpochUtc = nowUtc };
             colony.Wallet.Money = economy.StartingMoney;
             var cage = colony.AddCage(CageSize.Standard);
-            var stage = Enum.TryParse(data.growthStage, out GrowthStage parsed) ? parsed : GrowthStage.Baby;
+            var stage = TryParseDefined(data.growthStage, out GrowthStage parsed) ? parsed : GrowthStage.Baby;
             // Game time runs 1 real day = 1 game month, so an age in game months is applied
             // here as that many real days back from now.
             var ageRealDays = stage == GrowthStage.Adult ? 12d : stage == GrowthStage.Juvenile ? 5d : 1d;
@@ -197,7 +197,7 @@ namespace TerrariumDays.Core
             {
                 foreach (var incubator in data.incubators)
                 {
-                    colony.Incubators.Add(Enum.TryParse(incubator, out IncubatorModel model) ? model : IncubatorModel.Simple);
+                    colony.Incubators.Add(TryParseDefined(incubator, out IncubatorModel model) ? model : IncubatorModel.Simple);
                 }
             }
             else
@@ -214,7 +214,7 @@ namespace TerrariumDays.Core
                 colony.Wallet.Ledger.Add(new LedgerEntry
                 {
                     AtUtc = Parse(entry.atUtc, nowUtc),
-                    Category = Enum.TryParse(entry.category, out LedgerCategory category) ? category : LedgerCategory.Other,
+                    Category = TryParseDefined(entry.category, out LedgerCategory category) ? category : LedgerCategory.Other,
                     Amount = entry.amount,
                     Note = entry.note,
                 });
@@ -230,7 +230,7 @@ namespace TerrariumDays.Core
                 colony.Cages.Add(new Cage
                 {
                     Id = c.id,
-                    Size = Enum.TryParse(c.size, out CageSize size) ? size : CageSize.Standard,
+                    Size = TryParseDefined(c.size, out CageSize size) ? size : CageSize.Standard,
                     AnimalId = c.animalId,
                     DecorIds = data.inventoryVersion >= CurrentInventoryVersion && c.decorIds != null
                         ? new List<string>(c.decorIds)
@@ -300,10 +300,10 @@ namespace TerrariumDays.Core
             {
                 Id = a.id,
                 Name = a.name,
-                Sex = Enum.TryParse(a.sex, out Sex sex) ? sex : Sex.Female,
+                Sex = TryParseDefined(a.sex, out Sex sex) ? sex : Sex.Female,
                 WeightGrams = a.weightGrams,
                 HatchedAtUtc = Parse(a.hatchedAtUtc, nowUtc),
-                Stage = Enum.TryParse(a.stage, out GrowthStage stage) ? stage : GrowthStage.Baby,
+                Stage = TryParseDefined(a.stage, out GrowthStage stage) ? stage : GrowthStage.Baby,
                 StageUpDueAtUtc = string.IsNullOrEmpty(a.stageUpDueAtUtc) ? (DateTimeOffset?)null : Parse(a.stageUpDueAtUtc, nowUtc),
                 Hunger = a.hunger,
                 Hydration = a.hydration,
@@ -322,7 +322,7 @@ namespace TerrariumDays.Core
                 {
                     foreach (var g in a.genes)
                     {
-                        if (Enum.TryParse(g.gene, out GeneId geneId))
+                        if (TryParseDefined(g.gene, out GeneId geneId))
                         {
                             genotype.Set(geneId, g.copies);
                         }
@@ -336,7 +336,7 @@ namespace TerrariumDays.Core
                 {
                     foreach (var h in a.hets)
                     {
-                        if (Enum.TryParse(h.gene, out GeneId geneId))
+                        if (TryParseDefined(h.gene, out GeneId geneId))
                         {
                             known.SetHet(geneId, h.probability);
                         }
@@ -345,7 +345,7 @@ namespace TerrariumDays.Core
 
                 pet.Known = known;
 
-                pet.Personality = Enum.TryParse(a.personality, out Personality personality) ? personality : PersonalityTraits.Roll(random);
+                pet.Personality = TryParseDefined(a.personality, out Personality personality) ? personality : PersonalityTraits.Roll(random);
                 pet.PersonalityKnown = a.personalityKnown;
             }
             else
@@ -488,5 +488,20 @@ namespace TerrariumDays.Core
 
         private static DateTimeOffset Parse(string value, DateTimeOffset fallback) =>
             string.IsNullOrEmpty(value) ? fallback : DateTimeOffset.ParseExact(value, TimestampFormat, CultureInfo.InvariantCulture);
+
+        /// <summary>
+        /// Enum.TryParse also accepts any number ("99"), which would index past the gene and
+        /// personality tables; only defined names/values count.
+        /// </summary>
+        private static bool TryParseDefined<T>(string value, out T result) where T : struct
+        {
+            if (!string.IsNullOrEmpty(value) && Enum.TryParse(value, out result) && Enum.IsDefined(typeof(T), result))
+            {
+                return true;
+            }
+
+            result = default;
+            return false;
+        }
     }
 }

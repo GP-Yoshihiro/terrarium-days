@@ -73,7 +73,7 @@ namespace TerrariumDays.Core
                 }
 
                 var p = known.HetProbability(gene);
-                bonus += p >= 1d ? ProvenHetBonus : p * PossibleHetBonusPerProbability;
+                bonus += KnownGenetics.IsProvenHet(p) ? ProvenHetBonus : p * PossibleHetBonusPerProbability;
             }
 
             return 1d + bonus;

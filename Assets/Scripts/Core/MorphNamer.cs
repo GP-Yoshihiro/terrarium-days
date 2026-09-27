@@ -100,7 +100,7 @@ namespace TerrariumDays.Core
                 }
 
                 var p = known.HetProbability(gene);
-                if (p >= 1d)
+                if (KnownGenetics.IsProvenHet(p))
                 {
                     name += " ヘテロ" + Genes.Label(gene);
                 }
