@@ -64,6 +64,100 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "04-threat");
         }
 
+        /// <summary>
+        /// Captures the home rack and the cage list with a visiting pair, a weak animal and a
+        /// cage with eggs into Logs/Screens/home-breeding.png and cage-list-breeding.png, so
+        /// the visiting border, the small visitor thumbnail, and the weakness mark can be
+        /// checked by eye: they must fit inside the four-column slot without clipped text.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureHomeBreeding()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var colony = view.Session.Colony;
+            var showcase = StarterGenetics.Showcase;
+            colony.RackCount = Mathf.Max(colony.RackCount, Mathf.CeilToInt((colony.Cages.Count + 4) / (float)Colony.CagesPerRack));
+
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState
+            {
+                Name = "タロウ",
+                Sex = Sex.Male,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                Genotype = showcase[0].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, maleCage);
+
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = colony.AddAnimal(new PetState
+            {
+                Name = "ハナ",
+                Sex = Sex.Female,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 50d,
+                Genotype = showcase[1 % showcase.Count].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, femaleCage);
+            maleCage.VisitorAnimalId = female.Id;
+            var pairingNow = view.Session.GameNowUtc;
+            colony.Pairings.Add(new Pairing
+            {
+                Id = colony.NextPairingId++,
+                MaleId = male.Id,
+                FemaleId = female.Id,
+                StartedAtUtc = pairingNow,
+                EndsAtUtc = pairingNow.AddDays(3),
+            });
+
+            var weakCage = colony.AddCage(CageSize.Standard);
+            colony.AddAnimal(new PetState
+            {
+                Name = "スズ",
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 48d,
+                Weak = true,
+                Genotype = showcase[2 % showcase.Count].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, weakCage);
+
+            var eggCage = colony.AddCage(CageSize.Standard);
+            eggCage.HasNestBox = true;
+            var eggMotherSeason = BreedingRules.SeasonOf(view.Session.Calendar.DateAt(pairingNow), view.Session.Breeding.Care);
+            var eggMother = colony.AddAnimal(new PetState
+            {
+                Name = "モモ",
+                Sex = Sex.Female,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 52d,
+                Gravid = new GravidState
+                {
+                    SeasonYear = eggMotherSeason,
+                    ClutchesPlanned = 1,
+                    NextClutchAtUtc = pairingNow.AddDays(30),
+                },
+                Genotype = showcase[3 % showcase.Count].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, eggCage);
+            colony.Eggs.Add(new Egg { Id = colony.NextEggId++, MotherId = eggMother.Id, CageId = eggCage.Id, Place = EggPlace.NestBox });
+
+            yield return new WaitForSeconds(1.5f);
+            yield return Capture(outputDir, "home-breeding");
+
+            var navigator = NavigatorOf(view);
+            navigator.ShowCageList();
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "cage-list-breeding");
+        }
+
         /// <summary>One detail screen per showcase morph (grown, so murphy shows) into Logs/Screens/morph-*.png.</summary>
         [UnityTest]
         public IEnumerator CaptureMorphGallery()

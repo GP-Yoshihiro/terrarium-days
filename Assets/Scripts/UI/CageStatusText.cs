@@ -21,32 +21,39 @@ namespace TerrariumDays.UI
             return $"ケージ{cage.Id} {pet.Name}（{GrowthModel.StageLabel(pet.Stage)}・{sex}）";
         }
 
-        public static string AlertsFor(PetState pet, DateTimeOffset nowUtc, CareTuning tuning)
+        /// <summary>The cage-list title for a cage whose resident is away visiting (§7.2): id only, no name or stage.</summary>
+        public static string AwayTitle(Cage cage) => $"ケージ{cage.Id}";
+
+        /// <summary>The breeding alerts (§7) then the care alerts, joined by "・". Only the breeding alerts when <paramref name="shown"/> is null.</summary>
+        public static string AlertsFor(Colony colony, Cage cage, PetState shown, DateTimeOffset nowUtc, CareTuning tuning)
         {
-            var alerts = new List<string>();
-            if (pet.Hunger < tuning.HealthyCareThreshold)
+            var alerts = new List<string>(BreedingText.Alerts(colony, cage, shown));
+            if (shown != null)
             {
-                alerts.Add("空腹");
-            }
+                if (shown.Hunger < tuning.HealthyCareThreshold)
+                {
+                    alerts.Add("空腹");
+                }
 
-            if (pet.Hydration < tuning.HealthyCareThreshold)
-            {
-                alerts.Add("水");
-            }
+                if (shown.Hydration < tuning.HealthyCareThreshold)
+                {
+                    alerts.Add("水");
+                }
 
-            if (pet.Cleanliness < tuning.HealthyCareThreshold)
-            {
-                alerts.Add("汚れ");
-            }
+                if (shown.Cleanliness < tuning.HealthyCareThreshold)
+                {
+                    alerts.Add("汚れ");
+                }
 
-            switch (AppetiteModel.Evaluate(pet, nowUtc, tuning))
-            {
-                case AppetiteState.PreShed:
-                    alerts.Add("脱皮前");
-                    break;
-                case AppetiteState.PreGrowth:
-                    alerts.Add("成長前");
-                    break;
+                switch (AppetiteModel.Evaluate(shown, nowUtc, tuning))
+                {
+                    case AppetiteState.PreShed:
+                        alerts.Add("脱皮前");
+                        break;
+                    case AppetiteState.PreGrowth:
+                        alerts.Add("成長前");
+                        break;
+                }
             }
 
             return string.Join("・", alerts);

@@ -98,10 +98,27 @@ namespace TerrariumDays.Tests
         public void Alerts_ListWhatNeedsAttention()
         {
             var care = new CareTuning();
-            var pet = new PetState { Hunger = 30d, Hydration = 80d, Cleanliness = 30d, NextShedAtUtc = Now.AddMinutes(30) };
+            var colony = new Colony();
+            var cage = colony.AddCage(CageSize.Standard);
+            var pet = colony.AddAnimal(new PetState { Hunger = 30d, Hydration = 80d, Cleanliness = 30d, NextShedAtUtc = Now.AddMinutes(30) }, cage);
 
-            Assert.That(CageStatusText.AlertsFor(pet, Now, care), Is.EqualTo("空腹・汚れ・脱皮前"));
-            Assert.That(CageStatusText.AlertsFor(new PetState { NextShedAtUtc = Now.AddDays(3) }, Now, care), Is.EqualTo(string.Empty));
+            Assert.That(CageStatusText.AlertsFor(colony, cage, pet, Now, care), Is.EqualTo("空腹・汚れ・脱皮前"));
+
+            var otherCage = colony.AddCage(CageSize.Standard);
+            var otherPet = colony.AddAnimal(new PetState { NextShedAtUtc = Now.AddDays(3) }, otherCage);
+            Assert.That(CageStatusText.AlertsFor(colony, otherCage, otherPet, Now, care), Is.EqualTo(string.Empty));
+        }
+
+        [Test]
+        public void AlertsFor_PutsBreedingAlertsBeforeCareAlerts_AndSkipsCareWhenAway()
+        {
+            var care = new CareTuning();
+            var colony = new Colony();
+            var cage = colony.AddCage(CageSize.Standard);
+            var pet = colony.AddAnimal(new PetState { Hunger = 30d, Weak = true, Gravid = new GravidState() }, cage);
+
+            Assert.That(CageStatusText.AlertsFor(colony, cage, pet, Now, care), Is.EqualTo("衰弱・抱卵中・産卵床なし・空腹"));
+            Assert.That(CageStatusText.AlertsFor(colony, cage, null, Now, care), Is.EqualTo(string.Empty));
         }
 
         [Test]
@@ -217,6 +234,51 @@ namespace TerrariumDays.Tests
             var before = HomeView.CageListSignature(colony, Now, tuning);
 
             colony.Animals[0].Hunger = 10d;
+
+            Assert.That(HomeView.CageListSignature(colony, Now, tuning), Is.Not.EqualTo(before));
+        }
+
+        [Test]
+        public void CageListSignature_ChangesWhenVisitingStarts()
+        {
+            var colony = new Colony();
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState { Name = "タロウ", Sex = Sex.Male, SexRevealed = true }, maleCage);
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = colony.AddAnimal(new PetState { Name = "ハナ", Sex = Sex.Female, SexRevealed = true }, femaleCage);
+            var tuning = new CareTuning();
+            var before = HomeView.CageListSignature(colony, Now, tuning);
+
+            maleCage.VisitorAnimalId = female.Id;
+            colony.Pairings.Add(new Pairing { MaleId = male.Id, FemaleId = female.Id });
+
+            Assert.That(HomeView.CageListSignature(colony, Now, tuning), Is.Not.EqualTo(before));
+        }
+
+        [Test]
+        public void CageListSignature_ChangesWhenAnAnimalBecomesWeak()
+        {
+            var colony = new Colony();
+            var cage = colony.AddCage(CageSize.Standard);
+            var pet = colony.AddAnimal(new PetState { Name = "ハナ" }, cage);
+            var tuning = new CareTuning();
+            var before = HomeView.CageListSignature(colony, Now, tuning);
+
+            pet.Weak = true;
+
+            Assert.That(HomeView.CageListSignature(colony, Now, tuning), Is.Not.EqualTo(before));
+        }
+
+        [Test]
+        public void CageListSignature_ChangesWhenAnEggIsAdded()
+        {
+            var colony = new Colony();
+            var cage = colony.AddCage(CageSize.Standard);
+            colony.AddAnimal(new PetState { Name = "ハナ" }, cage);
+            var tuning = new CareTuning();
+            var before = HomeView.CageListSignature(colony, Now, tuning);
+
+            colony.Eggs.Add(new Egg { CageId = cage.Id });
 
             Assert.That(HomeView.CageListSignature(colony, Now, tuning), Is.Not.EqualTo(before));
         }

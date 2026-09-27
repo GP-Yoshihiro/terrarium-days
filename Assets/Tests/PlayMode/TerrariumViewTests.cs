@@ -1091,6 +1091,42 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void HomeView_MarksAVisitingPairAndAWeakAnimal()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState { Name = "タロウ", Sex = Sex.Male, SexRevealed = true, Stage = GrowthStage.Adult }, maleCage);
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = colony.AddAnimal(new PetState { Name = "ハナ", Sex = Sex.Female, SexRevealed = true, Stage = GrowthStage.Adult }, femaleCage);
+            maleCage.VisitorAnimalId = female.Id;
+            colony.Pairings.Add(new Pairing { MaleId = male.Id, FemaleId = female.Id });
+
+            var weakCage = colony.AddCage(CageSize.Standard);
+            var weak = colony.AddAnimal(new PetState { Name = "スズ", Weak = true }, weakCage);
+
+            var rackList = new VisualElement();
+            var home = new HomeView(rackList);
+            home.Render(colony, ShopNow, view.Tuning);
+
+            var slots = rackList.Query<Button>(className: "rack-slot").ToList();
+            var maleSlot = slots[colony.Cages.IndexOf(maleCage)];
+            Assert.That(maleSlot.ClassListContains("rack-slot-visiting"), Is.True);
+            Assert.That(maleSlot.Q<Label>(className: "rack-visitor-label").text, Is.EqualTo("訪問中"));
+
+            var femaleSlot = slots[colony.Cages.IndexOf(femaleCage)];
+            Assert.That(femaleSlot.enabledSelf, Is.False);
+            Assert.That(femaleSlot.Q<Label>(className: "rack-name").text, Is.Empty);
+
+            var weakSlot = slots[colony.Cages.IndexOf(weakCage)];
+            var badge = weakSlot.Q<Label>(className: "rack-badge-weak");
+            Assert.That(badge, Is.Not.Null);
+            Assert.That(badge.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+        }
+
+        [Test]
         public void ShopWholesale_SellingTheUnselectedAnimal_RemovesItAndPaysTheWholesalePrice()
         {
             var path = CreateTempSavePath();
