@@ -70,6 +70,10 @@ namespace TerrariumDays.Tests
         private Button confirmYesButton;
         private Button confirmNoButton;
         private Label cageListEmptyLabel;
+        private VisualElement breedingPanel;
+        private Label breedingSeasonLabel;
+        private Label breedingMessageLabel;
+        private ScrollView breedingList;
         private readonly List<string> tempSavePaths = new List<string>();
 
         private string CreateTempSavePath()
@@ -198,6 +202,14 @@ namespace TerrariumDays.Tests
 
             cageListEmptyLabel = new Label { name = "cage-list-empty-label" };
 
+            breedingPanel = new VisualElement { name = "breeding-panel" };
+            breedingSeasonLabel = new Label { name = "breeding-season-label" };
+            breedingMessageLabel = new Label { name = "breeding-message-label" };
+            breedingList = new ScrollView { name = "breeding-list" };
+            breedingPanel.Add(breedingSeasonLabel);
+            breedingPanel.Add(breedingMessageLabel);
+            breedingPanel.Add(breedingList);
+
             root.Add(growthStageLabel);
             root.Add(profileChips);
             root.Add(growthGaugeFill);
@@ -226,6 +238,7 @@ namespace TerrariumDays.Tests
             root.Add(ledgerPanel);
             root.Add(confirmModal);
             root.Add(cageListEmptyLabel);
+            root.Add(breedingPanel);
             root.Add(topBar);
             root.Add(debugButton);
             root.Add(debugPanel);
@@ -1576,6 +1589,183 @@ namespace TerrariumDays.Tests
             var action = FindClickAction(button.clickable);
             Assert.That(action, Is.Not.Null, $"{buttonName} has no click action wired up");
             action();
+        }
+
+        // ---- Breeding tab (§13): ongoing pairings, picking a pair, forecast, start/cancel. ----
+
+        private PairingView PairingViewOf() =>
+            (PairingView)typeof(TerrariumView).GetField("pairingView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+
+        private void RenderBreeding() =>
+            PairingViewOf().Render(view.Session.Colony, view.Session.Breeding, view.Session.Calendar, view.Session.GameNowUtc, view.Session.Room);
+
+        private void ClickBreedingPanelButton(string buttonName)
+        {
+            var button = breedingPanel.Q<Button>(buttonName);
+            Assert.That(button, Is.Not.Null, buttonName);
+            var action = FindClickAction(button.clickable);
+            Assert.That(action, Is.Not.Null, $"{buttonName} has no click action wired up");
+            action();
+        }
+
+        [Test]
+        public void BreedingTab_WithAnEligiblePair_ShowsForecastAndStartsThePairingOnConfirm()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var animalsBefore = colony.Animals.Count;
+            view.OnDebugAddPairClicked();
+            var added = colony.Animals.Skip(animalsBefore).ToList();
+            var male = added.Single(a => a.Sex == Sex.Male);
+            var female = added.Single(a => a.Sex == Sex.Female);
+
+            RenderBreeding();
+
+            var pairingView = PairingViewOf();
+            Assert.That(breedingList.Q<Button>($"breeding-candidate-{female.Id}"), Is.Not.Null);
+            Assert.That(breedingList.Q<Button>($"breeding-candidate-{male.Id}"), Is.Not.Null);
+
+            ClickBreedingPanelButton($"breeding-candidate-{female.Id}");
+            ClickBreedingPanelButton($"breeding-candidate-{male.Id}");
+
+            Assert.That(pairingView.SelectedFemaleId, Is.EqualTo(female.Id));
+            Assert.That(pairingView.SelectedMaleId, Is.EqualTo(male.Id));
+
+            var forecastLines = breedingList.Query<Label>(className: "breeding-forecast-line").ToList().Select(l => l.text).ToList();
+            Assert.That(forecastLines.Any(l => l.Contains("相性：")), Is.True);
+            Assert.That(forecastLines.Any(l => l.Contains("交尾の成功率：約")), Is.True);
+
+            var startButton = breedingList.Q<Button>("breeding-start-button");
+            Assert.That(startButton.enabledSelf, Is.True);
+
+            // PairingView.StartRequested is only wired to TerrariumView in Awake(), which this
+            // harness skips (state is already set before SetActive fires) — call the handler
+            // directly, exactly as the existing ShopView tests call OnShopOfferBuyRequested.
+            view.OnPairingStartRequested(male.Id, female.Id);
+            ClickConfirmYes();
+
+            Assert.That(colony.Pairings.Count, Is.EqualTo(1));
+            Assert.That(colony.IsVisiting(female), Is.True);
+        }
+
+        [Test]
+        public void BreedingTab_WithASexUnknownBaby_HidesItsRowAndShowsTheUnknownSexNotice()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            foreach (var existing in colony.Animals)
+            {
+                existing.SexRevealed = true; // isolate the notice's "1匹" count to just our new baby
+            }
+
+            var cage = colony.AddCage(CageSize.Standard);
+            var baby = colony.AddAnimal(new PetState { Name = "ベビー", SexRevealed = false }, cage);
+
+            RenderBreeding();
+
+            Assert.That(breedingList.Q<Button>($"breeding-candidate-{baby.Id}"), Is.Null);
+            var lines = breedingList.Query<Label>(className: "breeding-line").ToList().Select(l => l.text).ToList();
+            Assert.That(lines.Any(l => l.Contains("性別が分かっていない個体（1匹）は選べません")), Is.True);
+        }
+
+        [Test]
+        public void BreedingTab_WithAWeakCandidate_BlocksTheRowWithTheWeakReason()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var animalsBefore = colony.Animals.Count;
+            view.OnDebugAddPairClicked();
+            var female = colony.Animals.Skip(animalsBefore).Single(a => a.Sex == Sex.Female);
+            female.Weak = true;
+
+            RenderBreeding();
+
+            var row = breedingList.Q<Button>($"breeding-candidate-{female.Id}");
+            Assert.That(row, Is.Not.Null);
+            Assert.That(row.enabledSelf, Is.False);
+            Assert.That(row.ClassListContains("breeding-row-blocked"), Is.True);
+            var reasonLabels = row.Query<Label>(className: "breeding-row-reason").ToList().Select(l => l.text).ToList();
+            Assert.That(reasonLabels, Has.Some.Contains("衰弱中です"));
+        }
+
+        [Test]
+        public void BreedingTab_OutOfSeason_DisablesStartButtonWithTheSeasonReason()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var animalsBefore = colony.Animals.Count;
+            view.OnDebugAddPairClicked();
+            var added = colony.Animals.Skip(animalsBefore).ToList();
+            var male = added.Single(a => a.Sex == Sex.Male);
+            var female = added.Single(a => a.Sex == Sex.Female);
+
+            // The in-game calendar starts at April (month 4) when the colony is created and
+            // compresses real time 48x (GameCalendar.RealMinutesPerGameDay); 200 game days
+            // lands on game-day 200 -> October (month 10), out of the March-September season.
+            view.Session.SimulateGameTime(GameCalendar.RealTimeFor(200));
+
+            RenderBreeding();
+            var pairingView = PairingViewOf();
+            ClickBreedingPanelButton($"breeding-candidate-{female.Id}");
+            ClickBreedingPanelButton($"breeding-candidate-{male.Id}");
+
+            var startButton = breedingList.Q<Button>("breeding-start-button");
+            Assert.That(startButton.enabledSelf, Is.False);
+            var reasonLabels = breedingList.Query<Label>(className: "breeding-row-reason").ToList().Select(l => l.text).ToList();
+            Assert.That(reasonLabels, Has.Some.Contains("繁殖期ではありません"));
+        }
+
+        [Test]
+        public void BreedingTab_CancelOngoingPairing_ConfirmYes_EndsItAndReturnsTheFemaleHome()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var animalsBefore = colony.Animals.Count;
+            view.OnDebugAddPairClicked();
+            var added = colony.Animals.Skip(animalsBefore).ToList();
+            var male = added.Single(a => a.Sex == Sex.Male);
+            var female = added.Single(a => a.Sex == Sex.Female);
+            var femaleHomeCage = colony.CageOf(female);
+            Assert.That(view.Session.Breeding.StartPairing(colony, male.Id, female.Id, ShopNow, view.Session.Calendar), Is.EqualTo(PairingProblem.None));
+
+            RenderBreeding();
+            Assert.That(breedingList.Q<Button>($"breeding-cancel-{female.Id}"), Is.Not.Null);
+            view.OnPairingCancelRequested(female.Id);
+            ClickConfirmYes();
+
+            Assert.That(colony.Pairings, Is.Empty);
+            Assert.That(colony.IsVisiting(female), Is.False);
+            Assert.That(colony.CageOf(female), Is.SameAs(femaleHomeCage));
+        }
+
+        [Test]
+        public void BreedingTab_FemaleGoesWeakWhileConfirmationIsOpen_DoesNotStartAndShowsTheWeakReason()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var animalsBefore = colony.Animals.Count;
+            view.OnDebugAddPairClicked();
+            var added = colony.Animals.Skip(animalsBefore).ToList();
+            var male = added.Single(a => a.Sex == Sex.Male);
+            var female = added.Single(a => a.Sex == Sex.Female);
+
+            RenderBreeding();
+            ClickBreedingPanelButton($"breeding-candidate-{female.Id}");
+            ClickBreedingPanelButton($"breeding-candidate-{male.Id}");
+            view.OnPairingStartRequested(male.Id, female.Id);
+
+            female.Weak = true; // time passes while the dialog is open
+
+            ClickConfirmYes();
+
+            Assert.That(colony.Pairings, Is.Empty);
+            StringAssert.Contains("衰弱中です", breedingMessageLabel.text);
         }
     }
 }

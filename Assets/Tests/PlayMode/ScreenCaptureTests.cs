@@ -418,6 +418,126 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "breeding-empty");
         }
 
+        /// <summary>
+        /// Captures the breeding tab with a pair selected and the forecast showing, and with an
+        /// ongoing pairing, a gravid female and a cage with eggs, into Logs/Screens/breeding-
+        /// forecast.png and breeding-ongoing.png (Task 13), so the reason labels (right of each
+        /// row) and the forecast lines can be checked by eye: neither should clip or overflow.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureBreedingTab()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var colony = view.Session.Colony;
+            var showcase = StarterGenetics.Showcase;
+            colony.RackCount = Mathf.Max(colony.RackCount, Mathf.CeilToInt((colony.Cages.Count + 6) / (float)Colony.CagesPerRack));
+
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState
+            {
+                Name = "タロウ",
+                Sex = Sex.Male,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                Genotype = showcase[0].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, maleCage);
+
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            var female = colony.AddAnimal(new PetState
+            {
+                Name = "ハナ",
+                Sex = Sex.Female,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 50d,
+                Genotype = showcase[1 % showcase.Count].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, femaleCage);
+            maleCage.VisitorAnimalId = female.Id;
+            var pairingNow = view.Session.GameNowUtc;
+            colony.Pairings.Add(new Pairing
+            {
+                Id = colony.NextPairingId++,
+                MaleId = male.Id,
+                FemaleId = female.Id,
+                StartedAtUtc = pairingNow,
+                EndsAtUtc = pairingNow.AddDays(3),
+            });
+
+            var eggCage = colony.AddCage(CageSize.Standard);
+            eggCage.HasNestBox = true;
+            var eggMotherSeason = BreedingRules.SeasonOf(view.Session.Calendar.DateAt(pairingNow), view.Session.Breeding.Care);
+            var eggMother = colony.AddAnimal(new PetState
+            {
+                Name = "モモ",
+                Sex = Sex.Female,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 52d,
+                Gravid = new GravidState
+                {
+                    SeasonYear = eggMotherSeason,
+                    ClutchesPlanned = 1,
+                    NextClutchAtUtc = pairingNow.AddDays(30),
+                },
+                Genotype = showcase[2 % showcase.Count].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, eggCage);
+            colony.Eggs.Add(new Egg { Id = colony.NextEggId++, MotherId = eggMother.Id, CageId = eggCage.Id, Place = EggPlace.NestBox });
+
+            // A second, unpaired pair to select for the forecast screenshot. HatchedAtUtc must
+            // be well in the past (in real time, compressed 48x into game time) or CheckCandidate
+            // blocks them as TooYoung.
+            var hatchedAt = view.Session.GameNowUtc - System.TimeSpan.FromDays(12);
+            var secondMaleCage = colony.AddCage(CageSize.Standard);
+            var secondMale = colony.AddAnimal(new PetState
+            {
+                Name = "ジロウ",
+                Sex = Sex.Male,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                HatchedAtUtc = hatchedAt,
+                Genotype = showcase[3 % showcase.Count].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, secondMaleCage);
+
+            var secondFemaleCage = colony.AddCage(CageSize.Standard);
+            var secondFemale = colony.AddAnimal(new PetState
+            {
+                Name = "サキ",
+                Sex = Sex.Female,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 50d,
+                HatchedAtUtc = hatchedAt,
+                Genotype = showcase[4 % showcase.Count].Genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+            }, secondFemaleCage);
+
+            var navigator = NavigatorOf(view);
+            navigator.ShowTab(ShellTab.Breeding);
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "breeding-ongoing");
+
+            var document = view.GetComponent<UIDocument>();
+            ClickNamed(document, $"breeding-candidate-{secondFemale.Id}");
+            ClickNamed(document, $"breeding-candidate-{secondMale.Id}");
+            yield return new WaitForSeconds(0.3f);
+
+            var breedingList = document.rootVisualElement.Q<ScrollView>("breeding-list");
+            var startButton = document.rootVisualElement.Q<Button>("breeding-start-button");
+            breedingList.ScrollTo(startButton);
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "breeding-forecast");
+        }
+
         [TearDown]
         public void TearDown()
         {

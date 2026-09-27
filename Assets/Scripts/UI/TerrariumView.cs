@@ -135,6 +135,7 @@ namespace TerrariumDays.UI
         private CageListView cageListView;
         private ShopView shopView;
         private LedgerView ledgerView;
+        private PairingView pairingView;
         private ConfirmDialog confirmDialog;
         private Label shopMessageLabel;
         private Label cageListEmptyLabel;
@@ -197,6 +198,12 @@ namespace TerrariumDays.UI
             if (ledgerView != null)
             {
                 ledgerView.AnimalTapped += OnLedgerAnimalTapped;
+            }
+
+            if (pairingView != null)
+            {
+                pairingView.StartRequested += OnPairingStartRequested;
+                pairingView.CancelRequested += OnPairingCancelRequested;
             }
 
             homeButton.clicked += OnHomeButtonClicked;
@@ -598,6 +605,12 @@ namespace TerrariumDays.UI
                 ledgerView?.Invalidate();
             }
 
+            if (tab == ShellTab.Breeding)
+            {
+                pairingView?.Invalidate();
+                pairingView?.ShowMessage(string.Empty);
+            }
+
             RefreshShell();
         }
 
@@ -785,6 +798,13 @@ namespace TerrariumDays.UI
             {
                 ledgerView.AnimalTapped -= OnLedgerAnimalTapped;
                 ledgerView.Dispose();
+            }
+
+            if (pairingView != null)
+            {
+                pairingView.StartRequested -= OnPairingStartRequested;
+                pairingView.CancelRequested -= OnPairingCancelRequested;
+                pairingView.Dispose();
             }
 
             confirmDialog?.Dispose();
@@ -1067,6 +1087,9 @@ namespace TerrariumDays.UI
             ledgerView = ledgerPanel != null ? new LedgerView(ledgerPanel) : null;
             cageListEmptyLabel = root.Q<Label>("cage-list-empty-label");
 
+            var breedingPanel = root.Q<VisualElement>("breeding-panel");
+            pairingView = breedingPanel != null ? new PairingView(breedingPanel) : null;
+
             var confirmModal = root.Q<VisualElement>("confirm-modal");
             confirmDialog = new ConfirmDialog(confirmModal, root.Q<Label>("confirm-message-label"),
                 root.Q<Button>("confirm-yes-button"), root.Q<Button>("confirm-no-button"));
@@ -1210,6 +1233,11 @@ namespace TerrariumDays.UI
             if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Ledger)
             {
                 ledgerView?.Render(session.Colony, session.Calendar, now, tuning);
+            }
+
+            if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Breeding)
+            {
+                pairingView?.Render(session.Colony, session.Breeding, session.Calendar, now, session.Room);
             }
         }
 
@@ -2103,6 +2131,87 @@ namespace TerrariumDays.UI
                 ShowShopMessage(ShopText.FailureMessage(result));
             }
 
+            RefreshShell();
+        }
+
+        /// <summary>Asks to start a pairing; the actual start happens on the confirmation's "はい" (see ConfirmStartPairing).</summary>
+        public void OnPairingStartRequested(int maleId, int femaleId)
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            var male = session.Colony.AnimalById(maleId);
+            var female = session.Colony.AnimalById(femaleId);
+            if (male == null || female == null)
+            {
+                return;
+            }
+
+            confirmDialog?.Show(BreedingText.ConfirmPairing(male, female, session.Breeding.Care), () => ConfirmStartPairing(maleId, femaleId));
+        }
+
+        /// <summary>Re-checks the pair against the current state: time keeps passing while the dialog is open (§7), so either animal could have gone weak or out of season by "はい".</summary>
+        private void ConfirmStartPairing(int maleId, int femaleId)
+        {
+            var male = session.Colony.AnimalById(maleId);
+            var female = session.Colony.AnimalById(femaleId);
+            var problem = session.Breeding.CheckPair(session.Colony, male, female, GameNowUtc(), session.Calendar);
+            if (problem != PairingProblem.None)
+            {
+                pairingView?.ShowMessage(BreedingText.ProblemLabel(problem));
+                return;
+            }
+
+            var wasShowingFemale = currentCage != null && currentCage == session.Colony.CageOf(female) && state == female;
+            session.Breeding.StartPairing(session.Colony, maleId, femaleId, GameNowUtc(), session.Calendar);
+            pairingView?.ShowMessage("ペアリングを始めました");
+            SaveCurrentState();
+            ColonyChanged?.Invoke();
+            pairingView?.Invalidate();
+
+            if (wasShowingFemale)
+            {
+                var cage = session.Colony.CageShowing(female);
+                if (cage != null)
+                {
+                    SelectCage(cage.Id);
+                }
+            }
+
+            RefreshShell();
+        }
+
+        /// <summary>Asks to cancel a pairing; the actual cancel happens on the confirmation's "はい" (see ConfirmCancelPairing).</summary>
+        public void OnPairingCancelRequested(int femaleId)
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            var female = session.Colony.AnimalById(femaleId);
+            if (female == null)
+            {
+                return;
+            }
+
+            confirmDialog?.Show($"{female.Name}のペアリングをやめますか？", () => ConfirmCancelPairing(femaleId));
+        }
+
+        private void ConfirmCancelPairing(int femaleId)
+        {
+            var female = session.Colony.AnimalById(femaleId);
+            if (female == null || !session.Breeding.CancelPairing(session.Colony, female))
+            {
+                return;
+            }
+
+            pairingView?.ShowMessage("ペアリングをやめました");
+            SaveCurrentState();
+            ColonyChanged?.Invoke();
+            pairingView?.Invalidate();
             RefreshShell();
         }
 
