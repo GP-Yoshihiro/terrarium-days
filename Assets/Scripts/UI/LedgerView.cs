@@ -53,6 +53,9 @@ namespace TerrariumDays.UI
 
         public event Action<int> AnimalTapped;
 
+        /// <summary>Raised by a row's small "ペアリング" button (only shown once the animal's sex is known).</summary>
+        public event Action<int> PairingRequested;
+
         /// <summary>Forces the next Render to rebuild even if the signature has not changed; call when the tab becomes visible again.</summary>
         public void Invalidate()
         {
@@ -156,7 +159,7 @@ namespace TerrariumDays.UI
                     sb.Append('|').Append(HomeView.CageListSignature(colony, nowUtc, tuning));
                     foreach (var pet in colony.Animals)
                     {
-                        sb.Append(';').Append(pet.Id).Append(':').Append((int)Math.Floor(GrowthModel.AgeMonths(pet, nowUtc)));
+                        sb.Append(';').Append(pet.Id).Append(':').Append((int)Math.Floor(GrowthModel.AgeMonths(pet, nowUtc))).Append(':').Append(pet.SexKnown);
                     }
 
                     break;
@@ -189,8 +192,11 @@ namespace TerrariumDays.UI
 
         private VisualElement AnimalRow(PetState pet)
         {
-            var row = new Button(() => AnimalTapped?.Invoke(pet.Id));
+            var row = new VisualElement();
             row.AddToClassList("ledger-row");
+
+            var body = new Button(() => AnimalTapped?.Invoke(pet.Id));
+            body.AddToClassList("ledger-row-body");
 
             var header = new VisualElement { pickingMode = PickingMode.Ignore };
             header.AddToClassList("ledger-row-header");
@@ -204,10 +210,19 @@ namespace TerrariumDays.UI
 
             header.Add(thumb);
             header.Add(NameLabel(pet.Name));
-            row.Add(header);
+            body.Add(header);
 
-            row.Add(ProfileLabel(string.Join(" ", CageStatusText.ProfileTokens(pet))));
-            row.Add(DetailLabel(LedgerText.AnimalDetail(pet, nowUtc)));
+            body.Add(ProfileLabel(string.Join(" ", CageStatusText.ProfileTokens(pet))));
+            body.Add(DetailLabel(LedgerText.AnimalDetail(pet, nowUtc)));
+
+            row.Add(body);
+
+            if (pet.SexKnown)
+            {
+                var pairButton = new Button(() => PairingRequested?.Invoke(pet.Id)) { text = "ペアリング", name = $"ledger-pair-{pet.Id}" };
+                pairButton.AddToClassList("ledger-row-pair-button");
+                row.Add(pairButton);
+            }
 
             return row;
         }

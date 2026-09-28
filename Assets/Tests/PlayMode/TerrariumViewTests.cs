@@ -36,6 +36,7 @@ namespace TerrariumDays.Tests
         private Button feedButton;
         private Button waterButton;
         private Button cleanButton;
+        private Button pairButton;
         private VisualElement milestoneModal;
         private Label milestoneStageLabel;
         private Label milestoneMessageLabel;
@@ -128,6 +129,7 @@ namespace TerrariumDays.Tests
             feedButton = new Button { name = "feed-button" };
             waterButton = new Button { name = "water-button" };
             cleanButton = new Button { name = "clean-button" };
+            pairButton = new Button { name = "pair-button" };
             milestoneModal = new VisualElement { name = "milestone-modal" };
             milestoneStageLabel = new Label { name = "milestone-stage-label" };
             milestoneMessageLabel = new Label { name = "milestone-message-label" };
@@ -227,6 +229,7 @@ namespace TerrariumDays.Tests
             root.Add(feedButton);
             root.Add(waterButton);
             root.Add(cleanButton);
+            root.Add(pairButton);
             root.Add(milestoneModal);
             foreach (var element in decorImageElements)
             {
@@ -245,6 +248,12 @@ namespace TerrariumDays.Tests
             root.Add(petElement);
 
             view.BindElements(root);
+
+            // Awake() (which builds the real navigator) is skipped by this harness (see the
+            // comment below), so build one directly against the same hand-built tree: it lets
+            // pair-button tests exercise ShellNavigator.ShowTab/Tab like the real app does.
+            typeof(TerrariumView).GetField("navigator", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(view, new ShellNavigator(root));
 
             // Activate now that the hand-built tree is bound: TerrariumView.Awake() is
             // guarded to skip real-UIDocument rebinding once already initialized, so this
@@ -1390,6 +1399,67 @@ namespace TerrariumDays.Tests
             Assert.That(view.CurrentCage, Is.SameAs(view.Session.Colony.CageOf(second)));
         }
 
+        /// <summary>
+        /// The row's body and its small pair button are separate sibling Buttons (not one
+        /// nested in the other, which would fire both on a single tap) — verified here at the
+        /// LedgerView level, directly on its own AnimalTapped/PairingRequested events, since
+        /// the further forwarding to TerrariumView happens only in Awake() (skipped by this
+        /// harness; see SetUp).
+        /// </summary>
+        [Test]
+        public void LedgerAnimalRow_BodyAndPairButtonAreSeparateAndFireOnlyTheirOwnEvent()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目", SexRevealed = true, Sex = Sex.Female }, view.Session.Colony.AddCage(CageSize.Standard));
+
+            RenderLedger();
+            var ledgerView = LedgerViewOf();
+            int? tappedId = null;
+            int? pairRequestedId = null;
+            ledgerView.AnimalTapped += id => tappedId = id;
+            ledgerView.PairingRequested += id => pairRequestedId = id;
+
+            var body = ledgerList.Query<Button>(className: "ledger-row-body").ToList()
+                .Single(b => b.Q<Label>(className: "ledger-row-name-label").text == second.Name);
+            var pairButton = ledgerList.Q<Button>($"ledger-pair-{second.Id}");
+            Assert.That(pairButton, Is.Not.Null);
+
+            FindClickAction(body.clickable)();
+            Assert.That(tappedId, Is.EqualTo(second.Id));
+            Assert.That(pairRequestedId, Is.Null);
+
+            tappedId = null;
+            FindClickAction(pairButton.clickable)();
+            Assert.That(pairRequestedId, Is.EqualTo(second.Id));
+            Assert.That(tappedId, Is.Null);
+        }
+
+        [Test]
+        public void LedgerAnimalRow_ForASexUnknownAnimal_HasNoPairButton()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            var baby = view.Session.Colony.AddAnimal(new PetState { Name = "ベビー", SexRevealed = false }, view.Session.Colony.AddCage(CageSize.Standard));
+
+            RenderLedger();
+
+            Assert.That(ledgerList.Q<Button>($"ledger-pair-{baby.Id}"), Is.Null);
+        }
+
+        [Test]
+        public void OnLedgerPairRequested_PreselectsThatAnimalAndOpensTheBreedingTab()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目", SexRevealed = true, Sex = Sex.Male }, view.Session.Colony.AddCage(CageSize.Standard));
+
+            view.OnLedgerPairRequested(second.Id);
+
+            Assert.That(NavigatorOf().Tab, Is.EqualTo(ShellTab.Breeding));
+            Assert.That(PairingViewOf().SelectedMaleId, Is.EqualTo(second.Id));
+        }
+
         [Test]
         public void LedgerMoneySection_AfterFeeding_TheNewestRowIsTheFoodCharge()
         {
@@ -1596,6 +1666,9 @@ namespace TerrariumDays.Tests
         private PairingView PairingViewOf() =>
             (PairingView)typeof(TerrariumView).GetField("pairingView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
 
+        private ShellNavigator NavigatorOf() =>
+            (ShellNavigator)typeof(TerrariumView).GetField("navigator", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+
         private void RenderBreeding() =>
             PairingViewOf().Render(view.Session.Colony, view.Session.Breeding, view.Session.Calendar, view.Session.GameNowUtc, view.Session.Room);
 
@@ -1606,6 +1679,35 @@ namespace TerrariumDays.Tests
             var action = FindClickAction(button.clickable);
             Assert.That(action, Is.Not.Null, $"{buttonName} has no click action wired up");
             action();
+        }
+
+        [Test]
+        public void OnPairButtonClicked_WithASexKnownAnimal_PreselectsItAndOpensTheBreedingTab()
+        {
+            var female = new PetState { Name = "メス", SexRevealed = true, Sex = Sex.Female };
+            var path = SaveColonyWith(female, ShopNow);
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+
+            // pair-button's clicked handler is wired in Awake() (skipped by this harness, see
+            // SetUp); call the handler directly, same technique as OnPairingStartRequested above.
+            view.OnPairButtonClicked();
+
+            Assert.That(NavigatorOf().Tab, Is.EqualTo(ShellTab.Breeding));
+            Assert.That(PairingViewOf().SelectedFemaleId, Is.EqualTo(view.State.Id));
+        }
+
+        [Test]
+        public void OnPairButtonClicked_WithASexUnknownAnimal_StillOpensTheBreedingTab()
+        {
+            var baby = new PetState { Name = "ベビー", SexRevealed = false };
+            var path = SaveColonyWith(baby, ShopNow);
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+
+            view.OnPairButtonClicked();
+
+            Assert.That(NavigatorOf().Tab, Is.EqualTo(ShellTab.Breeding));
+            Assert.That(PairingViewOf().SelectedFemaleId, Is.Null);
+            Assert.That(PairingViewOf().SelectedMaleId, Is.Null);
         }
 
         [Test]

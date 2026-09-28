@@ -69,6 +69,7 @@ namespace TerrariumDays.UI
         private Button feedButton;
         private Button waterButton;
         private Button cleanButton;
+        private Button pairButton;
         private Coroutine feedbackHideCoroutine;
 
         private VisualElement milestoneModal;
@@ -198,6 +199,7 @@ namespace TerrariumDays.UI
             if (ledgerView != null)
             {
                 ledgerView.AnimalTapped += OnLedgerAnimalTapped;
+                ledgerView.PairingRequested += OnLedgerPairRequested;
             }
 
             if (pairingView != null)
@@ -239,6 +241,11 @@ namespace TerrariumDays.UI
             if (cleanButton != null)
             {
                 cleanButton.clicked += OnCleanClicked;
+            }
+
+            if (pairButton != null)
+            {
+                pairButton.clicked += OnPairButtonClicked;
             }
 
             if (milestoneContinueButton != null)
@@ -625,6 +632,21 @@ namespace TerrariumDays.UI
             }
         }
 
+        /// <summary>The cage detail's "ペアリング" button: preselects this cage's animal (if its sex is known) and opens the breeding tab.</summary>
+        public void OnPairButtonClicked()
+        {
+            pairingView?.Preselect(state);
+            navigator?.ShowTab(ShellTab.Breeding);
+        }
+
+        /// <summary>The ledger row's small "ペアリング" button: preselects that animal and opens the breeding tab.</summary>
+        public void OnLedgerPairRequested(int animalId)
+        {
+            var pet = session?.Colony.AnimalById(animalId);
+            pairingView?.Preselect(pet);
+            navigator?.ShowTab(ShellTab.Breeding);
+        }
+
         /// <summary>Places or removes the current cage's nest box, based on whether it already has one.</summary>
         public void OnNestBoxButtonClicked()
         {
@@ -797,6 +819,7 @@ namespace TerrariumDays.UI
             if (ledgerView != null)
             {
                 ledgerView.AnimalTapped -= OnLedgerAnimalTapped;
+                ledgerView.PairingRequested -= OnLedgerPairRequested;
                 ledgerView.Dispose();
             }
 
@@ -857,6 +880,11 @@ namespace TerrariumDays.UI
             if (cleanButton != null)
             {
                 cleanButton.clicked -= OnCleanClicked;
+            }
+
+            if (pairButton != null)
+            {
+                pairButton.clicked -= OnPairButtonClicked;
             }
 
             if (milestoneContinueButton != null)
@@ -1009,6 +1037,7 @@ namespace TerrariumDays.UI
             feedButton = root.Q<Button>("feed-button");
             waterButton = root.Q<Button>("water-button");
             cleanButton = root.Q<Button>("clean-button");
+            pairButton = root.Q<Button>("pair-button");
 
             milestoneModal = root.Q<VisualElement>("milestone-modal");
             milestoneStageLabel = root.Q<Label>("milestone-stage-label");

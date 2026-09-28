@@ -89,6 +89,7 @@
                         <ui:Button name="water-button" text="みずをかえる" class="care-button" />
                         <ui:Button name="clean-button" text="そうじ" class="care-button" />
                         <ui:Button name="decor-button" text="そうしょく" class="care-button" />
+                        <ui:Button name="pair-button" text="ペアリング" class="care-button" />
                     </ui:VisualElement>
                 </ui:VisualElement>
                 <ui:VisualElement name="shop-panel" class="panel">
