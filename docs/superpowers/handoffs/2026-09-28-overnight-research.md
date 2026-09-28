@@ -17,7 +17,7 @@ cronジョブID: `f126d158`（毎時23分に発火。最終サイクルでこの
 3. ✅ フェーズ3/4の脆弱性・保護観点レビュー（経済・セーブデータ・ショップ）
 4. ✅ 類似ブリーダー/ペット育成ゲームのUI/UXパターン比較調査
 5. ⏳ 今セッションのトークン内訳分析・スキル/メモリ更新
-6. ⏳ 繁殖(phase4)ロジックの手動デバッグ（デバッグ倍率でペアリング→抱卵→産卵を1周走らせ、例外/コンソールエラーを監視）
+6. ✅ 繁殖(phase4)ロジックの手動デバッグ（デバッグ倍率でペアリング→抱卵→産卵を1周走らせ、例外/コンソールエラーを監視）
 
 ---
 
@@ -166,6 +166,33 @@ phase4前: floor(529/144) = 3行(432px) + 4行目が97px(67%)だけ覗く
 
 ---
 
+---
+
+## サイクル4（04:23〜、中断からの継続）
+
+### トピック5: 繁殖(phase4)ロジックの手動デバッグ（デバッグ倍率でペアリング→抱卵→産卵を1周走らせ、例外/コンソールエラーを監視）
+
+このトピックは市場・SNS調査ではなく、既存の繁殖ロジックが実際に例外なく最後まで動くかを検証する内部エンジニアリング確認のため、LP1は外部Web検索ではなくUnity Test Frameworkの既知の仕様確認（`LogAssert`は未処理のコンソールエラー/例外を自動的にテスト失敗として扱う、という一般知識）にとどめ、以降は主にコード調査（検証フェーズ）に時間を充てた。
+
+**LP1（情報収集）**: Unity Test FrameworkのPlayModeテストでは、`LogAssert.Expect(...)`で明示的に許容しない限り、コンソールへの未処理のエラー/例外ログはテストを自動的に失敗させる。この性質を使えば「例外/コンソールエラーが出ていないか」を新規テスト1本の合否だけで機械的に確認できる。
+
+**LP2（比較・現状分析）**: 既存の `Assets/Tests/PlayMode/TerrariumViewTests.cs` には `OnDebugSimulate12HoursClicked_RepeatedlyUntilPairingEnds_ShowsThePairingSuccessMessage`（[TerrariumViewTests.cs:1601](Assets/Tests/PlayMode/TerrariumViewTests.cs:1601)）など、ペアリング開始〜抱卵(Gravid)到達までをデバッグ倍率で進めるテストは既にあった。しかし「抱卵の先、実際に産卵(Egg)まで到達する」経路を通しで検証するテストは存在しなかった。これが今回追加したテストの新規性。
+
+**検証（影響範囲・具体的算出・メリデメ・リスク）**:
+- **発見1（単位換算の誤解）**: `OnDebugSimulate12HoursClicked()` は `TimeSpan.FromHours(12)` をゲーム内クロック軸にそのまま加算するが、この軸は `GameCalendar.RealTimeFor(gameDays) = TimeSpan.FromMinutes(gameDays * 48)`（[GameCalendar.cs](Assets/Scripts/Core/GameCalendar.cs)）という「1ゲーム内日 = 48分」の換算で、繁殖・脱皮などゲーム内日数ベースの全システムと同一の軸を共有している。したがって1クリックは額面の「12時間≒0.5ゲーム内日」ではなく **12h ÷ 48min/日 = 15ゲーム内日** 相当進む。旧版テスト（70クリックのループ）はこの誤解に基づき、実際には約1050ゲーム内日（1年超）も進めてしまい、繁殖シーズン境界や体重超過(TooThin)判定に達する前提が狂っていた。デバッグUIのラベル「12時間」表記と、実際の繁殖・脱皮システムへの影響量（15日相当）に約30倍の乖離があることは、デバッグツールの表示と実効果の齟齬として記録しておく価値がある。
+- **発見2（実際の失敗要因）**: ループ回数を10回に補正しても直らず、診断ログ（`Debug.Log`一時追加）で調査した結果、`Gravid.ClutchesLaid` は0→1と正常に増えているのに `colony.Eggs.Count` が常に0のままだった。`BreedingService.Lay()`（[BreedingService.cs:255](Assets/Scripts/Core/BreedingService.cs:255)）は巣箱の有無に関わらず必ず卵を`colony.Eggs`に追加する（`Place = HasNestBox ? NestBox : Loose`）ため、「巣箱が無いと卵が追加されない」という当初の仮説は誤りと判明。真因は `BreedingService.AdvanceEggs()`（[BreedingService.cs:341](Assets/Scripts/Core/BreedingService.cs:341)）で、`Loose`配置の卵は `LaidAtUtc + GameCalendar.RealTimeFor(LooseEggDryGameDays=2)` ≒ 1.6時間（クロック軸換算）を過ぎると即座に`colony.Eggs`から削除（乾燥判定）される点。1回のデバッグクリックが15ゲーム内日（≒12時間）を一度に進めるため、巣箱が無い状態で産まれた卵は「産卵→乾燥除去」が同一の`Advance()`呼び出し内で完結してしまい、テストからは一度も観測できなかった。
+- **発見3（付随する見落とし）**: 上記2点を修正して卵は観測できたが、`view.LoadColony(...)` で新規作成される空のセーブには `Colony.CreateNew()`（[Colony.cs:172](Assets/Scripts/Core/Colony.cs:172)）によりスターター個体「レオパ1」が自動で1匹生成される。テストはタロウ/ハナのみ世話をしていたため、レオパ1が放置され衰弱(Weak)し、そのフィードバックメッセージ（「レオパ1が衰弱しました…」）が産卵メッセージより優先表示され、`feedbackLabel.text`の検証が失敗した。同ファイル内の別テスト（[TerrariumViewTests.cs:1380](Assets/Tests/PlayMode/TerrariumViewTests.cs:1380)）に既に「`colony.RemoveAnimal(colony.Animals[0])`でスターター個体を除去する」という前例パターンがあり、それに倣った。
+- **発見4（メッセージ文言の思い込み）**: 巣箱ありの場合のメッセージテンプレートは `"{name}が産卵床に卵を{n}個産みました"`（[BreedingText.cs:249](Assets/Scripts/UI/BreedingText.cs:249)）で、巣箱なし用の`"{name}が卵を{n}個産みました。産卵床が…"`（同250行）とは文言が異なる。テストのアサーションは巣箱なし版の文言を当て推量していたため失敗しており、実装コードを直接確認して修正した。
+- 影響範囲: いずれもテストコード自体の前提の誤りであり、ゲームロジック本体（`BreedingService`/`OfflineProgressCalculator`/`BreedingText`）に不具合は見つからなかった。今回の作業を通じ、デバッグ倍率経由でペアリング→抱卵→産卵まで**例外/コンソールエラー無しで**完走できることを実機テストで確認できた（当初の調査目的を達成）。
+- リスク/デメリット: 無し（テスト追加のみ、本体コードは無変更）。強いて言えば、デバッグUIの「12時間」ラベルとゲーム内日数換算（15日相当）の乖離は、開発者が別のデバッグ用途でこのボタンを使う際に誤解を招きうる点は留意事項として残る（UI文言変更は意匠判断のためユーザー確認事項とする）。
+
+**修正**: `Assets/Tests/PlayMode/TerrariumViewTests.cs` に新規テスト `OnDebugSimulate12HoursClicked_ContinuedPastGravid_LaysAnEggWithoutErrors` を追加。ゲーム本体のコードは一切変更していない（テストのみ）。
+
+**反映**: ローカルコミット `0f17127`「Add a PlayMode test walking breeding pairing through to a laid egg」。`git push` は行っていない。
+
+**ユーザーへの提案（朝の判断用）**: 今回は対応不要な情報共有のみ。デバッグ倍率ボタンの「12時間」表記が実際には約15ゲーム内日を進める点は、今後デバッグUIを拡充する際の文言候補（例:「12時間(≒15日)」等への変更）として検討の余地があります。見た目の変更はユーザーの決定事項のため、コードは変更していません。
+
+---
+
 ## 未消化トピック（次サイクル以降）
 - セッションのトークン内訳分析・スキル/メモリ更新
-- 繁殖ロジックのデバッグ倍率を使った手動通し稼働確認
