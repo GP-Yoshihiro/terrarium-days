@@ -31,6 +31,8 @@ iOS build notes:
 
 ## Pet life model
 - Daily rhythm follows the device's local clock (`Core/DayPhase.cs`): leopard geckos sleep long by day (next to floor decor, their hide) and are active at dusk/night. Tuning lives in `Core/PetBehaviourTuning.cs`.
+- An animal is weak (衰弱) whenever health is at `CareTuning.WeakHealthThreshold` (0) until it recovers to `WeakRecoveryHealth` (30); weak animals cannot breed and sell at `MarketPrice.WeakMultiplier` (0.3×).
+- Game time is real time plus `Colony.GameClockOffset`; debug fast-forward (multiplier or "+12h") only ever increases this offset, so it survives save/load and never rewinds the in-game date.
 - Growth is by body weight and age (grams / game months, `Core/CareTuning.cs`), not a growth gauge. Food refusal (拒食) and shedding (脱皮) are time-driven and deterministic (`Core/AppetiteModel.cs`, `Core/OfflineProgressCalculator.cs`): once a stage's weight/age target is met the pet fasts for `PreGrowthFastGameDays` before the stage-up lands; a shed refuses food for `PreShedGameDays` beforehand and recurs every `YoungShedIntervalGameDays` (baby/juvenile) or `AdultShedIntervalGameDays` (adult), and on every stage-up. Game time runs at 1 real day = 1 game month. While fasting, hunger falls slower and does not count against health or growth. Sex is hidden until the animal is juvenile-or-older *and* has shed since (`PetState.SexRevealed`, set in `Core/OfflineProgressCalculator.cs`), not simply on reaching that stage.
 
 ## Morph appearance
@@ -38,7 +40,7 @@ iOS build notes:
 
 ## Scope limits for this prototype
 - Multiple animals across multiple cages, breeding, incubation, money, and shop purchases are in scope. Still no ads, accounts, push notifications, or real-money purchases. Adult animals never die (eggs can fail).
-- Networking: the only allowed use is the optional current-location weather (`UI/WeatherService.cs`, Open-Meteo, no API key, coordinates rounded to ~1 km), approved 2026-09-24. Everything else must work offline; never make gameplay depend on the network.
+- Networking: the only allowed use is the optional current-location weather (`UI/WeatherService.cs`, Open-Meteo, no API key, coordinates rounded to ~1 km), approved 2026-09-24. Its temperature also feeds breeding's room temperature (`Core/RoomTemperature.cs`, clamped 18–30 ℃, falling back to 24 ℃ when weather isn't usable). Everything else must work offline; never make gameplay depend on the network.
 - Do not add a water shader, procedural animation system, or third-party package without explicit approval. The pet's sprite-frame animation (idle, walk, eat, sleep, yawn, threat, happy + hearts/Zzz) was approved on 2026-09-24: behaviour lives in `Gameplay/PetBehaviour.cs`, rendering in `UI/PetActor.cs`, tuning in `Core/PetBehaviourTuning.cs`; extend these rather than adding another animation system.
 - Keep all tuning values in data assets or dedicated configuration classes, never scattered magic numbers.
 
@@ -46,6 +48,7 @@ iOS build notes:
 - `Assets/Scripts/Core/` — time, save, state, and offline progress
 - `Assets/Scripts/Core/Colony*.cs` — the multi-cage colony (cages, animals, wallet), its session/save service, and offline progress across the whole colony
 - `Assets/Scripts/Core/GameCalendar.cs` — the in-game calendar (real 1 day = 1 in-game month) used for age and growth display
+- `Assets/Scripts/Core/Breeding*.cs`, `Core/EggDevelopment.cs` — breeding conditions, pairing, gravid state, and nest-box egg development; numbers live in `CareTuning`
 - `Assets/Scripts/Gameplay/` — care actions, status, and growth
 - `Assets/Scripts/UI/` — views and input adapters only
 - Code map before reading code: `python3 ~/.claude/skills/minimal-read-edit/scripts/cs-outline.py Assets/Scripts` (types and methods with line numbers; ~21 KB vs 327 KB of source; add `--grep Word` to filter, pass one .cs file for its outline). Then Read only the line range you need (skill `minimal-read-edit`).

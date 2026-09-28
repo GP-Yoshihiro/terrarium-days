@@ -54,6 +54,7 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 - Low condition: if any care status is below 20, health decreases. Health never goes below 0.
 - Default player pacing: Adult is reachable after seven healthy real-world days.
 - Development pacing: a debug-only time multiplier supports 1×, 60×, and 600×.
+- Debug fast-forward is saved as a game-clock offset (`Colony.GameClockOffset`): game-now = real-now + offset, and closing/reopening the app or reloading a save never rewinds the in-game date. Only "clear save" resets the offset.
 
 ## 8. MVP screens
 1. **Terrarium** — pet, status bars, three care buttons, growth stage, selected decor.
@@ -103,5 +104,13 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 - **Wholesale**: any owned animal can be sold back to the shop for the market price × a wholesale rate (well below the shop's selling price); this is allowed even for the colony's last animal.
 - **Per-cage decor and slots**: decor is bought into a shared inventory, then placed into a specific cage's decor slots (small 1, standard 2, large 3; at most one of each item per cage) from that cage's own decor drawer. Removing a placed item returns it to the inventory.
 - **Decor migration**: a save from before per-cage decor existed has its previously "unlocked" decor moved into the shared inventory on first load, with an on-screen notice; the player then places it from a cage's decor drawer.
+
+## 14. Breeding, eggs, and weakness (phase 4)
+- **Breeding season and conditions**: the breeding season is game months 3–9. A female can pair once she is 10 game months old and at least 45 g; a male, 8 months and 40 g.
+- **Pairing**: started from the cage detail, the new breeding tab, or the ledger. The female visits the male's cage for 3 game days — her own cage shows empty, his shows a "visiting" marker — then the pairing resolves as success or failure; the forecast screen shows the chance beforehand (base 70%, up to 95%, better with a good match).
+- **Gravid state and egg-laying schedule**: a successful pairing goes gravid and lays its first clutch 21–28 game days later, then every 14–28 game days after that, 4–8 eggs per clutch (occasionally a single egg). Each clutch costs the female 3–5 g of body weight; laying stops once she is under 40 g.
+- **Nest box and eggs**: an egg laid with a nest box in the cage develops at room temperature and hatches in phase 5. An egg laid without one dries out after 2 game days (a notice shows the remaining time); a nest-box egg spent 3 total game days below the room-temperature floor also fails.
+- **Weakness**: health at 0 makes an animal weak — it cannot breed and its market price drops to 0.3× — until health recovers to 30, when a notice clears the state.
+- **Room temperature**: the current-location weather's temperature, clamped to 18–30 ℃, feeds breeding and eggs. With no usable weather (location off, failed, or offline) it falls back to 24 ℃ and is labelled accordingly.
 
 Detailed spec: docs/superpowers/specs/2026-09-25-breeder-sim-design.md
