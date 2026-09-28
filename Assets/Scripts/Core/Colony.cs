@@ -17,7 +17,6 @@ namespace TerrariumDays.Core
         Luxury
     }
 
-    /// <summary>One cage on a rack; holds at most one animal (pairing comes later).</summary>
     /// <summary>One cage on a rack; holds one animal, plus a visiting female while pairing (§6.1).</summary>
     public sealed class Cage
     {

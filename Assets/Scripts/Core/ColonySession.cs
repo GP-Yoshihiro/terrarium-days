@@ -210,7 +210,6 @@ namespace TerrariumDays.Core
         }
 
         /// <summary>
-        /// <summary>
         /// Re-anchors every animal and the game clock on real time plus the saved offset,
         /// keeping each animal's sub-step remainder so a care action is never replayed away.
         /// </summary>

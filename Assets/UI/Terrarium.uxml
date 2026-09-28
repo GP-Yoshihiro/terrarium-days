@@ -35,7 +35,7 @@
                         </ui:VisualElement>
                         <ui:Label name="growth-stage-label" text="ベビー 3.0g" class="growth-stage-label" />
                         <ui:VisualElement name="profile-chips" class="profile-chips" />
-                        <ui:VisualElement name="breeding-row" class="breeding-row">
+                        <ui:VisualElement name="breeding-row" class="cage-breeding-row">
                             <ui:Label name="breeding-status-label" text="" class="breeding-status-label" />
                             <ui:Button name="nest-box-button" text="産卵床を置く" class="nest-box-button" />
                         </ui:VisualElement>

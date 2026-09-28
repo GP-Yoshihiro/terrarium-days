@@ -1752,6 +1752,28 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void BreedingTab_StartingAPairing_WhileViewingTheFemalesCage_FollowsHerToTheMalesCage()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var animalsBefore = colony.Animals.Count;
+            view.OnDebugAddPairClicked();
+            var added = colony.Animals.Skip(animalsBefore).ToList();
+            var male = added.Single(a => a.Sex == Sex.Male);
+            var female = added.Single(a => a.Sex == Sex.Female);
+
+            view.SelectCage(colony.CageOf(female).Id);
+            Assert.That(view.State, Is.SameAs(female));
+
+            view.OnPairingStartRequested(male.Id, female.Id);
+            ClickConfirmYes();
+
+            Assert.That(view.CurrentCage, Is.SameAs(colony.CageOf(male)));
+            Assert.That(view.State, Is.SameAs(male));
+        }
+
+        [Test]
         public void BreedingTab_WithASexUnknownBaby_HidesItsRowAndShowsTheUnknownSexNotice()
         {
             var path = CreateTempSavePath();

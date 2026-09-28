@@ -48,7 +48,7 @@
     background-color: rgb(255, 167, 38);
 }
 
-.breeding-row {
+.cage-breeding-row {
     width: 100%;
     flex-direction: row;
     align-items: center;
