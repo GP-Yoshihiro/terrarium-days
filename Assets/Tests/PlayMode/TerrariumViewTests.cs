@@ -1632,6 +1632,77 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void OnDebugSimulate12HoursClicked_ContinuedPastGravid_LaysAnEggWithoutErrors()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            // A fresh colony seeds one starter baby (Colony.CreateNew) that this test never
+            // feeds; left in place it goes Weak partway through the loops below and its
+            // feedback message crowds out the egg-laid message this test asserts on.
+            colony.RemoveAnimal(colony.Animals[0]);
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState
+            {
+                Name = "タロウ", Sex = Sex.Male, SexRevealed = true, Stage = GrowthStage.Adult,
+                WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30), PersonalityKnown = true,
+            }, maleCage);
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            femaleCage.HasNestBox = true; // without one, every laid egg is Loose and dries out
+            // (LooseEggDryGameDays) well within a single debug click, so colony.Eggs never holds one
+            var female = colony.AddAnimal(new PetState
+            {
+                Name = "ハナ", Sex = Sex.Female, SexRevealed = true, Stage = GrowthStage.Adult,
+                WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30), PersonalityKnown = true,
+            }, femaleCage);
+            Assert.That(view.Session.Breeding.StartPairing(colony, male.Id, female.Id, ShopNow, view.Session.Calendar), Is.EqualTo(PairingProblem.None));
+            colony.PairingOf(female).SuccessChance = 1d; // pin the mating roll to always succeed
+
+            // Reaching the first clutch takes up to ~28 in-game days (see below), long enough that
+            // unattended hunger decay would otherwise starve both animals into BreedingEnd.Weak
+            // before any egg is laid. Top up care stats before every tick, as a diligent player
+            // would, so the test isolates the breeding/clutch path rather than the hunger path
+            // (which has its own coverage elsewhere).
+            void KeepAnimalsCaredFor()
+            {
+                foreach (var pet in new[] { male, female })
+                {
+                    pet.Hunger = 100d;
+                    pet.Hydration = 100d;
+                    pet.Cleanliness = 100d;
+                    pet.Health = 100d;
+                }
+            }
+
+            for (var i = 0; i < 7 && female.Gravid == null; i++)
+            {
+                KeepAnimalsCaredFor();
+                view.OnDebugSimulate12HoursClicked();
+            }
+            Assert.That(female.Gravid, Is.Not.Null, "precondition: pairing must reach Gravid before this test can check egg-laying");
+
+            // OnDebugSimulate12HoursClicked advances the clock by TimeSpan.FromHours(12) on the
+            // same axis GameCalendar.RealTimeFor uses (1 game day = 48 minutes on that axis), so
+            // one click is ~15 game-calendar-days, not the 0.5 the "12 hours" label suggests.
+            // FirstClutchMinGameDays/MaxGameDays (21-28 game days = ~16.8-22.4 hours on this
+            // axis) falls comfortably inside a single click from here, so a handful of clicks is
+            // a generous margin. An earlier version of this test looped up to 70 clicks (~1050
+            // game-days) expecting to need that many.
+            for (var i = 0; i < 10 && colony.Eggs.Count == 0; i++)
+            {
+                KeepAnimalsCaredFor();
+                view.OnDebugSimulate12HoursClicked();
+            }
+
+            Assert.That(colony.Eggs.Any(e => e.MotherId == female.Id && e.FatherId == male.Id), Is.True,
+                "the debug time multiplier should be able to carry a pairing all the way through to a real, " +
+                "simulation-laid egg (via BreedingService.Lay), not just to Gravid");
+            // BreedingText formats the nest-box case as "{name}が産卵床に卵を{n}個産みました"
+            // (the loose-egg wording omits "産卵床に"); the cage here has a nest box.
+            StringAssert.Contains($"{female.Name}が産卵床に卵を", feedbackLabel.text);
+        }
+
+        [Test]
         public void OnDebugAddPairClicked_AddsAnAdultMaleAndFemaleBothAbleToBreed()
         {
             var path = CreateTempSavePath();
