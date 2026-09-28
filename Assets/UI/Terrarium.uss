@@ -1032,7 +1032,7 @@
 }
 
 /* Breeding tab (Task 12 lays out the panel skeleton; Task 13 fills it with these
-   classes, so their look follows .shop-*/.ledger-* row conventions). */
+   classes, so their look follows the .shop- and .ledger- row conventions). */
 .breeding-season-label {
     height: 20px;
     min-height: 20px;
