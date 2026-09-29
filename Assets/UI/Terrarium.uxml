@@ -186,7 +186,7 @@
                     <ui:Button name="debug-60x-button" text="60x" class="debug-small-button" />
                     <ui:Button name="debug-600x-button" text="600x" class="debug-small-button" />
                 </ui:VisualElement>
-                <ui:Button name="debug-simulate-12h-button" text="+12時間進める" class="milestone-continue-button" />
+                <ui:Button name="debug-simulate-12h-button" text="+12時間進める（ゲーム内約15日相当）" class="milestone-continue-button" />
                 <ui:VisualElement class="debug-slider-row">
                     <ui:Label text="空腹度" class="debug-slider-label" />
                     <ui:Slider name="debug-hunger-slider" low-value="0" high-value="100" value="80" class="debug-slider" />
