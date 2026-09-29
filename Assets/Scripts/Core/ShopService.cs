@@ -100,6 +100,7 @@ namespace TerrariumDays.Core
                     break;
                 case ShopItemKind.Rack:
                     colony.RackCount++;
+                    colony.NewRackIndices.Add(colony.RackCount - 1);
                     break;
                 case ShopItemKind.Incubator:
                     colony.Incubators.Add(item.Incubator);

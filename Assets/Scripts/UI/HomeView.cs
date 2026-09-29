@@ -29,7 +29,8 @@ namespace TerrariumDays.UI
         public static string CageListSignature(Colony colony, DateTimeOffset nowUtc, CareTuning tuning)
         {
             var signature = new StringBuilder();
-            signature.Append(colony.RackCount).Append('|').Append(colony.Cages.Count);
+            signature.Append(colony.RackCount).Append('|').Append(colony.Cages.Count)
+                .Append('|').Append(string.Join(",", colony.NewRackIndices));
             foreach (var cage in colony.Cages)
             {
                 var pet = colony.AnimalIn(cage);
@@ -76,6 +77,12 @@ namespace TerrariumDays.UI
             {
                 var row = new VisualElement();
                 row.AddToClassList("rack-row");
+                if (colony.NewRackIndices.Contains(rack))
+                {
+                    row.AddToClassList("rack-row-new");
+                    row.Add(Label("新着", "rack-badge-new"));
+                }
+
                 for (var slot = 0; slot < Colony.CagesPerRack; slot++)
                 {
                     var index = rack * Colony.CagesPerRack + slot;

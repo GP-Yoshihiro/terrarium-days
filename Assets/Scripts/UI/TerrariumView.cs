@@ -438,6 +438,8 @@ namespace TerrariumDays.UI
                 return false;
             }
 
+            session.Colony.NewRackIndices.Remove(session.Colony.Cages.IndexOf(cage) / Colony.CagesPerRack);
+
             currentCage = cage;
             if (petElement != null)
             {

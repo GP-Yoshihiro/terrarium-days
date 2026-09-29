@@ -188,6 +188,7 @@ namespace TerrariumDays.Core
             {
                 CalendarEpochUtc = Parse(data.calendarEpochUtc, nowUtc),
                 RackCount = data.rackCount,
+                NewRackIndices = data.newRackIndices != null ? new List<int>(data.newRackIndices) : new List<int>(),
                 NextAnimalId = data.nextAnimalId,
                 NextCageId = data.nextCageId,
                 LastBilledMonthIndex = data.lastBilledMonthIndex,
@@ -448,6 +449,7 @@ namespace TerrariumDays.Core
                 calendarEpochUtc = Format(colony.CalendarEpochUtc),
                 money = colony.Wallet.Money,
                 rackCount = colony.RackCount,
+                newRackIndices = new List<int>(colony.NewRackIndices),
                 incubatorCount = colony.IncubatorCount,
                 nextAnimalId = colony.NextAnimalId,
                 nextCageId = colony.NextCageId,

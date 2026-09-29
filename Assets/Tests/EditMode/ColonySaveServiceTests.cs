@@ -522,6 +522,29 @@ namespace TerrariumDays.Tests
             Assert.That(service.LoadOrCreate(path, Now, new Random(1)).GameClockOffset, Is.EqualTo(TimeSpan.FromHours(30)));
         }
 
+        [Test]
+        public void RoundTrip_KeepsNewRackIndices()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            colony.RackCount = 3;
+            colony.NewRackIndices.Add(1);
+            colony.NewRackIndices.Add(2);
+
+            service.Save(path, colony);
+
+            Assert.That(service.LoadOrCreate(path, Now, new Random(1)).NewRackIndices, Is.EqualTo(new[] { 1, 2 }));
+        }
+
+        [Test]
+        public void ASaveWithoutNewRackIndices_LoadsWithAnEmptyList()
+        {
+            WriteSchemaThreeWithAnimal("{" + AnimalBase + "}");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(colony.NewRackIndices, Is.Empty);
+        }
+
         private const string AnimalBase = "\"id\":1,\"name\":\"レオパ1\",\"sex\":\"Female\",\"weightGrams\":45.0,\"stage\":\"Adult\"," +
             "\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100";
 

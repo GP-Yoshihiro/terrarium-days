@@ -47,6 +47,8 @@ namespace TerrariumDays.Core
         public List<PetState> Animals { get; set; } = new List<PetState>();
         public List<Cage> Cages { get; set; } = new List<Cage>();
         public int RackCount { get; set; } = 1;
+        /// <summary>Indices of racks bought but not yet visited, for the home screen's new-arrival highlight; cleared per rack once the player selects an occupied cage in it.</summary>
+        public List<int> NewRackIndices { get; set; } = new List<int>();
         public Inventory Inventory { get; set; } = new Inventory();
         public List<IncubatorModel> Incubators { get; set; } = new List<IncubatorModel> { IncubatorModel.Simple };
         public int IncubatorCount => Incubators.Count;

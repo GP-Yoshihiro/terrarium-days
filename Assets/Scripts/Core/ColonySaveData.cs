@@ -14,6 +14,7 @@ namespace TerrariumDays.Core
         public List<AnimalSaveData> animals = new List<AnimalSaveData>();
         public List<CageSaveData> cages = new List<CageSaveData>();
         public int rackCount;
+        public List<int> newRackIndices = new List<int>();
         public int incubatorCount;
         public int nextAnimalId;
         public int nextCageId;

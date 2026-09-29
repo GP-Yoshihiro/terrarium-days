@@ -135,6 +135,19 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void BuyItem_ARack_MarksItsIndexAsNew()
+        {
+            var colony = ColonyWithOffer(out _);
+            colony.Wallet.Money = 1_000_000;
+
+            Assert.That(shop.BuyItem(colony, "rack", Now), Is.EqualTo(ShopResult.Ok));
+            Assert.That(colony.NewRackIndices, Is.EqualTo(new[] { 1 }));
+
+            Assert.That(shop.BuyItem(colony, "rack", Now), Is.EqualTo(ShopResult.Ok));
+            Assert.That(colony.NewRackIndices, Is.EqualTo(new[] { 1, 2 }));
+        }
+
+        [Test]
         public void BuyItem_DecorAndNestBoxesGoToTheInventory()
         {
             var colony = ColonyWithOffer(out _);

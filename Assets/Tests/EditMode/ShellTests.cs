@@ -231,6 +231,25 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void HomeView_MarksANewlyBoughtRackWithAHighlightRowAndBadge()
+        {
+            var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
+            colony.RackCount = 2;
+            colony.NewRackIndices.Add(1);
+            var rackList = new VisualElement();
+            var home = new HomeView(rackList);
+
+            home.Render(colony, Now, new CareTuning());
+
+            var rows = rackList.Query<VisualElement>(className: "rack-row").ToList();
+            Assert.That(rows, Has.Count.EqualTo(2));
+            Assert.That(rows[0].ClassListContains("rack-row-new"), Is.False);
+            Assert.That(rows[0].Q<Label>(className: "rack-badge-new"), Is.Null);
+            Assert.That(rows[1].ClassListContains("rack-row-new"), Is.True);
+            Assert.That(rows[1].Q<Label>(className: "rack-badge-new")?.text, Is.EqualTo("新着"));
+        }
+
+        [Test]
         public void CageListSignature_IsStableWhenNothingChanges()
         {
             var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
@@ -292,6 +311,18 @@ namespace TerrariumDays.Tests
             var before = HomeView.CageListSignature(colony, Now, tuning);
 
             colony.Eggs.Add(new Egg { CageId = cage.Id });
+
+            Assert.That(HomeView.CageListSignature(colony, Now, tuning), Is.Not.EqualTo(before));
+        }
+
+        [Test]
+        public void CageListSignature_ChangesWhenANewRackIsMarked()
+        {
+            var colony = Colony.CreateNew(Now, new EconomyTuning(), new CareTuning(), new System.Random(1));
+            var tuning = new CareTuning();
+            var before = HomeView.CageListSignature(colony, Now, tuning);
+
+            colony.NewRackIndices.Add(0);
 
             Assert.That(HomeView.CageListSignature(colony, Now, tuning), Is.Not.EqualTo(before));
         }
