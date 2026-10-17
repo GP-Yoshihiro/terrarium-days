@@ -188,7 +188,7 @@ namespace TerrariumDays.UI
             text.Append("|tray:").Append(colony.FirstEmptyCage() != null);
             foreach (var pet in colony.TrayAnimals())
             {
-                text.Append(',').Append(pet.Id).Append('=').Append(IncubatorText.GraceLine(pet, gameNowUtc));
+                text.Append(',').Append(pet.Id).Append('=').Append(IncubatorText.GraceLine(pet, gameNowUtc)).Append('/').Append((int)pet.Stage).Append(pet.SexKnown ? 's' : '-');
             }
 
             text.Append('|').Append(selectedEggId);

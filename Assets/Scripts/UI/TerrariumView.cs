@@ -644,6 +644,7 @@ namespace TerrariumDays.UI
 
         private void OnTabChanged(ShellTab tab)
         {
+            OnFamilyTreeCloseClicked();
             if (tab == ShellTab.Cages && !navigator.ShowingCageDetail)
             {
                 cageListView.Invalidate();
@@ -2379,6 +2380,11 @@ namespace TerrariumDays.UI
             if (result == ShopResult.Ok)
             {
                 ShowShopMessage(ShopText.WholesaleMessage(name, pay));
+                if (navigator != null && navigator.Tab == ShellTab.Incubator)
+                {
+                    ShowFeedback(ShopText.WholesaleMessage(name, pay));
+                }
+
                 if (wasSelected)
                 {
                     var occupied = session.Colony.ShownCages();

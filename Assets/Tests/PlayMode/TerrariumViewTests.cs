@@ -2210,6 +2210,38 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void HatchTray_Sell_ShowsTheResultOnTheIncubatorTab()
+        {
+            OpenIncubatorTab();
+            var pet = HatchIntoTray();
+            var pay = ShopServiceOf().WholesalePriceOf(pet);
+
+            view.OnTraySellRequested(pet);
+            ClickConfirmYes();
+
+            Assert.That(view.Session.Colony.TrayAnimals(), Is.Empty);
+            Assert.That(feedbackLabel.text, Is.EqualTo(ShopText.WholesaleMessage(pet.Name, pay)));
+        }
+
+        [Test]
+        public void SwitchingTabs_ClosesTheFamilyTree()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
+            view.OnLedgerAnimalTapped(second.Id);
+            Assert.That(familyTreeModal.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+
+            // Awake() is skipped by this harness, so hook the real handler up the way Awake does.
+            var onTabChanged = (Action<ShellTab>)Delegate.CreateDelegate(typeof(Action<ShellTab>), view,
+                typeof(TerrariumView).GetMethod("OnTabChanged", BindingFlags.NonPublic | BindingFlags.Instance));
+            NavigatorOf().TabChanged += onTabChanged;
+            NavigatorOf().ShowTab(ShellTab.Shop);
+
+            Assert.That(familyTreeModal.style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
         public void HatchTray_WithNoEmptyCage_DisablesMoveAndSaysSo()
         {
             OpenIncubatorTab();
@@ -2340,13 +2372,14 @@ namespace TerrariumDays.Tests
             view.OnDebugAddIncubatorEggsClicked();
 
             var notified = false;
-            for (var i = 0; i < 800 && !notified; i++)
+            // Debug eggs start well developed; one click is ~15 game days, so a handful of clicks is plenty.
+            for (var i = 0; i < 5 && !notified; i++)
             {
                 view.OnDebugSimulate12HoursClicked();
                 notified = feedbackLabel.text.Contains("が孵化しました（孵化トレイ）");
             }
 
-            Assert.That(notified, Is.True, feedbackLabel.text);
+            Assert.That(notified, Is.True, "no hatch notice within 5 clicks; feedback was: " + feedbackLabel.text);
         }
 
         [Test]
@@ -2409,6 +2442,8 @@ namespace TerrariumDays.Tests
                 KeepAnimalsCaredFor();
                 view.OnDebugSimulate12HoursClicked();
             }
+
+            Assert.That(female.Gravid, Is.Not.Null, "precondition: pairing must reach Gravid before the clutch can be laid");
 
             for (var i = 0; i < 10 && colony.Eggs.Count == 0; i++)
             {
