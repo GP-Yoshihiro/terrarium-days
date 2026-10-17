@@ -49,6 +49,9 @@ iOS build notes:
 - `Assets/Scripts/Core/Colony*.cs` — the multi-cage colony (cages, animals, wallet), its session/save service, and offline progress across the whole colony
 - `Assets/Scripts/Core/GameCalendar.cs` — the in-game calendar (real 1 day = 1 in-game month) used for age and growth display
 - `Assets/Scripts/Core/Breeding*.cs`, `Core/EggDevelopment.cs` — breeding conditions, pairing, gravid state, and nest-box egg development; numbers live in `CareTuning`
+- `Assets/Scripts/Core/Incubator.cs`, `IncubatorRules.cs`, `IncubatorService*.cs` — one incubator's state (model, set temperature, humidity), its numbers (capacity, real temperature, daily failure) and the per-game-day egg advance; reports go through `IncubationReport`
+- `Assets/Scripts/Core/Candling.cs` (`Candling`, `HatchSex`) — what candling shows and the temperature-dependent hatch sex; `Core/Hatchery.cs` — hatching into the tray and tray → cage. An animal that is in no cage is in the hatchery tray (`Colony.TrayAnimals()`); code must not assume every animal has a cage
+- `Assets/Scripts/Core/FamilyTree.cs` — family tree and the light `LineageRecord` kept for animals that left; `Core/SpriteCachePolicy.cs` — LRU eviction for the pet sprite cache
 - `Assets/Scripts/Gameplay/` — care actions, status, and growth
 - `Assets/Scripts/UI/` — views and input adapters only
 - Code map before reading code: `python3 ~/.claude/skills/minimal-read-edit/scripts/cs-outline.py Assets/Scripts` (types and methods with line numbers; ~21 KB vs 327 KB of source; add `--grep Word` to filter, pass one .cs file for its outline). Then Read only the line range you need (skill `minimal-read-edit`).
