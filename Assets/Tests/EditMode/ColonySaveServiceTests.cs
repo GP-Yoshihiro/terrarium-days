@@ -688,5 +688,168 @@ namespace TerrariumDays.Tests
             Assert.That(colony.Incubators.Select(i => i.Model), Is.EqualTo(new[] { IncubatorModel.Simple }));
             Assert.That(colony.Wallet.Ledger[0].Category, Is.EqualTo(LedgerCategory.Other));
         }
+
+        private const string StateTime = "\"2026-09-25T12:00:00.0000000+00:00\"";
+
+        private void WriteIncubatorFile(string incubatorStates, string eggs = "", string animalExtra = "", string extra = "")
+        {
+            File.WriteAllText(path, "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":50000," +
+                "\"animals\":[{\"id\":1,\"name\":\"A\",\"sex\":\"Male\",\"weightGrams\":45.0,\"stage\":\"Adult\"," +
+                "\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100," +
+                "\"genomeVersion\":1,\"personality\":\"Calm\",\"personalityKnown\":true" + animalExtra + "}]," +
+                "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1}],\"rackCount\":1," +
+                "\"incubatorStates\":[" + incubatorStates + "],\"eggs\":[" + eggs + "]" + extra + ",\"nextAnimalId\":2,\"nextCageId\":2}");
+        }
+
+        private static string IncState(int id, string model = "Simple", int temp = 28, int humidity = 80, string applied = null) =>
+            "{\"id\":" + id + ",\"model\":\"" + model + "\",\"setTemperatureC\":" + temp + ",\"humidityPercent\":" + humidity +
+            ",\"appliedUntilUtc\":" + (applied ?? StateTime) + "}";
+
+        private static string IncEgg(int id, int incubatorId, string place = "Incubator") =>
+            "{\"id\":" + id + ",\"cageId\":-1,\"laidAtUtc\":" + StateTime + ",\"place\":\"" + place + "\",\"fertile\":true," +
+            "\"incubatorId\":" + incubatorId + ",\"appliedUntilUtc\":" + StateTime + "}";
+
+        [Test]
+        public void Load_IncubatorModelOutOfRange_ReadsAsSimple()
+        {
+            WriteIncubatorFile(IncState(1, "99"));
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(colony.Incubators[0].Model, Is.EqualTo(IncubatorModel.Simple));
+        }
+
+        [TestCase(10, -5, 24, 0d)]
+        [TestCase(50, 140, 34, 100d)]
+        public void Load_IncubatorSettings_AreClamped(int temp, int humidity, int expectedTemp, double expectedHumidity)
+        {
+            WriteIncubatorFile(IncState(1, "Standard", temp, humidity));
+
+            var incubator = service.LoadOrCreate(path, Now, new Random(1)).Incubators[0];
+
+            Assert.That(incubator.SetTemperatureC, Is.EqualTo(expectedTemp));
+            Assert.That(incubator.HumidityPercent, Is.EqualTo(expectedHumidity));
+        }
+
+        [Test]
+        public void Load_BadOrDuplicateIncubatorIds_AreRenumberedAndEggsFollow()
+        {
+            WriteIncubatorFile(IncState(0) + "," + IncState(5, "Standard") + "," + IncState(5, "Luxury") + "," + IncState(-2),
+                IncEgg(1, 5));
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(colony.Incubators.Select(i => i.Id), Is.EqualTo(new[] { 1, 2, 3, 4 }));
+            Assert.That(colony.Eggs[0].IncubatorId, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Load_EggInAMissingIncubator_GoesToTheFirstOneWithRoom()
+        {
+            // Incubator 1 (Simple, capacity 6) is full, so the stray egg goes to incubator 2.
+            var eggs = string.Join(",", Enumerable.Range(1, 6).Select(i => IncEgg(i, 1))) + "," + IncEgg(7, 9);
+            WriteIncubatorFile(IncState(1) + "," + IncState(2, "Standard"), eggs);
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(colony.Eggs.Find(e => e.Id == 7).IncubatorId, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Load_EggInAMissingIncubator_WithNoRoomAnywhere_GoesToTheFirstOver()
+        {
+            var eggs = string.Join(",", Enumerable.Range(1, 6).Select(i => IncEgg(i, 1))) + "," + IncEgg(7, 0);
+            WriteIncubatorFile(IncState(1), eggs);
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(colony.Eggs.Find(e => e.Id == 7).IncubatorId, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Load_BrokenGraceAndAppliedTimes_AreDroppedWithoutBreakingTheSave()
+        {
+            WriteIncubatorFile(IncState(1, applied: "\"garbage\""), IncEgg(1, 1), ",\"careGraceUntilUtc\":\"not a time\"");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(colony.Animals[0].CareGraceUntilUtc, Is.Null);
+            Assert.That(colony.Incubators[0].AppliedUntilUtc, Is.EqualTo(default(DateTimeOffset)));
+            Assert.That(colony.Animals, Has.Count.EqualTo(1));
+            Assert.That(colony.Eggs, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void Load_MissingOrNullLineage_IsAnEmptyList()
+        {
+            WriteIncubatorFile(IncState(1));
+            Assert.That(service.LoadOrCreate(path, Now, new Random(1)).Lineage, Is.Empty);
+
+            WriteIncubatorFile(IncState(1), extra: ",\"lineage\":null");
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(colony.Lineage, Is.Empty);
+        }
+
+        [Test]
+        public void RoundTrip_KeepsTrayAnimalParentsGraceLineageAndIncubatorEggs()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            var tray = colony.AddAnimal(new PetState
+            {
+                Name = "Tray",
+                MotherId = 7,
+                FatherId = 8,
+                CareGraceUntilUtc = Now.AddDays(2),
+                LastSavedAtUtc = Now,
+                NextShedAtUtc = Now.AddDays(3),
+            }, null);
+            colony.AddCage(CageSize.Standard);
+            colony.Lineage.Add(new LineageRecord { Id = 7, Name = "Mum", MorphName = "ノーマル", Sex = Sex.Female, SexKnown = true, MotherId = 3, FatherId = 4 });
+            colony.Eggs.Add(new Egg { Id = 1, CageId = -1, LaidAtUtc = Now, Place = EggPlace.Incubator, IncubatorId = colony.Incubators[0].Id, Fertile = true, AppliedUntilUtc = Now });
+            colony.NextEggId = 2;
+            var cageCount = colony.Cages.Count;
+
+            service.Save(path, colony);
+            var loaded = service.LoadOrCreate(path, Now, new Random(2));
+
+            var loadedTray = loaded.AnimalById(tray.Id);
+            Assert.That(loadedTray, Is.Not.Null);
+            Assert.That(loaded.CageOf(loadedTray), Is.Null);
+            Assert.That(loaded.TrayAnimals().Select(a => a.Id), Is.EqualTo(new[] { tray.Id }));
+            Assert.That(loaded.Cages, Has.Count.EqualTo(cageCount));
+            Assert.That(loadedTray.MotherId, Is.EqualTo(7));
+            Assert.That(loadedTray.FatherId, Is.EqualTo(8));
+            Assert.That(loadedTray.CareGraceUntilUtc, Is.EqualTo(Now.AddDays(2)));
+            Assert.That(loaded.Lineage, Has.Count.EqualTo(1));
+            var record = loaded.Lineage[0];
+            Assert.That((record.Id, record.Name, record.MorphName, record.Sex, record.SexKnown, record.MotherId, record.FatherId),
+                Is.EqualTo((7, "Mum", "ノーマル", Sex.Female, true, 3, 4)));
+            Assert.That(loaded.Eggs[0].Place, Is.EqualTo(EggPlace.Incubator));
+            Assert.That(loaded.Eggs[0].IncubatorId, Is.EqualTo(loaded.Incubators[0].Id));
+        }
+
+        [Test]
+        public void Load_PhaseFourFile_HasNoParentsGraceLineageOrIncubatorIds()
+        {
+            File.WriteAllText(path, "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":50000," +
+                "\"animals\":[{\"id\":1,\"name\":\"A\",\"sex\":\"Male\",\"weightGrams\":45.0,\"stage\":\"Adult\"," +
+                "\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100," +
+                "\"genomeVersion\":1,\"personality\":\"Calm\",\"personalityKnown\":true}]," +
+                "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1}],\"rackCount\":1,\"incubatorCount\":1," +
+                "\"eggs\":[{\"id\":1,\"cageId\":1,\"laidAtUtc\":" + StateTime + ",\"place\":\"NestBox\",\"fertile\":true,\"appliedUntilUtc\":" + StateTime + "}]," +
+                "\"nextAnimalId\":2,\"nextCageId\":2}");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(colony.Animals[0].MotherId, Is.EqualTo(0));
+            Assert.That(colony.Animals[0].FatherId, Is.EqualTo(0));
+            Assert.That(colony.Animals[0].CareGraceUntilUtc, Is.Null);
+            Assert.That(colony.Lineage, Is.Empty);
+            Assert.That(colony.Eggs[0].IncubatorId, Is.EqualTo(0));
+            Assert.That(colony.Eggs[0].Place, Is.EqualTo(EggPlace.NestBox));
+        }
     }
 }

@@ -33,6 +33,7 @@ namespace TerrariumDays.Core
         public List<PairingSaveData> pairings = new List<PairingSaveData>();
         public List<GravidSaveData> gravidStates = new List<GravidSaveData>();
         public List<EggSaveData> eggs = new List<EggSaveData>();
+        public List<LineageSaveData> lineage = new List<LineageSaveData>();
     }
 
     [Serializable]
@@ -86,6 +87,7 @@ namespace TerrariumDays.Core
         public double coldGameDays;
         public string failure;
         public string appliedUntilUtc;
+        public int incubatorId;
     }
 
     [Serializable]
@@ -132,6 +134,9 @@ namespace TerrariumDays.Core
         public bool sexRevealed;
         public string personalityRevealAtUtc;
         public bool weak;
+        public int motherId;
+        public int fatherId;
+        public string careGraceUntilUtc;
     }
 
     [Serializable]
@@ -175,6 +180,18 @@ namespace TerrariumDays.Core
         public int setTemperatureC;
         public double humidityPercent;
         public string appliedUntilUtc;
+    }
+
+    [Serializable]
+    public sealed class LineageSaveData
+    {
+        public int id;
+        public string name;
+        public string morphName;
+        public string sex;
+        public bool sexKnown;
+        public int motherId;
+        public int fatherId;
     }
 
     /// <summary>Reads only the schema version, to choose between loading and migrating.</summary>

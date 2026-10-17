@@ -195,17 +195,37 @@ namespace TerrariumDays.Core
                 GameClockOffset = TimeSpan.FromTicks(Math.Max(0L, data.gameClockOffsetTicks)),
             };
             colony.Incubators.Clear();
+            var incubatorIdMap = new Dictionary<int, int>();
             if (data.incubatorStates != null && data.incubatorStates.Count > 0)
             {
+                var seenIds = new HashSet<int>();
+                var idsAreSound = true;
                 foreach (var state in data.incubatorStates)
                 {
+                    if (state == null || state.id <= 0 || !seenIds.Add(state.id))
+                    {
+                        idsAreSound = false;
+                    }
+                }
+
+                // Unsound ids (0, negative, duplicated) renumber every incubator 1,2,3... in load
+                // order; the first incubator that held a usable old id keeps its eggs.
+                foreach (var rawState in data.incubatorStates)
+                {
+                    var state = rawState ?? new IncubatorSaveData();
+                    var newId = idsAreSound ? state.id : colony.Incubators.Count + 1;
+                    if (!idsAreSound && state.id > 0 && !incubatorIdMap.ContainsKey(state.id))
+                    {
+                        incubatorIdMap[state.id] = newId;
+                    }
+
                     colony.Incubators.Add(new Incubator
                     {
-                        Id = state.id,
+                        Id = newId,
                         Model = TryParseDefined(state.model, out IncubatorModel model) ? model : IncubatorModel.Simple,
-                        SetTemperatureC = state.setTemperatureC,
-                        HumidityPercent = state.humidityPercent,
-                        AppliedUntilUtc = Parse(state.appliedUntilUtc, default),
+                        SetTemperatureC = IncubatorRules.ClampSetting(state.setTemperatureC),
+                        HumidityPercent = IncubatorRules.ClampHumidity(state.humidityPercent),
+                        AppliedUntilUtc = TryParseTime(state.appliedUntilUtc) ?? default,
                     });
                 }
             }
@@ -376,6 +396,7 @@ namespace TerrariumDays.Core
                         CageId = e.cageId,
                         LaidAtUtc = Parse(e.laidAtUtc, nowUtc),
                         Place = TryParseDefined(e.place, out EggPlace place) ? place : EggPlace.NestBox,
+                        IncubatorId = incubatorIdMap.TryGetValue(e.incubatorId, out var mappedId) ? mappedId : e.incubatorId,
                         Fertile = e.fertile,
                         ChildGenotype = GenotypeFrom(e.genes, e.hypo, e.tangerine),
                         ChildKnown = KnownFrom(e.hets, e.hetsUnknown),
@@ -385,6 +406,38 @@ namespace TerrariumDays.Core
                         ColdGameDays = e.coldGameDays,
                         Failure = TryParseDefined(e.failure, out EggFailure failure) ? failure : EggFailure.None,
                         AppliedUntilUtc = Parse(e.appliedUntilUtc, nowUtc),
+                    });
+                }
+            }
+
+            // An egg that sits in an incubator that no longer exists goes to the first one with room
+            // (the first incubator when all are full: over capacity beats losing the egg).
+            foreach (var egg in colony.Eggs)
+            {
+                if (egg.Place == EggPlace.Incubator && colony.IncubatorById(egg.IncubatorId) == null)
+                {
+                    egg.IncubatorId = (IncubatorService.FirstWithFreeSlot(colony) ?? colony.Incubators[0]).Id;
+                }
+            }
+
+            if (data.lineage != null)
+            {
+                foreach (var r in data.lineage)
+                {
+                    if (r == null)
+                    {
+                        continue;
+                    }
+
+                    colony.Lineage.Add(new LineageRecord
+                    {
+                        Id = r.id,
+                        Name = r.name ?? string.Empty,
+                        MorphName = r.morphName ?? string.Empty,
+                        Sex = TryParseDefined(r.sex, out Sex lineageSex) ? lineageSex : Sex.Female,
+                        SexKnown = r.sexKnown,
+                        MotherId = r.motherId,
+                        FatherId = r.fatherId,
                     });
                 }
             }
@@ -456,6 +509,10 @@ namespace TerrariumDays.Core
             {
                 pet.PersonalityRevealAtUtc = nowUtc + GameCalendar.RealTimeFor(care.PersonalityRevealGameDays);
             }
+
+            pet.MotherId = a.motherId;
+            pet.FatherId = a.fatherId;
+            pet.CareGraceUntilUtc = TryParseTime(a.careGraceUntilUtc);
 
             return pet;
         }
@@ -594,6 +651,21 @@ namespace TerrariumDays.Core
                     coldGameDays = e.ColdGameDays,
                     failure = e.Failure.ToString(),
                     appliedUntilUtc = Format(e.AppliedUntilUtc),
+                    incubatorId = e.IncubatorId,
+                });
+            }
+
+            foreach (var r in colony.Lineage)
+            {
+                data.lineage.Add(new LineageSaveData
+                {
+                    id = r.Id,
+                    name = r.Name,
+                    morphName = r.MorphName,
+                    sex = r.Sex.ToString(),
+                    sexKnown = r.SexKnown,
+                    motherId = r.MotherId,
+                    fatherId = r.FatherId,
                 });
             }
 
@@ -634,6 +706,9 @@ namespace TerrariumDays.Core
                 sexRevealed = a.SexRevealed,
                 personalityRevealAtUtc = a.PersonalityRevealAtUtc.HasValue ? Format(a.PersonalityRevealAtUtc.Value) : string.Empty,
                 weak = a.Weak,
+                motherId = a.MotherId,
+                fatherId = a.FatherId,
+                careGraceUntilUtc = a.CareGraceUntilUtc.HasValue ? Format(a.CareGraceUntilUtc.Value) : string.Empty,
             };
         }
 
@@ -702,6 +777,12 @@ namespace TerrariumDays.Core
         }
 
         private static string Format(DateTimeOffset value) => value.ToString(TimestampFormat, CultureInfo.InvariantCulture);
+
+        /// <summary>A timestamp that may be empty or damaged: null instead of failing the whole save.</summary>
+        private static DateTimeOffset? TryParseTime(string value) =>
+            !string.IsNullOrEmpty(value) && DateTimeOffset.TryParseExact(value, TimestampFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+                ? parsed
+                : (DateTimeOffset?)null;
 
         private static DateTimeOffset Parse(string value, DateTimeOffset fallback) =>
             string.IsNullOrEmpty(value) ? fallback : DateTimeOffset.ParseExact(value, TimestampFormat, CultureInfo.InvariantCulture);

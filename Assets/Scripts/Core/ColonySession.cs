@@ -15,9 +15,11 @@ namespace TerrariumDays.Core
         public TimeSpan AppliedElapsed { get; set; }
         public bool Restocked { get; set; }
         public BreedingReport Breeding { get; set; } = new BreedingReport();
+        public IncubationReport Incubation { get; set; } = new IncubationReport();
 
         public bool HasEvents => StageUps.Count > 0 || Sheds.Count > 0 || SexReveals.Count > 0 || ElectricityCharged > 0
-            || PersonalityReveals.Count > 0 || Restocked || WeakStarted.Count > 0 || WeakRecovered.Count > 0 || Breeding.HasEvents;
+            || PersonalityReveals.Count > 0 || Restocked || WeakStarted.Count > 0 || WeakRecovered.Count > 0 || Breeding.HasEvents
+            || Incubation.HasEvents;
     }
 
     /// <summary>
@@ -35,6 +37,8 @@ namespace TerrariumDays.Core
         private readonly ColonySaveService saveService;
         private readonly OfflineProgressCalculator calculator;
         private readonly BreedingService breeding;
+        private readonly IncubatorService incubation;
+        private readonly Hatchery hatchery;
         private TimeService clock;
 
         public ColonySession(string savePath, TimeService clock, CareTuning care, EconomyTuning economy, System.Random random)
@@ -47,6 +51,8 @@ namespace TerrariumDays.Core
             saveService = new ColonySaveService(care, economy);
             calculator = new OfflineProgressCalculator(care);
             breeding = new BreedingService(care);
+            incubation = new IncubatorService(care);
+            hatchery = new Hatchery(care);
         }
 
         public Colony Colony { get; private set; }
@@ -70,6 +76,10 @@ namespace TerrariumDays.Core
         public string SavePath => savePath;
 
         public BreedingService Breeding => breeding;
+
+        public IncubatorService Incubation => incubation;
+
+        public Hatchery Hatchery => hatchery;
 
         public void UseClock(TimeService newClock)
         {
@@ -189,6 +199,9 @@ namespace TerrariumDays.Core
             }
 
             report.Breeding = breeding.Advance(Colony, targetUtc, Calendar, Room.TemperatureC);
+            var incubationReport = incubation.Advance(Colony, targetUtc, Room.TemperatureC);
+            hatchery.Advance(Colony, targetUtc, Room.TemperatureC, incubationReport);
+            report.Incubation = incubationReport;
             report.ElectricityCharged = BillElectricity(targetUtc);
             report.Restocked = Colony.Shop.EnsureStocked(Calendar.MonthIndexAt(targetUtc), targetUtc, care);
             return report;

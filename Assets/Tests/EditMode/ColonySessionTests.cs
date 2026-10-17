@@ -420,5 +420,82 @@ namespace TerrariumDays.Tests
             Assert.That(session.GameNowUtc, Is.EqualTo(realNow + TimeSpan.FromHours(2)));
             Assert.That(pet.Hunger, Is.EqualTo(80d - care.HungerDecayPerHour * 3d).Within(1e-6));
         }
+
+        private static Egg IncubatorEgg(Colony colony, DateTimeOffset laidAt, double development) => new Egg
+        {
+            Id = colony.NextEggId++,
+            CageId = -1,
+            LaidAtUtc = laidAt,
+            Place = EggPlace.Incubator,
+            IncubatorId = colony.Incubators[0].Id,
+            Fertile = true,
+            DevelopmentPercent = development,
+            AppliedUntilUtc = laidAt,
+        };
+
+        private ColonySession LoadedSessionWithIncubatorEgg(double development, out Egg egg)
+        {
+            var session = NewSession();
+            session.Load();
+            session.Colony.Incubators[0].AppliedUntilUtc = session.GameNowUtc;
+            egg = IncubatorEgg(session.Colony, session.GameNowUtc, development);
+            session.Colony.Eggs.Add(egg);
+            return session;
+        }
+
+        [Test]
+        public void ApplyUntil_AdvancesIncubatorEggs()
+        {
+            var session = LoadedSessionWithIncubatorEgg(50d, out var egg);
+
+            session.SimulateGameTime(TimeSpan.FromHours(12));
+
+            Assert.That(egg.DevelopmentPercent, Is.GreaterThan(50d));
+            Assert.That(egg.Place, Is.EqualTo(EggPlace.Incubator));
+        }
+
+        [Test]
+        public void ApplyUntil_HatchesIntoTheTray_AndReportsIt()
+        {
+            var session = LoadedSessionWithIncubatorEgg(99.9d, out _);
+            var animalsBefore = session.Colony.Animals.Count;
+
+            var report = session.SimulateGameTime(TimeSpan.FromHours(12));
+
+            Assert.That(report.Incubation.Hatched, Has.Count.EqualTo(1));
+            Assert.That(report.HasEvents, Is.True);
+            Assert.That(session.Colony.TrayAnimals(), Has.Count.EqualTo(1));
+            Assert.That(session.Colony.Animals.Count, Is.EqualTo(animalsBefore + 1));
+        }
+
+        [Test]
+        public void ApplyUntil_TrayAnimalInGrace_KeepsItsStats()
+        {
+            var session = NewSession();
+            session.Load();
+            var graced = session.Colony.AddAnimal(new PetState { LastSavedAtUtc = session.GameNowUtc, NextShedAtUtc = session.GameNowUtc.AddDays(30), CareGraceUntilUtc = session.GameNowUtc.AddDays(2) }, null);
+            var plain = session.Colony.AddAnimal(new PetState { LastSavedAtUtc = session.GameNowUtc, NextShedAtUtc = session.GameNowUtc.AddDays(30) }, null);
+
+            session.SimulateGameTime(TimeSpan.FromHours(12));
+
+            Assert.That(graced.Hunger, Is.EqualTo(80d));
+            Assert.That(plain.Hunger, Is.LessThan(80d));
+        }
+
+        [Test]
+        public void ApplyUntil_IncubatorEggs_AreNotAdvancedTwice()
+        {
+            var session = LoadedSessionWithIncubatorEgg(50d, out var egg);
+            var reference = new Colony { CalendarEpochUtc = session.Colony.CalendarEpochUtc };
+            reference.Incubators[0].AppliedUntilUtc = session.GameNowUtc;
+            var referenceEgg = IncubatorEgg(reference, session.GameNowUtc, 50d);
+            reference.Eggs.Add(referenceEgg);
+            var target = session.GameNowUtc + TimeSpan.FromHours(12);
+
+            session.SimulateGameTime(TimeSpan.FromHours(12));
+            new IncubatorService(care).Advance(reference, target, session.Room.TemperatureC);
+
+            Assert.That(egg.DevelopmentPercent, Is.EqualTo(referenceEgg.DevelopmentPercent).Within(1e-9));
+        }
     }
 }
