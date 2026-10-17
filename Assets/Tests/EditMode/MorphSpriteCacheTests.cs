@@ -36,10 +36,10 @@ namespace TerrariumDays.Tests
         }
 
         [SetUp]
-        public void SetUp() => MorphSprites.SetKeysInUse(null);
+        public void SetUp() => MorphSprites.ClearCache();
 
         [TearDown]
-        public void TearDown() => MorphSprites.SetKeysInUse(null);
+        public void TearDown() => MorphSprites.ClearCache();
 
         [Test]
         public void ManyLooks_KeepCacheAtCapacity()
@@ -83,6 +83,45 @@ namespace TerrariumDays.Tests
             Assert.That(first == null, Is.True, "oldest look was evicted and its sprite destroyed");
             var again = MorphSprites.Thumbnail(pets[0]);
             Assert.That(again != null, Is.True);
+        }
+
+        [Test]
+        public void AllLooksInUse_KeepEveryThumbnailAlive()
+        {
+            var pets = DistinctLooks(40);
+            var keys = new List<string>();
+            foreach (var pet in pets)
+            {
+                keys.Add(MorphSprites.KeyFor(pet));
+            }
+
+            MorphSprites.SetKeysInUse(keys);
+            var sprites = new List<Sprite>();
+            foreach (var pet in pets)
+            {
+                sprites.Add(MorphSprites.Thumbnail(pet));
+            }
+
+            foreach (var sprite in sprites)
+            {
+                Assert.That(sprite != null, Is.True);
+            }
+        }
+
+        [Test]
+        public void EvictionViaFor_KeepsSourceFrame()
+        {
+            var pets = DistinctLooks(40);
+            var source = MorphSprites.Base.Frame(PetClip.Idle, 0);
+            Assert.That(source != null, Is.True);
+            foreach (var pet in pets)
+            {
+                MorphSprites.For(pet).Frame(PetClip.Idle, 0, true);
+            }
+
+            Assert.That(MorphSprites.CachedCount, Is.LessThanOrEqualTo(SpriteCachePolicy.DefaultCapacity));
+            Assert.That(source != null, Is.True);
+            Assert.That(MorphSprites.Base.Frame(PetClip.Idle, 0) != null, Is.True);
         }
     }
 }

@@ -1241,7 +1241,14 @@ namespace TerrariumDays.UI
                 Add(tray);
             }
 
-            if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Ledger)
+            foreach (var offer in colony.Shop.Offers)
+            {
+                Add(offer.Animal);
+            }
+
+            // The ledger and the shop's wholesale list render a thumbnail for every colony animal.
+            if (navigator != null && navigator.Screen == ShellScreen.Main
+                && (navigator.Tab == ShellTab.Ledger || navigator.Tab == ShellTab.Shop))
             {
                 foreach (var animal in colony.Animals)
                 {

@@ -32,6 +32,30 @@ namespace TerrariumDays.UI
             keysInUse = keys == null ? new HashSet<string>() : new HashSet<string>(keys);
         }
 
+        /// <summary>Drops every recoloured look (used by tests to start from an empty cache).</summary>
+        public static void ClearCache()
+        {
+            keysInUse = new HashSet<string>();
+            foreach (var key in new List<string>(byKey.Keys))
+            {
+                policy.Remove(key);
+                byKey[key].ReleaseRecoloured();
+            }
+
+            foreach (var thumbnail in thumbnails.Values)
+            {
+                DestroyObject(thumbnail);
+            }
+
+            foreach (var key in new List<string>(thumbnails.Keys))
+            {
+                policy.Remove(key);
+            }
+
+            byKey.Clear();
+            thumbnails.Clear();
+        }
+
         private static void TrimCache()
         {
             foreach (var key in policy.Evict(keysInUse))
@@ -50,7 +74,8 @@ namespace TerrariumDays.UI
             }
         }
 
-        private static void DestroyObject(Object obj)
+        /// <summary>Destroys a runtime-made object: Destroy in play mode, DestroyImmediate in edit mode.</summary>
+        internal static void DestroyObject(Object obj)
         {
             if (obj == null)
             {

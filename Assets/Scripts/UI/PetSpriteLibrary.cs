@@ -75,19 +75,7 @@ namespace TerrariumDays.UI
         {
             foreach (var texture in cache.Values)
             {
-                if (texture == null)
-                {
-                    continue;
-                }
-
-                if (Application.isPlaying)
-                {
-                    UnityEngine.Object.Destroy(texture);
-                }
-                else
-                {
-                    UnityEngine.Object.DestroyImmediate(texture);
-                }
+                MorphSprites.DestroyObject(texture);
             }
 
             cache.Clear();
