@@ -219,5 +219,32 @@ namespace TerrariumDays.Tests
                 Assert.AreEqual(oneStep.Eggs[i].DevelopmentPercent, twoSteps.Eggs[i].DevelopmentPercent, 1e-6, $"egg {i}");
             }
         }
+
+        [Test]
+        public void ReadyEgg_SurvivesALongStepThroughADryIncubator()
+        {
+            var colony = NewColony();
+            var egg = AddEgg(colony);
+            egg.DevelopmentPercent = 99.5d;
+
+            service.Advance(colony, AtDay(15), 28d);
+
+            Assert.Less(colony.Incubators[0].HumidityPercent, care.HumidityDryBelowPercent);
+            Assert.IsFalse(egg.Failed, egg.Failure.ToString());
+            Assert.AreEqual(100d, egg.DevelopmentPercent, 1e-9);
+        }
+
+        [Test]
+        public void ReadyEgg_DoesNotAccumulateColdDaysInAColdIncubator()
+        {
+            var colony = NewColony(IncubatorModel.Luxury, 20);
+            var egg = AddEgg(colony);
+            egg.DevelopmentPercent = 100d;
+
+            service.Advance(colony, AtDay(15), 20d);
+
+            Assert.IsFalse(egg.Failed, egg.Failure.ToString());
+            Assert.AreEqual(0d, egg.ColdGameDays, 1e-9);
+        }
     }
 }

@@ -20,7 +20,7 @@ namespace TerrariumDays.Core
 
         public static void Apply(Egg egg, double gameDays, double celsius, CareTuning care)
         {
-            if (gameDays <= 0d || egg.Failed || !egg.Fertile)
+            if (gameDays <= 0d || egg.Failed || !egg.Fertile || egg.DevelopmentPercent >= 100d)
             {
                 return;
             }

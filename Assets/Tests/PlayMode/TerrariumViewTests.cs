@@ -2433,14 +2433,17 @@ namespace TerrariumDays.Tests
             egg.Fertile = true;
             egg.ChildGenotype = female.Genotype;
             egg.DevelopmentPercent = 99.5d;
-            colony.Incubators[0].HumidityPercent = 80d; // it drifts while the incubator sat empty during the earlier clicks
+            colony.Incubators[0].HumidityPercent = 80d; // it drifts while the incubator sat empty during the earlier clicks; the brief starts from 80%
 
-            // A 12-hour click is ~15 game days, enough for the dry incubator to kill the egg after it
-            // reaches 100%, so advance one game day (48 real minutes) through the real session instead.
+            // End the pairing so a second clutch laid during the click cannot crowd the hatch message
+            // out of the one-line summary (it shows the first message plus "ほか n件").
+            view.Session.Breeding.CancelPairing(colony, female);
+            female.Gravid = null;
+            Assert.That(colony.PairingOf(female), Is.Null);
             KeepAnimalsCaredFor();
-            var report = view.Session.SimulateGameTime(TimeSpan.FromMinutes(48));
+            view.OnDebugSimulate12HoursClicked();
 
-            Assert.That(report.Incubation.Hatched.Count, Is.EqualTo(1), $"dev={egg.DevelopmentPercent} failure={egg.Failure}");
+            StringAssert.Contains("が孵化しました（孵化トレイ）", feedbackLabel.text);
             Assert.That(colony.Eggs.Contains(egg), Is.False);
             var tray = colony.TrayAnimals();
             Assert.That(tray.Count, Is.EqualTo(1));

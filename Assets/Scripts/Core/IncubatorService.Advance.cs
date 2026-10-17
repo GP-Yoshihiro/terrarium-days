@@ -80,7 +80,8 @@ namespace TerrariumDays.Core
                     {
                         foreach (var egg in eggs)
                         {
-                            if (!egg.Fertile || egg.Failed)
+                            // Ready eggs wait for the hatchery at the end of the span; they can no longer fail.
+                            if (!egg.Fertile || egg.Failed || egg.DevelopmentPercent >= 100d)
                             {
                                 continue;
                             }
