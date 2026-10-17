@@ -13,6 +13,7 @@ namespace TerrariumDays.Editor
         {
             "Assets/Resources/Gecko/",
             "Assets/Resources/Effects/",
+            "Assets/Resources/Candling/",
         };
 
         private void OnPreprocessTexture()
@@ -23,7 +24,9 @@ namespace TerrariumDays.Editor
             }
 
             var importer = (TextureImporter)assetImporter;
-            importer.textureType = TextureImporterType.Default;
+            importer.textureType = assetPath.StartsWith("Assets/Resources/Candling/")
+                ? TextureImporterType.Sprite
+                : TextureImporterType.Default;
             importer.filterMode = FilterMode.Point;
             importer.mipmapEnabled = false;
             importer.alphaIsTransparency = true;
