@@ -5,6 +5,7 @@ namespace TerrariumDays.Core
     /// <summary>
     /// Deterministic elapsed-time state update, capped and stepped per
     /// Terrarium_Days_仕様書.md section 7. Weight, stage-up and sheds run on game time.
+    /// Hatchlings in their care grace (PetState.CareGraceUntilUtc) skip the care-stat decay and fasting weight loss.
     /// No MonoBehaviour dependency.
     /// </summary>
     public sealed class OfflineProgressCalculator
@@ -37,8 +38,12 @@ namespace TerrariumDays.Core
             for (var i = 0; i < stepCount; i++)
             {
                 var stepEndUtc = previousUtc + TimeSpan.FromTicks(step.Ticks * (i + 1));
+                var inGrace = state.CareGraceUntilUtc.HasValue && stepEndUtc <= state.CareGraceUntilUtc.Value;
                 var refusing = AppetiteModel.IsRefusingFood(state, stepEndUtc, tuning);
-                ApplyStep(state, refusing);
+                if (!inGrace)
+                {
+                    ApplyStep(state, refusing);
+                }
 
                 if (!state.Weak && state.Health <= tuning.WeakHealthThreshold)
                 {
@@ -49,7 +54,7 @@ namespace TerrariumDays.Core
                     state.Weak = false;
                 }
 
-                if (refusing)
+                if (refusing && !inGrace)
                 {
                     state.WeightGrams -= tuning.FastingWeightLossPerGameDay * step.TotalMinutes / GameCalendar.RealMinutesPerGameDay;
                 }
