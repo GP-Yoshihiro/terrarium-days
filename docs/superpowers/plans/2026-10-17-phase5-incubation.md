@@ -120,7 +120,7 @@ scripts/run-unity-tests.sh PlayMode && python3 scripts/test-summary.py Logs/Play
 | 4 | 孵卵器の時間の適用（湿度・発生・1日の判定・報告） | transcriber |
 | 5 | キャンドリングと雌雄 | transcriber |
 | 6 | 孵化・産卵床の後片付け・トレイからケージへ | transcriber |
-| 7 | 母父の番号と弱らない猶予 | transcriber |
+| 7 | 弱らない猶予（母父の番号と猶予の時刻の欄は Task 6 で足す） | transcriber |
 | 8 | 家系の記録と3世代の家系図 | transcriber |
 | 9 | スプライトキャッシュの捨て方（純粋な方針） | transcriber |
 | 10 | 孵卵器・孵化・家系の文字（`IncubatorText`） | transcriber |
@@ -3057,3 +3057,223 @@ git commit -m "Add incubator, hatchling and family tree text"
 ```
 
 ---
+
+## 結線と画面のタスク（Task 11〜21）
+
+ここから先は文章の指示書。行番号は HEAD ac2bfc3 のもので、Task 1〜10 の後はずれている。作業の前に必ず `python3 ~/.claude/skills/minimal-read-edit/scripts/cs-outline.py <file> --grep <Word>` で今の位置を確かめる。指示書にない細部（既存の補助関数の名前、時刻の保存形式など）は、作業者が `grep -n` で既存の書き方を探して合わせる。分からないまま推測で作らない。
+
+画面のタスク（14〜18）の確認は次の手順に統一する：
+
+```bash
+scripts/capture-screens.sh            # PlayMode の ScreenCaptureTests を流して Logs/Screens/*.png を作る
+mkdir -p Logs/Screens/small && sips -Z 800 Logs/Screens/<name>.png --out Logs/Screens/small/<name>.png
+```
+
+縮小画像だけを Read で見て、報告には縮小画像のパスを書く。新しい画面の撮影は `ScreenCaptureTests` に1件ずつ足す（既存の撮影テストの書き方をまねる）。
+
+---
+
+### Task 11: セッションとセーブ（programmer）
+
+**Files（最大5）:** `Assets/Scripts/Core/ColonySession.cs`、`Assets/Scripts/Core/ColonySaveData.cs`、`Assets/Scripts/Core/ColonySaveService.cs`、`Assets/Tests/EditMode/ColonySessionTests.cs`、`Assets/Tests/EditMode/ColonySaveServiceTests.cs`
+
+**1. セッション（`ColonySession.ApplyUntil`）**
+- `ColonySession` に `IncubatorService Incubation`（`new IncubatorService(care)`）と `Hatchery Hatchery` を持たせる（既存の `BreedingService` の持たせ方に合わせる。UI から `session.Incubation` で使う）。
+- `ApplyUntil` で、既存の繁殖の適用（`breeding.Advance…` / `AdvanceEggs` を呼んでいる所）の**直後**に次を足す。`roomC` は、繁殖の卵の発生に渡している室温と同じ値を使う（`grep -n "AdvanceEggs\|RoomTemperature" Assets/Scripts/Core/ColonySession.cs` で探す）。
+  ```csharp
+  var incubation = Incubation.Advance(colony, gameNowUtc, roomC);
+  Hatchery.Advance(colony, gameNowUtc, roomC, incubation);
+  report.Incubation = incubation;
+  ```
+  `gameNowUtc` は既存の「ゲーム内の今」（現実の今＋`GameClockOffset`）。
+- `ColonyTickReport` に `public IncubationReport Incubation { get; set; } = new IncubationReport();` を足し、`HasEvents` に `|| Incubation.HasEvents` を足す。
+- 世話の値の適用（`OfflineProgressCalculator.Apply`）が**トレイの個体にも**かかることを確かめる。`ApplyUntil` が `colony.Animals` を回していればそのまま。ケージ（`OccupiedCages`）を回しているなら、`colony.TrayAnimals()` も回すように足す（猶予は Task 7 で calculator が見る。脱皮・成長・性格の判明はトレイでも進める ★11）。
+- `grep -n "CageOf(" Assets/Scripts/Core` で、`CageOf` の戻り値を null 確認なしに使っている Core のコードを探し、トレイの個体で落ちないようにする（UI 側は各画面のタスクで行う）。直した箇所を報告に列挙する。
+
+**ColonySessionTests に足すテスト（名前は例）**
+- `ApplyUntil_AdvancesIncubatorEggs`：孵卵器の卵1個（発生50%、28℃）→ 12時間後に発生が増え、`Place` は `Incubator` のまま。
+- `ApplyUntil_HatchesIntoTheTray_AndReportsIt`：発生99.9%の卵 → 適用後に `report.Incubation.Hatched` が1件、`report.HasEvents` が true、`colony.TrayAnimals()` が1件。
+- `ApplyUntil_TrayAnimalInGrace_KeepsItsStats`：トレイの個体（猶予あり）を12時間進めて空腹が変わらない。猶予なしにすると下がる。
+- `ApplyUntil_IncubatorEggs_AreNotAdvancedTwice`：孵卵器の卵が室温の発生（`BreedingService.AdvanceEggs`）でも進んでいないこと（同じ時間を進めた期待値と比べる）。
+
+**2. セーブ（スキーマ3のまま、欄を足す）**
+- `EggSaveData` に `public int incubatorId;`。卵の読み込み（旧 348 行付近）と書き込み（旧 550 行付近）で `Egg.IncubatorId` と相互に写す。`place` の列挙の保存方法は既存に合わせる（`EggPlace.Incubator` が増えるので、数値で保存しているなら旧ファイルの値が変わらないことを確かめる。列挙の末尾に足したので変わらないはず）。
+- `AnimalSaveData` に `public int motherId; public int fatherId;` と猶予の時刻 `careGraceUntilUtc`。時刻の型と書き方は、既存の nullable の時刻 `PersonalityRevealAtUtc` の保存（`FromAnimalSaveData` 旧 392 行・`ToAnimalSaveData` 旧 576 行の周辺）と同じにする。
+- `LineageSaveData { int id; string name; string morphName; int sex; bool sexKnown; int motherId; int fatherId; }`（`sex` の保存方法は既存の個体の `sex` に合わせる）と、`ColonySaveData` に `public List<LineageSaveData> lineage = new List<LineageSaveData>();`。読み込みで `colony.Lineage` に、書き込みで逆に写す。
+- 孵卵器の状態（`incubatorStates`）の読み書きと移行は Task 1 で済んでいる。ここでは異常系を足す。
+
+**3. 異常系（判断28、段階2からの持ち越し）**。それぞれ `ColonySaveServiceTests` にテストを1件ずつ（壊した JSON 文字列を書いて `LoadOrCreate`（旧 45 行）に読ませる。既存の異常系テストの書き方があればそれに合わせる）。
+- 孵卵器の `model` が範囲外（例 99）→ 簡易として読む。
+- `setTemperatureC` が 10 / 50 → 24 / 34 に収める。`humidityPercent` が -5 / 140 → 0 / 100。
+- 孵卵器の `id` が 0・負・重複 → 読み込み順に 1,2,3… と振り直す（そのときは卵の `incubatorId` も対応を取って直す。対応が取れないものは次の項目の扱い）。
+- 卵の `place` が孵卵器なのに `incubatorId` の孵卵器がない → 空きのある最初の孵卵器へ。どこにも空きがなければ1台目へ（容量を超えてよい）。
+- 猶予・孵卵器の適用時刻の文字列が壊れている → 猶予は null、適用時刻は既定値（Task 1 の判断22で、最初の適用で今に合わせる扱いになる）。**セーブ全体を壊れた扱いにしない**（他の個体・卵がそのまま読めることを確かめる）。
+- `lineage` が欠けている／null → 空の一覧。
+- 往復：トレイの個体（ケージなし）・母父の番号・猶予・家系の記録・孵卵器の卵が、保存して読み直しても同じ。**特にトレイの個体が読み込みで消えたり、空きケージに勝手に入ったりしないこと**を確かめる（個体の一覧とケージの `animalId` の対応の作り方を読んで確かめる）。
+- 段階4の旧ファイル（既存のテストの JSON）を読んで、`MotherId`・`FatherId` が0、猶予が null、`Lineage` が空、卵の `IncubatorId` が0。
+
+**4. 確認**：EditMode 全体が合格し、件数が増えている。`ColonySaveServiceTests` の既存テストを1件も消していない。
+
+**コミット:** `Advance incubators and hatching in the session and save the new fields`
+
+---
+
+### Task 12: スプライトキャッシュの上限の結線（programmer）
+
+**Files（最大4）:** `Assets/Scripts/UI/MorphSprites.cs`、`Assets/Scripts/UI/PetSpriteLibrary.cs`、`Assets/Scripts/UI/TerrariumView.cs`、テスト（`Assets/Tests/EditMode/` か `PlayMode/` の、既存の `MorphSprites` のテストがある方）
+
+- `MorphSprites` が持っている色替えの辞書（見た目のキー → 色を変えた `PetSpriteLibrary`／サムネイル）を探す（`grep -n "Dictionary" Assets/Scripts/UI/MorphSprites.cs`）。そこに `SpriteCachePolicy`（Task 9、容量32）を1つ持たせる。
+- 取り出すたび（キャッシュに当たったときも、新しく作ったときも）`policy.Touch(key)`。新しく作った直後に `TrimCache` を呼ぶ。
+- `public static void SetKeysInUse(IEnumerable<string> keys)`（または同等）で「今画面に出ている個体のキー」を受け取り、`TrimCache` で `policy.Evict(inUse)` の返したキーについて、辞書から外し、作ったテクスチャ・スプライトを `UnityEngine.Object.Destroy`（EditMode では `DestroyImmediate`。`Application.isPlaying` で分ける）する。**元の共通のスプライト（Resources から読んだもの）は壊さない**。色を変えて新しく作ったものだけ。
+- `TerrariumView.RefreshShell`（旧 1215 行）など、画面を描き直す所で、ケージ詳細・ホーム・台帳・ショップ・トレイに出ている個体の見た目のキーを集めて `SetKeysInUse` に渡す。キーの作り方は `MorphSprites` の既存の関数を使う（自前でキーを組み立てない）。毎フレーム集めるのが重いなら、既存の Signature の仕組みが変わったときだけでよい。
+- テスト：40種類の異なる見た目でスプライトを取り出した後、キャッシュの件数が32以下（使用中のキーを渡した場合は 32＋使用中の数以下）。使用中に渡したキーのスプライトは壊れていない（`!= null`）。捨てたキーを取り出し直すと新しく作られて null でない。
+- 確認：EditMode・PlayMode 全体が合格。ホームとケージ詳細の画面キャプチャを1枚ずつ撮り、縮小画像でスプライトが欠けていないことを確かめる。
+
+**コミット:** `Cap the recoloured sprite caches at 32 entries`
+
+---
+
+### Task 13: キャンドリングの絵（graphics）
+
+**Files:** `tools/sprites/candling_sprites.py`（新規）、`Assets/Resources/Candling/candling_{unknown,infertile,early,middle,late,hatching,dead}.png`（新規7枚）
+
+- `tools/sprites` の既存の生成スクリプトを1つ読み、使っているライブラリ・パレット・出力の仕方（書き出し先の引数、透過 PNG）をまねる。
+- 64×64、背景は透明。暗い背景（孵卵器の中）に光を当てた卵：橙〜黄の楕円（縦長、中央が明るいグラデーション）。段階の描き分け（判断30）：
+  - `unknown`：一様に明るい卵だけ（何も見えない）。
+  - `infertile`：明るく黄色っぽい、血管なし。
+  - `early`：中央に小さな赤い点と細い血管が数本。
+  - `middle`：血管が広がり、暗い影（胚）が卵の3分の1。
+  - `late`：影が卵の3分の2、血管は縁に。
+  - `hatching`：ほぼ全体が暗い影、上に小さな空気の部屋（明るい帯）。
+  - `dead`：くすんだ灰褐色、血管が輪（血の輪）か、緑がかった斑点。
+- 段階が並べて一目で区別できること（明るさと影の大きさが段階順に単調に変わる）。
+- Unity での読み込み設定は、既存の `Assets/Resources` の絵と同じ（Sprite、Point フィルタ、圧縮なし）にする。既存の絵の設定を AssetPostprocessor が付けているならそのフォルダ規則に入れる。手で .meta を書かない（Unity に生成させてから設定を合わせる）。
+- 確認：7枚を横に並べた確認用画像を `Logs/Screens/small/candling-sheet.png`（幅800以下）に書き出して見る。報告にそのパスを書く。
+
+**コミット:** `Add candling sprites for the seven egg stages`
+
+---
+
+### Task 14: 孵卵器タブと家系図モーダルの枠（graphics）
+
+**Files（4）:** `Assets/UI/Terrarium.uxml`、`Assets/UI/Terrarium.uss`、`Assets/Scripts/UI/ShellNavigator.cs`、`Assets/Tests/PlayMode/ScreenCaptureTests.cs`
+
+- UXML：孵卵器タブ（旧 `tab-incubator` 126 行）の中身は今 placeholder（旧 118 行のパネルの placeholder ラベル）。孵卵器タブのときだけ出る `incubator-panel` を足す：
+  - `incubator-panel`（ScrollView）の中に `incubator-card-list`（カードを入れる空の入れ物）、`incubator-egg-detail`（Label、★19の1行。高さは固定で `visibility` で出し入れ）、見出し「孵化トレイ」のラベルと `hatch-tray-list`（空の入れ物）、`hatch-tray-empty`（Label「孵化トレイは空です」）。
+  - モーダル `family-tree-modal`（既存のモーダルと同じ層・同じ書き方。切り替えは `display`）：見出し `family-tree-title`、上段に祖父母4枠 `family-tree-mgm`・`family-tree-mgf`・`family-tree-pgm`・`family-tree-pgf`、中段に `family-tree-mother`・`family-tree-father`、下段に `family-tree-self`。ボタン `family-tree-cage-button`「ケージを見る」と `family-tree-close-button`「閉じる」。
+- USS：`.incubator-card`、`.incubator-card__header`、`.incubator-temp-row`（−／＋ボタンと設定・実温）、`.humidity-bar`・`.humidity-bar__fill`・`.humidity-bar--warning`（警告色。既存の警告色の変数があれば使う）、`.egg-grid`（6個で1行、折り返し）、`.egg-slot`（64×64 の絵＋下に小さな「取り除く」の置き場）、`.egg-slot--selected`、`.egg-slot--empty`、`.tray-row`、`.tray-row__grace`、`.tray-row__warning`、`.family-box`（3行の文字が入る枠、幅は4枠が1行に収まる）、`.family-box--unknown`（薄い）、`.family-box--gone`（点線の枠）。iPhone の縦画面幅で横にはみ出さないこと。
+- ShellNavigator：`PlaceholderTextFor`（旧 72 行）で孵卵器タブの placeholder 文を返さないようにし、`ShowTab`（旧 104 行）で孵卵器タブのとき `incubator-panel` を `display: flex`、ほかのタブで `none`。コンストラクタ（旧 41 行）で `incubator-panel` を Q する。
+- 撮影：`ScreenCaptureTests` に「孵卵器タブ（空）」と「家系図モーダル（不明だけ）」の2件を足す。この段階ではカードもトレイも空なので、枠と余白・見出しの見た目を確かめる。名前は `incubator-empty`・`family-tree-empty`。
+- 確認：縮小画像2枚。PlayMode 全体が合格（既存の ShellNavigator のテストで、孵卵器タブの placeholder を期待しているものがあれば、新しい表示に合わせて直し、報告に書く）。
+
+**コミット:** `Lay out the incubator tab and the family tree modal`
+
+---
+
+### Task 15: 孵卵器カード（programmer、画面キャプチャで確認）
+
+**Files（4）:** `Assets/Scripts/UI/IncubatorView.cs`（新規）、`Assets/Scripts/UI/TerrariumView.cs`、`Assets/Tests/PlayMode/TerrariumViewTests.cs`、`Assets/Tests/PlayMode/ScreenCaptureTests.cs`
+
+- 形は既存の `PairingView`／`HomeView` にならう：`IncubatorView(VisualElement root, …)` が要素を Q し、`Render(Colony colony, DateTimeOffset gameNowUtc, CareTuning care)` で描く。描き直しは `HomeView.CageListSignature`（旧 29 行）と同じく、署名の文字列（孵卵器ごとの設定・湿度の整数・卵の番号と段階・選択中の卵）が変わったときだけ。
+- 操作はイベントで外に出す（`TemperatureChangeRequested(Incubator, int delta)`、`WaterRequested(Incubator)`、`EggTapped(Egg)`、`RemoveRequested(Egg)`）。`TerrariumView` が受けて `session.Incubation`（Task 11）を呼び、保存（既存の保存の呼び方）と再描画をする。
+- カード1枚＝孵卵器1台（番号順）。見出し `IncubatorText.IncubatorName`＋`Occupancy(EggsInIncubator 数, IncubatorRules.Capacity)`。温度の行：「−」`SetTemperature` `RealTemperature`「＋」。実温は `IncubatorRules.RealTemperature` をその日の乱数で（Task 4 の `Advance` と同じ日の番号・同じ乱数の流れで呼ぶ。`IncubatorService.Advance.cs` の実温の計算部分を読んで同じ引数を渡す。表示用に別の値を作らない）。−は24℃、＋は34℃で `SetEnabled(false)`（★3）。
+- 湿度：バーの幅＝湿度%、文字 `IncubatorText.Humidity`、`IsHumidityWarning` で `.humidity-bar--warning`。「水を足す」ボタン。`AddWater` が true を返したら `ShowFeedback(IncubatorText.MoldWarning(care))`（`ShowFeedback` は旧 1975 行）。
+- 卵のマス：入っている卵ごとに `Candling.StageOf` の絵（Task 13 の `Resources/Candling/candling_*`）。空きは `.egg-slot--empty` で容量まで並べる。タップで選択 → `incubator-egg-detail` に `IncubatorText.EggDetail`（★19）。`IncubatorService.CanRemove` が true のマスだけ下に「取り除く」（押すと確認なしで `RemoveEgg`、選択を解除）。
+- `TerrariumView`：`BindElements`（旧 1020 行）で `IncubatorView` を作り、`OnTabChanged`（旧 599 行）で孵卵器タブになったら描く。開いている間は既存の更新の流れ（`RefreshShell` 旧 1215 行）で `Render` を呼ぶ。
+- テスト（PlayMode、`TerrariumViewTests`）：孵卵器タブを開くとカードが1枚（初期の簡易機）、「＋」で設定が29℃になりセーブに残る、34℃で＋が押せない、「水を足す」で湿度が上がる、95%超でフィードバックに MoldWarning、デバッグの卵（`session.Incubation.AddDebugEggs` を直接呼んでよい）のマスをタップすると説明の行が出る。
+- 撮影：デバッグの卵3個を入れた状態 `incubator-cards`。縮小画像で、絵・バー・ボタンが重ならず、幅に収まっていることを確かめる。
+
+**コミット:** `Show incubator cards with temperature, humidity and candled eggs`
+
+---
+
+### Task 16: 孵化トレイ（programmer、画面キャプチャで確認）
+
+**Files（4）:** `Assets/Scripts/UI/IncubatorView.cs`、`Assets/Scripts/UI/TerrariumView.cs`、`Assets/Tests/PlayMode/TerrariumViewTests.cs`、`Assets/Tests/PlayMode/ScreenCaptureTests.cs`
+
+- `IncubatorView.Render` に、`hatch-tray-list` へトレイの個体（`colony.TrayAnimals()`、番号順）を並べる処理を足す。0件なら `hatch-tray-empty` を出す。
+- 1行：個体のサムネイル（既存の一覧と同じ `MorphSprites` の取り方）、`IncubatorText.TrayRow`、`GraceLine`（猶予中は `.tray-row__grace`、切れたら `.tray-row__warning`）、ボタン「ケージへ移す」「売る」。
+- 「ケージへ移す」：`colony.FirstEmptyCage()` が null なら押せなくし、行に `IncubatorText.NoEmptyCage`（★12）。押したら `Hatchery.MoveToCage`、結果が Ok なら保存・再描画し `ShowFeedback($"{pet.Name}をケージ{cage.Id}へ移しました")`。
+- 「売る」：既存の卸売りの流れ `OnShopWholesaleRequested`（旧 2102 行）→ `ConfirmWholesale`（旧 2126 行）にその個体を渡す（★13）。**この2つがケージのない個体で落ちないか読んで確かめ**、`CageOf` が null のときはケージの片付けを飛ばすように直す。売った個体は `RemoveAnimal` で家系の記録に残る（Task 8）。
+- 一括の世話 `OnBulkCare`（旧 687 行）の対象からトレイの個体を外す（★11）。対象をケージから集めているならそのまま、`colony.Animals` から集めているなら `CageOf(a) != null` で絞る。
+- テスト：孵化させた個体（`Hatchery.Hatch` を直接呼んでよい）がトレイに出る、空きケージがあれば「ケージへ移す」でケージに入りトレイが空になる、空きがなければボタンが押せず文が出る、「売る」→確認でトレイから消え `colony.Lineage` に1件、一括のえさでトレイの個体の空腹が変わらない。
+- 撮影：トレイに2匹（1匹は猶予中、1匹は猶予切れ）`hatch-tray`。
+
+**コミット:** `Add the hatchling tray with move-to-cage and sell`
+
+---
+
+### Task 17: ケージ詳細の「孵卵器へ移す（全部）」とホームの件数（programmer、画面キャプチャで確認）
+
+**Files（4）:** `Assets/Scripts/UI/TerrariumView.cs`、`Assets/Scripts/UI/HomeView.cs`、`Assets/UI/Terrarium.uxml`（ボタン1つ）、`Assets/Tests/PlayMode/TerrariumViewTests.cs`
+
+- ケージ詳細で産卵床の卵（`colony.EggsIn(cage)`）を表示している所を探す（`grep -n "EggsIn\|HasNestBox" Assets/Scripts/UI/TerrariumView.cs`）。その近くに `cage-move-eggs-button`「孵卵器へ移す（全部）」を UXML に足す。そのケージに生きている卵（`!Failed`、置き場所が産卵床か床置き）が1つもなければ `display: none`。
+- 押したら `session.Incubation.MoveAllFromCage(colony, cage)` → `ShowFeedback(IncubatorText.MoveResult(result.Moved, result.Left))`（★7）→ 保存・再描画。
+- ホーム：`home-incubator-button`（UXML 旧 16 行）の文字を `HomeView.Render`（旧 65 行）で `IncubatorText.HomeButton(IncubatorService.EggsInIncubators(colony), colony.TrayAnimals().Count)` にする（★14）。`CageListSignature`（旧 29 行）か Render の署名にこの2つの数を含め、変わったら描き直す。ホームのケージ一覧がトレイの個体（ケージなし）で落ちないことも確かめる。
+- テスト：産卵床に卵2個のケージで「孵卵器へ移す（全部）」→ 2個が孵卵器に入り、フィードバックが「孵卵器へ2個移しました」、ボタンが消える。孵卵器を満杯（6個）にしてから押すと「孵卵器に空きがありません」。ホームのボタンの文字が「孵卵器（卵2・トレイ0）」。
+- 撮影：卵のあるケージ詳細 `cage-detail-eggs`、ホーム `home-incubator-counts`。
+
+**コミット:** `Move nest-box eggs to the incubator and show counts on the home button`
+
+---
+
+### Task 18: 台帳の両親の列と家系図モーダル（programmer、画面キャプチャで確認）
+
+**Files（4）:** `Assets/Scripts/UI/LedgerView.cs`、`Assets/Scripts/UI/TerrariumView.cs`、`Assets/Tests/PlayMode/TerrariumViewTests.cs`、`Assets/Tests/PlayMode/ScreenCaptureTests.cs`（UXML・USS は Task 14 のものを使う。足りなければ USS の微調整だけ5ファイル目として許す）
+
+- `LedgerView.RenderAnimals`（旧 174 行）と `AnimalRow`（旧 193 行）：一覧に `colony.TrayAnimals()` も含める（場所は `IncubatorText.TrayLocation`）。各行に `IncubatorText.ParentsLine(FamilyTree.Member(colony, pet.MotherId), FamilyTree.Member(colony, pet.FatherId))` を1行足す（★15）。`Signature`（旧 152 行）に母父の番号と、親の名前（記録の名前を含む）を入れる。
+- 行のタップ `OnLedgerAnimalTapped`（旧 627 行）：今はケージを開いている。**家系図モーダルを開く動きに変える**。モーダルは `FamilyTree.For(colony, pet)` を `IncubatorText.TreeBox` で7枠に入れ、`Unknown` は `.family-box--unknown`、`Gone` は `.family-box--gone`。見出しは本人の名前。
+- 「ケージを見る」：本人がケージにいるときだけ出し、押すとモーダルを閉じて**今までの `OnLedgerAnimalTapped` がしていた処理**（ケージ詳細を開く）を行う。トレイの個体なら代わりに孵卵器タブへ移る、でもよい（どちらにしたか報告に書く）。「閉じる」で閉じる。
+- 既存の PlayMode テストで「台帳の行をタップするとケージが開く」を確かめているものは、「行をタップ → ケージを見る」に直す（テストを消さない。直したテスト名を報告に書く）。
+- テスト：親がいる個体の行に「両親：ハナ×タロウ」、ショップの個体は「両親：不明」、行タップでモーダルが開き母の枠に母の名前、親を売った後は「（手放した）」が付く、「ケージを見る」でケージ詳細が開く。
+- 撮影：3世代そろった家系図（デバッグのペアで作った子。祖父母は不明でよい）`family-tree`、台帳 `ledger-parents`。
+
+**コミット:** `Show parents in the ledger and open a family tree on tap`
+
+---
+
+### Task 19: 通知とデバッグ「孵卵器に卵を追加」（programmer）
+
+**Files（3〜4）:** `Assets/Scripts/UI/TerrariumView.cs`、`Assets/UI/Terrarium.uxml`（デバッグのボタン1つ）、`Assets/Tests/PlayMode/TerrariumViewTests.cs`
+
+- `HandleReport`（旧 499〜576 行）：繁殖の通知の文を集めている一覧に、`IncubatorText.Messages(report.Incubation, care)` を後ろに足す（★18）。表示は既存の「最初の1件＋（ほか○件）」の仕組みに乗せる（新しい表示の仕組みを作らない）。孵化したら孵卵器タブ・ホームのボタンを描き直す。
+- 孵化した個体の性格の判明（7日後）の通知が、既存の判明の通知でトレイの個体にも出ることを確かめる（出ない作りなら、`CageOf` を見ている所を直す）。
+- デバッグ：既存のデバッグのボタン群（`OnDebugAddPairClicked` 旧 1829 行の近く）に `debug-add-incubator-eggs-button`「孵卵器に卵を追加」を足し、`session.Incubation.AddDebugEggs(colony, gameNowUtc)` → 入った数で `ShowFeedback($"孵卵器に卵を{n}個追加しました")`（0なら「孵卵器に空きがありません」）→ 保存・再描画（★20）。
+- テスト：`AddDebugEggs` の後に `OnDebugSimulate12HoursClicked`（旧 1761 行）を数回押して孵化させ、通知に「が孵化しました（孵化トレイ）」が出る。孵卵器の湿度を61%にして12時間進めると「湿度が60%を下回りました」が出る。
+
+**コミット:** `Notify incubator events and add a debug button for incubator eggs`
+
+---
+
+### Task 20: PlayMode の1周（programmer、段階の完了条件）
+
+**Files:** `Assets/Tests/PlayMode/TerrariumViewTests.cs`（テストの追加だけ。本体のコードを直す必要が出たら、直した箇所を報告に書く）
+
+- 手本：`TerrariumViewTests` の `OnDebugSimulate12HoursClicked_ContinuedPastGravid_LaysAnEggWithoutErrors`（旧 1635 行付近）。同じ準備（シーンの読み込み、ペアの用意、時間の進め方）を使う。
+- テスト名：`FullLoop_LayMoveToIncubatorHatchAndMoveToCage_WithoutErrors`。手順：
+  1. デバッグのペアを追加し、産卵床を付けたケージでメスを抱卵（手本と同じ進め方）→ 12時間ずつ進めて産卵床に卵が出るまで（上限の回数を決めて超えたら失敗）。
+  2. そのケージ詳細を開き「孵卵器へ移す（全部）」を押す → 卵が `EggPlace.Incubator` になり、ケージの卵が0。
+  3. 時間短縮のため、テストの中で孵卵器の卵の `DevelopmentPercent` を 99.5 にし、無精卵なら `Fertile = true`・`ChildGenotype` は親のものにしてよい（**孵化の手前までの短縮だけ。孵化そのものは本物の適用で起こす**）。湿度は80%のまま。
+  4. 12時間進める → 孵化の通知、トレイに1匹、卵が消える。
+  5. 空きケージを1つ用意（`colony.AddCage`）し、孵卵器タブのトレイの「ケージへ移す」を押す → その個体がケージに入り、トレイが空。
+  6. 保存して読み直し（既存のテストに保存・読み込みの補助があれば使う）→ 個体の母父の番号が親の番号、猶予の時刻が残っている。
+  7. 全体を通して `LogAssert.NoUnexpectedReceived()`（エラーのログなし）。
+- 確認：PlayMode 全体が合格。
+
+**コミット:** `Add a PlayMode test for the full lay-incubate-hatch-cage loop`
+
+---
+
+### Task 21: 文書の更新と最終確認（programmer、最後に HQ が利用者に確認）
+
+**Files:** `GAME.md`、`CLAUDE.md`
+
+- `GAME.md`：孵卵器（機種・容量・温度と湿度・水を足す・死ぬ理由）、キャンドリング、雌雄の温度、孵化トレイと1か月の猶予、家系図、デバッグ「孵卵器に卵を追加」を、既存の段階4の書き方に合わせて足す。数値は `CareTuning` の値と一致させる。
+- `CLAUDE.md`：新しい Core のクラス（`Incubator`・`IncubatorRules`・`IncubatorService`・`Candling`・`HatchSex`・`Hatchery`・`FamilyTree`・`SpriteCachePolicy`）と「ケージに入っていない個体＝孵化トレイ」の前提を、既存の構成の説明に1〜2行ずつ足す。
+- 最終確認：
+  1. EditMode・PlayMode 全体が合格。段階5開始時からの件数の増減を報告に書く。
+  2. `scripts/capture-screens.sh` で全画面を撮り、Task 14〜18 の縮小画像を見直す。
+  3. `scripts/build-ios.sh` が通る。
+  4. 実機で HQ が利用者に確かめてもらう項目を報告に箇条書きする：デバッグの卵で孵化まで、トレイからケージへ、家系図、湿度の警告、ショップで標準孵卵器を買うと2枚目のカードが出る。
+
+**コミット:** `Document incubation, hatching and the family tree`
