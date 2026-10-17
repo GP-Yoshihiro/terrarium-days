@@ -92,20 +92,29 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void ParentsThatExist_PassOnAPersonality_WithoutErrors()
+        public void ParentsThatExist_PassOnTheirPersonality_AboutAFifthEachPlusTheRandomRoll()
         {
             var colony = NewColony();
-            var mother = colony.AddAnimal(new PetState { Sex = Sex.Female }, null);
-            var father = colony.AddAnimal(new PetState { Sex = Sex.Male }, null);
-            var egg = AddEgg(colony, EggPlace.Incubator, 100d);
-            egg.MotherId = mother.Id;
-            egg.FatherId = father.Id;
-            var report = new IncubationReport();
+            var mother = colony.AddAnimal(new PetState { Sex = Sex.Female, Personality = Personality.Shy }, null);
+            var father = colony.AddAnimal(new PetState { Sex = Sex.Male, Personality = Personality.Bold }, null);
+            for (var i = 0; i < 200; i++)
+            {
+                var egg = AddEgg(colony, EggPlace.Incubator, 100d);
+                egg.MotherId = mother.Id;
+                egg.FatherId = father.Id;
+            }
 
+            var report = new IncubationReport();
             hatchery.Advance(colony, Now, 22d, report);
 
-            Assert.AreEqual(1, report.Hatched.Count);
-            Assert.AreEqual(mother.Id, report.Hatched[0].MotherId);
+            Assert.AreEqual(200, report.Hatched.Count);
+            Assert.That(report.Hatched.TrueForAll(p => p.MotherId == mother.Id));
+            var shy = report.Hatched.FindAll(p => p.Personality == Personality.Shy).Count;
+            var bold = report.Hatched.FindAll(p => p.Personality == Personality.Bold).Count;
+            // Expected 72 each (20% inherited + 20% of the 60% random roll); a random-only hatchery gives ~40.
+            Assert.GreaterOrEqual(shy, 45, "the mother's personality must be passed on");
+            Assert.GreaterOrEqual(bold, 45, "the father's personality must be passed on");
+            Assert.GreaterOrEqual(shy + bold, 110, "inheritance must beat a plain random roll (~80)");
         }
 
         [Test]

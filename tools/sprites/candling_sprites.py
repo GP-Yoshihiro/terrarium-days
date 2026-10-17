@@ -97,7 +97,7 @@ def render(name):
                 col = lerp(col, (40, 18, 10), smooth(0.9, 1.0, d) * 0.7)
             px[y][x] = col
 
-    def plot(pts, colour, only_inside=True, keep=lambda d: True):
+    def plot(pts, colour, keep=lambda d: True):
         for (x, y) in pts:
             if 0 <= x < SIZE and 0 <= y < SIZE and px[y][x] is not None and keep(egg_d(x, y)):
                 px[y][x] = colour
@@ -120,7 +120,6 @@ def render(name):
         # air cell: bright band at the blunt (top) end
         for y in range(SIZE):
             for x in range(SIZE):
-                d = egg_d(x, y)
                 if px[y][x] is not None and y < CY - RY * 0.72:
                     t = smooth(0.0, 1.0, (CY - RY * 0.72 - y) / 6.0)
                     px[y][x] = lerp(px[y][x], (255, 232, 170), 0.2 + 0.8 * t)

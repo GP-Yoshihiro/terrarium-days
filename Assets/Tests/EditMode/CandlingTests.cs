@@ -54,6 +54,7 @@ namespace TerrariumDays.Tests
         [TestCase(28d, 0.95d)]
         [TestCase(28.5d, 0.825d)]
         [TestCase(29d, 0.70d)]
+        [TestCase(29.5d, 0.65d)]
         [TestCase(30d, 0.60d)]
         [TestCase(30.5d, 0.425d)]
         [TestCase(31d, 0.25d)]
