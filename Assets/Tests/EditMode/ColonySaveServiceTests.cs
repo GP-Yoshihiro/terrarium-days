@@ -851,5 +851,42 @@ namespace TerrariumDays.Tests
             Assert.That(colony.Eggs[0].IncubatorId, Is.EqualTo(0));
             Assert.That(colony.Eggs[0].Place, Is.EqualTo(EggPlace.NestBox));
         }
+
+        [Test]
+        public void Load_IncubatorEggWithNoIncubatorList_GetsTheDefaultIncubator()
+        {
+            WriteIncubatorFile(string.Empty, IncEgg(1, 3));
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(colony.Incubators.Select(i => i.Id), Is.EqualTo(new[] { 1 }));
+            Assert.That(colony.Eggs[0].IncubatorId, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Load_StaleIncubatorId_OnANestBoxEgg_IsNotRemapped()
+        {
+            WriteIncubatorFile(IncState(0) + "," + IncState(5), IncEgg(1, 5, "NestBox"));
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(colony.Eggs[0].Place, Is.EqualTo(EggPlace.NestBox));
+            Assert.That(colony.Eggs[0].IncubatorId, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Load_NullEntriesInLineageAndIncubatorStates_AreSkippedOrDefaulted()
+        {
+            WriteIncubatorFile("null," + IncState(2), IncEgg(1, 2), extra: ",\"lineage\":[null]");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(colony.Lineage, Is.Empty);
+            Assert.That(colony.Incubators, Has.Count.EqualTo(2));
+            Assert.That(colony.Animals, Has.Count.EqualTo(1));
+            Assert.That(colony.Eggs, Has.Count.EqualTo(1));
+        }
     }
 }

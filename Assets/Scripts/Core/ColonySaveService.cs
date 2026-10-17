@@ -199,6 +199,7 @@ namespace TerrariumDays.Core
             if (data.incubatorStates != null && data.incubatorStates.Count > 0)
             {
                 var seenIds = new HashSet<int>();
+                var nextRenumberedId = 1;
                 var idsAreSound = true;
                 foreach (var state in data.incubatorStates)
                 {
@@ -213,7 +214,7 @@ namespace TerrariumDays.Core
                 foreach (var rawState in data.incubatorStates)
                 {
                     var state = rawState ?? new IncubatorSaveData();
-                    var newId = idsAreSound ? state.id : colony.Incubators.Count + 1;
+                    var newId = idsAreSound ? state.id : nextRenumberedId++;
                     if (!idsAreSound && state.id > 0 && !incubatorIdMap.ContainsKey(state.id))
                     {
                         incubatorIdMap[state.id] = newId;
@@ -396,7 +397,7 @@ namespace TerrariumDays.Core
                         CageId = e.cageId,
                         LaidAtUtc = Parse(e.laidAtUtc, nowUtc),
                         Place = TryParseDefined(e.place, out EggPlace place) ? place : EggPlace.NestBox,
-                        IncubatorId = incubatorIdMap.TryGetValue(e.incubatorId, out var mappedId) ? mappedId : e.incubatorId,
+                        IncubatorId = place == EggPlace.Incubator && incubatorIdMap.TryGetValue(e.incubatorId, out var mappedId) ? mappedId : (place == EggPlace.Incubator ? e.incubatorId : 0),
                         Fertile = e.fertile,
                         ChildGenotype = GenotypeFrom(e.genes, e.hypo, e.tangerine),
                         ChildKnown = KnownFrom(e.hets, e.hetsUnknown),
@@ -424,7 +425,8 @@ namespace TerrariumDays.Core
             {
                 foreach (var r in data.lineage)
                 {
-                    if (r == null)
+                    // JsonUtility turns a null entry into an all-default record (id 0): not a real animal.
+                    if (r == null || r.id <= 0)
                     {
                         continue;
                     }
