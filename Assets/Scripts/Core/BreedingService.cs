@@ -344,6 +344,11 @@ namespace TerrariumDays.Core
             var cap = TimeSpan.FromHours(care.MaxOfflineProgressHours);
             foreach (var egg in colony.Eggs.ToArray())
             {
+                if (egg.Place == EggPlace.Incubator)
+                {
+                    continue;
+                }
+
                 if (egg.Place == EggPlace.Loose)
                 {
                     if (targetUtc >= egg.LaidAtUtc + dryAfter)
