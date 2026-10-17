@@ -1165,3 +1165,175 @@
     color: rgb(90, 62, 40);
     font-size: 14px;
 }
+
+/* Incubator tab (Task 14). Cards, egg slots and tray rows are filled from C#; sizes are
+   fixed or percentage-based so nothing overflows at iPhone portrait width. */
+.incubator-scroll {
+    flex-grow: 1;
+    padding: 0 12px;
+}
+
+.incubator-card-list {
+    flex-direction: column;
+}
+
+.incubator-card {
+    margin: 6px 0;
+    padding: 10px;
+    background-color: rgb(250, 243, 230);
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: rgba(90, 62, 40, 0.25);
+}
+
+.incubator-card__header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    height: 28px;
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgb(90, 62, 40);
+}
+
+.incubator-temp-row {
+    flex-direction: row;
+    align-items: center;
+    height: 44px;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+}
+
+.humidity-bar {
+    height: 10px;
+    margin: 4px 0;
+    background-color: rgba(90, 62, 40, 0.2);
+    border-radius: 5px;
+}
+
+.humidity-bar__fill {
+    height: 100%;
+    background-color: rgb(102, 187, 106);
+    border-radius: 5px;
+}
+
+.humidity-bar--warning .humidity-bar__fill {
+    background-color: rgb(253, 216, 53);
+}
+
+.egg-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.egg-slot {
+    width: 16%;
+    min-width: 64px;
+    margin: 2px 0.5%;
+    align-items: center;
+    padding: 2px;
+    border-radius: 8px;
+    border-width: 2px;
+    border-color: rgba(0, 0, 0, 0);
+}
+
+.egg-slot--selected {
+    border-color: rgb(255, 167, 38);
+    background-color: rgba(255, 167, 38, 0.15);
+}
+
+.egg-slot--empty {
+    background-color: rgba(90, 62, 40, 0.08);
+    border-color: rgba(90, 62, 40, 0.25);
+}
+
+.incubator-egg-detail {
+    height: 24px;
+    min-height: 24px;
+    flex-shrink: 0;
+    margin: 4px 4px;
+    font-size: 13px;
+    color: rgb(90, 62, 40);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.hatch-tray-list {
+    flex-direction: column;
+}
+
+.hatch-tray-empty {
+    margin: 12px 16px;
+    font-size: 14px;
+    color: rgb(140, 110, 80);
+    -unity-text-align: middle-center;
+}
+
+.tray-row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 56px;
+    margin: 3px 0;
+    padding: 6px 10px;
+    background-color: rgb(250, 243, 230);
+    border-radius: 10px;
+}
+
+.tray-row__grace {
+    font-size: 12px;
+    color: rgb(140, 110, 80);
+}
+
+.tray-row__warning {
+    font-size: 12px;
+    color: rgb(229, 57, 53);
+}
+
+/* Family tree modal. The card is 94% wide; four boxes share the top row. */
+.family-tree-card {
+    width: 94%;
+    padding: 12px;
+}
+
+.family-tree-row {
+    flex-direction: row;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.family-tree-row--parents .family-box {
+    width: 36%;
+}
+
+.family-tree-row--self .family-box {
+    width: 40%;
+}
+
+.family-box {
+    width: 23.5%;
+    min-height: 56px;
+    margin: 0 0.5%;
+    padding: 4px;
+    font-size: 10px;
+    color: rgb(90, 62, 40);
+    white-space: normal;
+    overflow: hidden;
+    background-color: rgb(255, 255, 255);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: rgba(90, 62, 40, 0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.family-box--unknown {
+    opacity: 0.45;
+}
+
+/* USS has no dashed border style; a dim fill and a thin pale border stand in for "gone". */
+.family-box--gone {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(90, 62, 40, 0.3);
+}

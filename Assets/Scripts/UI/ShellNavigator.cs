@@ -33,6 +33,7 @@ namespace TerrariumDays.UI
         private readonly VisualElement shop;
         private readonly VisualElement ledger;
         private readonly VisualElement breeding;
+        private readonly VisualElement incubator;
         private readonly VisualElement placeholder;
         private readonly Label placeholderLabel;
         private readonly Dictionary<ShellTab, Button> tabButtons = new Dictionary<ShellTab, Button>();
@@ -46,6 +47,7 @@ namespace TerrariumDays.UI
             shop = root.Q("shop-panel");
             ledger = root.Q("ledger-panel");
             breeding = root.Q("breeding-panel");
+            incubator = root.Q("incubator-panel");
             placeholder = root.Q("placeholder-panel");
             placeholderLabel = root.Q<Label>("placeholder-label");
             Bind(root, "tab-cages", ShellTab.Cages);
@@ -69,8 +71,6 @@ namespace TerrariumDays.UI
         {
             switch (tab)
             {
-                case ShellTab.Incubator:
-                    return "孵卵器は段階5で追加されます";
                 case ShellTab.Events:
                     return "イベントは段階6で追加されます";
                 default:
@@ -112,7 +112,8 @@ namespace TerrariumDays.UI
             SetDisplay(shop, tab == ShellTab.Shop);
             SetDisplay(ledger, tab == ShellTab.Ledger);
             SetDisplay(breeding, tab == ShellTab.Breeding);
-            var hasPanel = tab == ShellTab.Cages || (tab == ShellTab.Shop && shop != null) || (tab == ShellTab.Ledger && ledger != null) || (tab == ShellTab.Breeding && breeding != null);
+            SetDisplay(incubator, tab == ShellTab.Incubator);
+            var hasPanel = tab == ShellTab.Cages || (tab == ShellTab.Shop && shop != null) || (tab == ShellTab.Ledger && ledger != null) || (tab == ShellTab.Breeding && breeding != null) || (tab == ShellTab.Incubator && incubator != null);
             SetDisplay(placeholder, !hasPanel);
             if (placeholderLabel != null)
             {

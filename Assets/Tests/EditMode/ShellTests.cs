@@ -13,7 +13,7 @@ namespace TerrariumDays.Tests
         private static VisualElement BuildShell()
         {
             var root = new VisualElement();
-            foreach (var name in new[] { "home-screen", "main-screen", "cage-list-panel", "cage-detail-panel", "shop-panel", "ledger-panel", "breeding-panel", "placeholder-panel" })
+            foreach (var name in new[] { "home-screen", "main-screen", "cage-list-panel", "cage-detail-panel", "shop-panel", "ledger-panel", "breeding-panel", "incubator-panel", "placeholder-panel" })
             {
                 root.Add(new VisualElement { name = name });
             }
@@ -82,6 +82,22 @@ namespace TerrariumDays.Tests
 
             Assert.That(Display(root, "ledger-panel"), Is.EqualTo(DisplayStyle.Flex));
             Assert.That(Display(root, "placeholder-panel"), Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
+        public void ShowTab_Incubator_ShowsTheIncubatorPanelInsteadOfThePlaceholder()
+        {
+            var root = BuildShell();
+            var nav = new ShellNavigator(root);
+
+            nav.ShowTab(ShellTab.Incubator);
+
+            Assert.That(Display(root, "incubator-panel"), Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(Display(root, "placeholder-panel"), Is.EqualTo(DisplayStyle.None));
+
+            nav.ShowTab(ShellTab.Cages);
+
+            Assert.That(Display(root, "incubator-panel"), Is.EqualTo(DisplayStyle.None));
         }
 
         [Test]

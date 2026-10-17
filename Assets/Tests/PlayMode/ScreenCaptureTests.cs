@@ -400,6 +400,38 @@ namespace TerrariumDays.Tests
         }
 
         /// <summary>
+        /// Captures the empty incubator tab and the family tree modal (unknown boxes only)
+        /// into Logs/Screens/incubator-empty.png and family-tree-empty.png (Task 14), so the
+        /// frames, margins and headings can be checked before the cards and boxes are filled.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureIncubatorAndFamilyTreeEmpty()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            NavigatorOf(view).ShowTab(ShellTab.Incubator);
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "incubator-empty");
+
+            var root = view.GetComponent<UIDocument>().rootVisualElement;
+            root.Q<Label>("family-tree-title").text = "家系図";
+            foreach (var name in new[] { "mgm", "mgf", "pgm", "pgf", "mother", "father", "self" })
+            {
+                var box = root.Q("family-tree-" + name);
+                box.AddToClassList("family-box--unknown");
+                box.Add(new Label("不明"));
+            }
+
+            root.Q("family-tree-modal").style.display = DisplayStyle.Flex;
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "family-tree-empty");
+            root.Q("family-tree-modal").style.display = DisplayStyle.None;
+        }
+
+        /// <summary>
         /// Captures the empty breeding tab into Logs/Screens/breeding-empty.png so the tab
         /// bar's now-six buttons (each label unclipped, at least 44px tall) can be checked by
         /// eye alongside the placeholder-panel skeleton (Task 12; Task 13 fills the panel).

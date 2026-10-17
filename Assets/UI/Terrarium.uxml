@@ -115,6 +115,15 @@
                     <ui:Label name="breeding-message-label" text="" class="breeding-message-label" />
                     <ui:ScrollView name="breeding-list" class="breeding-list" />
                 </ui:VisualElement>
+                <ui:VisualElement name="incubator-panel" class="panel">
+                    <ui:ScrollView name="incubator-scroll" class="incubator-scroll">
+                        <ui:VisualElement name="incubator-card-list" class="incubator-card-list" />
+                        <ui:Label name="incubator-egg-detail" text="" class="incubator-egg-detail" />
+                        <ui:Label text="孵化トレイ" class="breeding-section-title" />
+                        <ui:VisualElement name="hatch-tray-list" class="hatch-tray-list" />
+                        <ui:Label name="hatch-tray-empty" text="孵化トレイは空です" class="hatch-tray-empty" />
+                    </ui:ScrollView>
+                </ui:VisualElement>
                 <ui:VisualElement name="placeholder-panel" class="panel">
                     <ui:Label name="placeholder-label" text="" class="placeholder-label" />
                 </ui:VisualElement>
@@ -134,6 +143,28 @@
                 <ui:VisualElement class="confirm-button-row">
                     <ui:Button name="confirm-yes-button" text="はい" class="confirm-yes-button" />
                     <ui:Button name="confirm-no-button" text="いいえ" class="confirm-no-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="family-tree-modal" class="milestone-modal-overlay" style="display: none;">
+            <ui:VisualElement class="milestone-modal-card family-tree-card">
+                <ui:Label name="family-tree-title" text="" class="decor-drawer-title" />
+                <ui:VisualElement class="family-tree-row">
+                    <ui:VisualElement name="family-tree-mgm" class="family-box" />
+                    <ui:VisualElement name="family-tree-mgf" class="family-box" />
+                    <ui:VisualElement name="family-tree-pgm" class="family-box" />
+                    <ui:VisualElement name="family-tree-pgf" class="family-box" />
+                </ui:VisualElement>
+                <ui:VisualElement class="family-tree-row family-tree-row--parents">
+                    <ui:VisualElement name="family-tree-mother" class="family-box" />
+                    <ui:VisualElement name="family-tree-father" class="family-box" />
+                </ui:VisualElement>
+                <ui:VisualElement class="family-tree-row family-tree-row--self">
+                    <ui:VisualElement name="family-tree-self" class="family-box" />
+                </ui:VisualElement>
+                <ui:VisualElement class="confirm-button-row">
+                    <ui:Button name="family-tree-cage-button" text="ケージを見る" class="confirm-yes-button" />
+                    <ui:Button name="family-tree-close-button" text="閉じる" class="confirm-no-button" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
