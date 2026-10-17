@@ -189,7 +189,6 @@ namespace TerrariumDays.Core
                 CalendarEpochUtc = Parse(data.calendarEpochUtc, nowUtc),
                 RackCount = data.rackCount,
                 NewRackIndices = data.newRackIndices != null ? new List<int>(data.newRackIndices) : new List<int>(),
-                NextAnimalId = data.nextAnimalId,
                 NextCageId = data.nextCageId,
                 LastBilledMonthIndex = data.lastBilledMonthIndex,
                 GameClockOffset = TimeSpan.FromTicks(Math.Max(0L, data.gameClockOffsetTicks)),
@@ -444,6 +443,10 @@ namespace TerrariumDays.Core
                 }
             }
 
+            var maxAnimalId = Math.Max(
+                colony.Animals.Count > 0 ? colony.Animals.Max(a => a.Id) : 0,
+                colony.Lineage.Count > 0 ? colony.Lineage.Max(r => r.Id) : 0);
+            colony.NextAnimalId = Math.Max(1, Math.Max(data.nextAnimalId, maxAnimalId + 1));
             var maxPairingId = colony.Pairings.Count > 0 ? colony.Pairings.Max(p => p.Id) : 0;
             colony.NextPairingId = Math.Max(1, Math.Max(data.nextPairingId, maxPairingId + 1));
             var maxEggId = colony.Eggs.Count > 0 ? colony.Eggs.Max(e => e.Id) : 0;

@@ -5,6 +5,15 @@ namespace TerrariumDays.Tests
 {
     public sealed class SpriteCachePolicyTests
     {
+        [TestCase(0)]
+        [TestCase(-5)]
+        public void ACapacityBelowOne_IsClampedToOne(int capacity)
+        {
+            var policy = new SpriteCachePolicy(capacity);
+
+            Assert.AreEqual(1, policy.Capacity);
+        }
+
         [Test]
         public void UnderCapacity_NothingIsEvicted()
         {

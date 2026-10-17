@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace TerrariumDays.Core
@@ -15,7 +16,7 @@ namespace TerrariumDays.Core
 
         public SpriteCachePolicy(int capacity = DefaultCapacity)
         {
-            Capacity = capacity;
+            Capacity = Math.Max(1, capacity);
         }
 
         public int Capacity { get; }

@@ -201,6 +201,23 @@ namespace TerrariumDays.Tests
             Assert.That(loaded.SexRevealed, Is.True);
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        public void Load_ATooLowNextAnimalId_IsClampedPastEveryUsedId(int savedNextAnimalId)
+        {
+            File.WriteAllText(path, "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":50000," +
+                "\"animals\":[{\"id\":1,\"name\":\"レオパ1\",\"sex\":\"Male\",\"weightGrams\":45.0,\"stage\":\"Adult\"," +
+                "\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100}]," +
+                "\"lineage\":[{\"id\":5,\"name\":\"売却済み\",\"sex\":\"Female\",\"sexKnown\":true}]," +
+                "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1}],\"rackCount\":1,\"incubatorCount\":1,\"nextAnimalId\":" + savedNextAnimalId + ",\"nextCageId\":2}");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            var added = colony.AddAnimal(new PetState { Name = "新入り" }, colony.AddCage(CageSize.Standard));
+
+            Assert.That(service.LastLoadFailed, Is.False);
+            Assert.That(added.Id, Is.EqualTo(6), "must not reuse the live animal's id 1 or the sold animal's id 5");
+        }
+
         [Test]
         public void Load_Phase1SchemaThreeFile_GetsStarterGeneticsOnceAndKeepsThem()
         {
