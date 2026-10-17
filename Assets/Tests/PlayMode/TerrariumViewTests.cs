@@ -2313,5 +2313,59 @@ namespace TerrariumDays.Tests
             home.Render(colony, ShopNow, view.Tuning);
             Assert.That(button.text, Is.EqualTo("孵卵器（卵2・トレイ1）"));
         }
+
+        [Test]
+        public void OnDebugAddIncubatorEggsClicked_AddsEggsAndReportsTheCount()
+        {
+            view.LoadColony(CreateTempSavePath(), ShopNow, new TimeService(() => ShopNow));
+
+            view.OnDebugAddIncubatorEggsClicked();
+
+            var added = view.Session.Colony.Eggs.Count;
+            Assert.That(added, Is.GreaterThan(0));
+            Assert.That(feedbackLabel.text, Is.EqualTo($"孵卵器に卵を{added}個追加しました"));
+
+            for (var i = 0; i < 10; i++)
+            {
+                view.OnDebugAddIncubatorEggsClicked();
+            }
+
+            Assert.That(feedbackLabel.text, Is.EqualTo("孵卵器に空きがありません"));
+        }
+
+        [Test]
+        public void OnDebugSimulate12HoursClicked_HatchesDebugEggsAndNotifiesTheTray()
+        {
+            view.LoadColony(CreateTempSavePath(), ShopNow, new TimeService(() => ShopNow));
+            view.OnDebugAddIncubatorEggsClicked();
+
+            var notified = false;
+            for (var i = 0; i < 800 && !notified; i++)
+            {
+                view.OnDebugSimulate12HoursClicked();
+                notified = feedbackLabel.text.Contains("が孵化しました（孵化トレイ）");
+            }
+
+            Assert.That(notified, Is.True, feedbackLabel.text);
+        }
+
+        [Test]
+        public void OnDebugSimulate12HoursClicked_WarnsWhenIncubatorHumidityFallsBelowTheDryLine()
+        {
+            view.LoadColony(CreateTempSavePath(), ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var incubator = colony.Incubators[0];
+            colony.Eggs.Add(new Egg
+            {
+                Id = colony.NextEggId++, CageId = -1, LaidAtUtc = ShopNow, Place = EggPlace.Incubator,
+                IncubatorId = incubator.Id, Fertile = true, ChildGenotype = Genotype.Normal(),
+                ChildKnown = new KnownGenetics(), AppliedUntilUtc = ShopNow, Failure = EggFailure.Dried,
+            });
+            incubator.HumidityPercent = 61d;
+
+            view.OnDebugSimulate12HoursClicked();
+
+            StringAssert.Contains($"孵卵器{incubator.Id}の湿度が60%を下回りました", feedbackLabel.text, feedbackLabel.text);
+        }
     }
 }

@@ -244,6 +244,7 @@
                     <ui:Button name="debug-add-cage-button" text="ケージ追加" class="debug-small-button" />
                     <ui:Button name="debug-add-pet-button" text="個体追加" class="debug-small-button" />
                     <ui:Button name="debug-add-pair-button" text="繁殖ペア追加" class="debug-small-button" />
+                    <ui:Button name="debug-add-incubator-eggs-button" text="孵卵器に卵を追加" class="debug-small-button" />
                 </ui:VisualElement>
                 <ui:Button name="debug-clear-save-button" text="セーブデータ削除" class="debug-clear-save-button" />
                 <ui:Button name="debug-close-button" text="とじる" class="milestone-continue-button" />

@@ -105,6 +105,7 @@ namespace TerrariumDays.UI
         private Button debugAddCageButton;
         private Button debugAddPetButton;
         private Button debugAddPairButton;
+        private Button debugAddIncubatorEggsButton;
         private Label debugAppliedElapsedLabel;
         private Slider debugHungerSlider;
         private Slider debugHydrationSlider;
@@ -340,6 +341,11 @@ namespace TerrariumDays.UI
                 debugAddPairButton.clicked += OnDebugAddPairClicked;
             }
 
+            if (debugAddIncubatorEggsButton != null)
+            {
+                debugAddIncubatorEggsButton.clicked += OnDebugAddIncubatorEggsClicked;
+            }
+
             if (nestBoxButton != null)
             {
                 nestBoxButton.clicked += OnNestBoxButtonClicked;
@@ -567,6 +573,16 @@ namespace TerrariumDays.UI
             }
 
             breedingMessages.AddRange(BreedingText.Messages(report.Breeding, tuning));
+            breedingMessages.AddRange(IncubatorText.Messages(report.Incubation, session.Breeding.Care));
+            foreach (var pet in report.PersonalityReveals)
+            {
+                // Tray hatchlings are never the selected pet, so announce their reveal here.
+                if (pet != state && session.Colony.CageOf(pet) == null)
+                {
+                    breedingMessages.Add(PersonalityReveal.Message(pet));
+                }
+            }
+
             var breedingSummary = BreedingText.Summary(breedingMessages);
             if (!string.IsNullOrEmpty(breedingSummary))
             {
@@ -586,6 +602,12 @@ namespace TerrariumDays.UI
             if (state != null && (report.AppliedElapsed > TimeSpan.Zero || report.HasEvents))
             {
                 Render(state, tuning);
+            }
+
+            if (report.Incubation.HasEvents)
+            {
+                incubatorView?.Invalidate();
+                homeView?.Invalidate();
             }
 
             if (report.Restocked)
@@ -1091,6 +1113,11 @@ namespace TerrariumDays.UI
                 debugAddPairButton.clicked -= OnDebugAddPairClicked;
             }
 
+            if (debugAddIncubatorEggsButton != null)
+            {
+                debugAddIncubatorEggsButton.clicked -= OnDebugAddIncubatorEggsClicked;
+            }
+
             if (nestBoxButton != null)
             {
                 nestBoxButton.clicked -= OnNestBoxButtonClicked;
@@ -1242,6 +1269,7 @@ namespace TerrariumDays.UI
             debugAddCageButton = root.Q<Button>("debug-add-cage-button");
             debugAddPetButton = root.Q<Button>("debug-add-pet-button");
             debugAddPairButton = root.Q<Button>("debug-add-pair-button");
+            debugAddIncubatorEggsButton = root.Q<Button>("debug-add-incubator-eggs-button");
             debugAppliedElapsedLabel = root.Q<Label>("debug-applied-elapsed-label");
             debugHungerSlider = root.Q<Slider>("debug-hunger-slider");
             debugHydrationSlider = root.Q<Slider>("debug-hydration-slider");
@@ -2018,6 +2046,22 @@ namespace TerrariumDays.UI
             }, empty);
             SaveCurrentState();
             ColonyChanged?.Invoke();
+        }
+
+        /// <summary>Debug helper: puts up to three fertile eggs into the first incubator with room.</summary>
+        public void OnDebugAddIncubatorEggsClicked()
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            var added = session.Incubation.AddDebugEggs(session.Colony, GameNowUtc());
+            ShowFeedback(added > 0 ? $"孵卵器に卵を{added}個追加しました" : "孵卵器に空きがありません");
+            if (added > 0)
+            {
+                AfterIncubatorAction();
+            }
         }
 
         /// <summary>Debug helper: adds a breeding-ready adult male and female, adding cages as needed.</summary>
