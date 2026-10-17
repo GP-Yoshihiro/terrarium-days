@@ -79,6 +79,8 @@ namespace TerrariumDays.Core
         public TimeSpan GameClockOffset { get; set; } = TimeSpan.Zero;
         public List<Pairing> Pairings { get; set; } = new List<Pairing>();
         public List<Egg> Eggs { get; set; } = new List<Egg>();
+        /// <summary>Animals that left the room, for the family tree (phase 5 §2.5).</summary>
+        public List<LineageRecord> Lineage { get; set; } = new List<LineageRecord>();
         public int NextPairingId { get; set; } = 1;
         public int NextEggId { get; set; } = 1;
 
@@ -201,6 +203,8 @@ namespace TerrariumDays.Core
                 }
             }
 
+            Lineage.RemoveAll(r => r.Id == pet.Id);
+            Lineage.Add(FamilyTree.RecordOf(pet));
             return true;
         }
 
