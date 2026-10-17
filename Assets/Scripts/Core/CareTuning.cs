@@ -83,5 +83,41 @@ namespace TerrariumDays.Core
 
         /// <summary>Game days below 24 ℃ (in total) that kill a nest-box egg (planner's ruling).</summary>
         public double EggColdFailGameDays { get; set; } = 3d;
+
+        /// <summary>Incubator humidity lost per game day (phase 5 §3).</summary>
+        public double IncubatorHumidityLossPerGameDay { get; set; } = 2d;
+
+        /// <summary>Below this humidity an egg may dry out each game day.</summary>
+        public double HumidityDryBelowPercent { get; set; } = 60d;
+
+        /// <summary>Above this humidity an egg may go mouldy each game day.</summary>
+        public double HumidityMoldAbovePercent { get; set; } = 95d;
+
+        public double HumidityDailyFailChance { get; set; } = 0.10d;
+
+        public double HeatRiskFromC { get; set; } = 33d;
+
+        public double HeatDailyFailChance { get; set; } = 0.05d;
+
+        public double SevereHeatFromC { get; set; } = 35d;
+
+        public double SevereHeatDailyFailChance { get; set; } = 0.15d;
+
+        /// <summary>"Add water" raises humidity by this much (capped at 100%).</summary>
+        public double AddWaterPercent { get; set; } = 15d;
+
+        /// <summary>Candling shows anything (and infertile eggs are known) from this egg age.</summary>
+        public double CandlingRevealGameDays { get; set; } = 7d;
+
+        /// <summary>Hatchlings' care stats do not drop for this long (phase 5 decision 2).</summary>
+        public double HatchlingCareGraceGameDays { get; set; } = 30d;
+
+        /// <summary>A simple incubator drifts this share of (room - set) toward the room.</summary>
+        public double SimpleIncubatorRoomPull { get; set; } = 0.1d;
+
+        public double SimpleIncubatorMaxDriftC { get; set; } = 2d;
+
+        /// <summary>A standard incubator wanders up to ± this much, one value per game day.</summary>
+        public double StandardIncubatorJitterC { get; set; } = 0.5d;
     }
 }

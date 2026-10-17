@@ -11,6 +11,9 @@ namespace TerrariumDays.Core
     {
         public const int PairingStream = 1;
         public const int ClutchStream = 2;
+        public const int IncubationStream = 3;
+        public const int IncubatorTemperatureStream = 4;
+        public const int HatchStream = 5;
 
         /// <summary>The colony's breeding seed, from its calendar epoch (so it needs no save field).</summary>
         public static int SeedOf(DateTimeOffset epochUtc)

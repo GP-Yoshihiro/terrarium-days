@@ -49,7 +49,9 @@ namespace TerrariumDays.Core
     {
         None,
         Dried,
-        Cold
+        Cold,
+        Mold,
+        Heat
     }
 
     /// <summary>
