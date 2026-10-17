@@ -1228,14 +1228,30 @@
 }
 
 .egg-slot {
-    width: 16%;
-    min-width: 64px;
+    width: 15%;
     margin: 2px 0.5%;
     align-items: center;
     padding: 2px;
     border-radius: 8px;
     border-width: 2px;
     border-color: rgba(0, 0, 0, 0);
+}
+
+/* The 64x64 candling sprite scales down to the slot width (6 slots per row). */
+.egg-slot__image {
+    width: 100%;
+    height: 44px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.egg-slot__remove {
+    width: 100%;
+    height: 18px;
+    margin: 2px 0 0;
+    padding: 0;
+    font-size: 9px;
+    border-width: 0;
+    border-radius: 6px;
 }
 
 .egg-slot--selected {
