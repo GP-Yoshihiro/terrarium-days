@@ -77,6 +77,11 @@ namespace TerrariumDays.UI
         private Label milestoneStageLabel;
         private Label milestoneMessageLabel;
         private Button milestoneContinueButton;
+        private VisualElement familyTreeModal;
+        private Label familyTreeTitle;
+        private Button familyTreeCageButton;
+        private Button familyTreeCloseButton;
+        private int familyTreePetId;
 
         private readonly VisualElement[] decorImageElements = new VisualElement[3];
         private readonly string[] appliedDecorIconClasses = new string[3];
@@ -255,6 +260,16 @@ namespace TerrariumDays.UI
             if (milestoneContinueButton != null)
             {
                 milestoneContinueButton.clicked += OnMilestoneContinueClicked;
+            }
+
+            if (familyTreeCageButton != null)
+            {
+                familyTreeCageButton.clicked += OnFamilyTreeCageClicked;
+            }
+
+            if (familyTreeCloseButton != null)
+            {
+                familyTreeCloseButton.clicked += OnFamilyTreeCloseClicked;
             }
 
             if (decorButton != null)
@@ -637,14 +652,73 @@ namespace TerrariumDays.UI
             RefreshShell();
         }
 
-        /// <summary>Tapping an animal row on the ledger's Animals section opens its cage detail, same as tapping it from the cage list.</summary>
+        /// <summary>Tapping an animal row on the ledger's Animals section opens its family tree; "ケージを見る" there goes on to the cage detail.</summary>
         public void OnLedgerAnimalTapped(int animalId)
         {
             var pet = session?.Colony.AnimalById(animalId);
+            if (pet == null || familyTreeModal == null)
+            {
+                return;
+            }
+
+            familyTreePetId = animalId;
+            var tree = FamilyTree.For(session.Colony, pet);
+            if (familyTreeTitle != null)
+            {
+                familyTreeTitle.text = pet.Name;
+            }
+
+            FillFamilyBox("family-tree-mgm", tree.MaternalGrandmother);
+            FillFamilyBox("family-tree-mgf", tree.MaternalGrandfather);
+            FillFamilyBox("family-tree-pgm", tree.PaternalGrandmother);
+            FillFamilyBox("family-tree-pgf", tree.PaternalGrandfather);
+            FillFamilyBox("family-tree-mother", tree.Mother);
+            FillFamilyBox("family-tree-father", tree.Father);
+            FillFamilyBox("family-tree-self", tree.Self);
+            if (familyTreeCageButton != null)
+            {
+                // Hatchlings in the tray have no cage to show.
+                familyTreeCageButton.style.display = session.Colony.CageShowing(pet) != null ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            familyTreeModal.style.display = DisplayStyle.Flex;
+        }
+
+        private void FillFamilyBox(string boxName, FamilyMember member)
+        {
+            var box = familyTreeModal.Q<VisualElement>(boxName);
+            if (box == null)
+            {
+                return;
+            }
+
+            box.Clear();
+            box.EnableInClassList("family-box--unknown", member.Unknown);
+            box.EnableInClassList("family-box--gone", member.Gone);
+            var label = new Label(IncubatorText.TreeBox(member));
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.maxWidth = Length.Percent(100);
+            box.Add(label);
+        }
+
+        /// <summary>The family tree's "ケージを見る": closes the tree and opens that animal's cage detail.</summary>
+        public void OnFamilyTreeCageClicked()
+        {
+            OnFamilyTreeCloseClicked();
+            var pet = session?.Colony.AnimalById(familyTreePetId);
             var cage = pet != null ? session.Colony.CageShowing(pet) : null;
             if (cage != null && SelectCage(cage.Id))
             {
                 navigator?.ShowCageDetail();
+            }
+        }
+
+        public void OnFamilyTreeCloseClicked()
+        {
+            if (familyTreeModal != null)
+            {
+                familyTreeModal.style.display = DisplayStyle.None;
             }
         }
 
@@ -939,6 +1013,16 @@ namespace TerrariumDays.UI
                 milestoneContinueButton.clicked -= OnMilestoneContinueClicked;
             }
 
+            if (familyTreeCageButton != null)
+            {
+                familyTreeCageButton.clicked -= OnFamilyTreeCageClicked;
+            }
+
+            if (familyTreeCloseButton != null)
+            {
+                familyTreeCloseButton.clicked -= OnFamilyTreeCloseClicked;
+            }
+
             if (decorButton != null)
             {
                 decorButton.clicked -= OnDecorButtonClicked;
@@ -1096,6 +1180,10 @@ namespace TerrariumDays.UI
             milestoneStageLabel = root.Q<Label>("milestone-stage-label");
             milestoneMessageLabel = root.Q<Label>("milestone-message-label");
             milestoneContinueButton = root.Q<Button>("milestone-continue-button");
+            familyTreeModal = root.Q<VisualElement>("family-tree-modal");
+            familyTreeTitle = root.Q<Label>("family-tree-title");
+            familyTreeCageButton = root.Q<Button>("family-tree-cage-button");
+            familyTreeCloseButton = root.Q<Button>("family-tree-close-button");
 
             terrariumViewElement?.UnregisterCallback<GeometryChangedEvent>(OnTerrariumGeometryChanged);
             terrariumViewElement = root.Q<VisualElement>("terrarium-view");

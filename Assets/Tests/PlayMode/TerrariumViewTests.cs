@@ -63,6 +63,7 @@ namespace TerrariumDays.Tests
         private Label shopMessageLabel;
         private ScrollView shopList;
         private VisualElement ledgerPanel;
+        private VisualElement familyTreeModal;
         private Button ledgerSectionAnimalsButton;
         private Button ledgerSectionMoneyButton;
         private Label ledgerSummaryLabel;
@@ -245,6 +246,17 @@ namespace TerrariumDays.Tests
             root.Add(shopPanel);
             root.Add(ledgerPanel);
             root.Add(confirmModal);
+            familyTreeModal = new VisualElement { name = "family-tree-modal" };
+            familyTreeModal.style.display = DisplayStyle.None;
+            familyTreeModal.Add(new Label { name = "family-tree-title" });
+            foreach (var boxName in new[] { "mgm", "mgf", "pgm", "pgf", "mother", "father", "self" })
+            {
+                familyTreeModal.Add(new VisualElement { name = $"family-tree-{boxName}" });
+            }
+
+            familyTreeModal.Add(new Button { name = "family-tree-cage-button" });
+            familyTreeModal.Add(new Button { name = "family-tree-close-button" });
+            root.Add(familyTreeModal);
             root.Add(cageListEmptyLabel);
             incubatorPanel = new VisualElement { name = "incubator-panel" };
             incubatorPanel.Add(new VisualElement { name = "incubator-card-list" });
@@ -1373,16 +1385,16 @@ namespace TerrariumDays.Tests
             var names = ledgerList.Query<Label>(className: "ledger-row-name-label").ToList();
             var details = ledgerList.Query<Label>(className: "ledger-row-detail-label").ToList();
             Assert.That(names.Count, Is.EqualTo(occupied.Count));
-            Assert.That(details.Count, Is.EqualTo(occupied.Count));
+            Assert.That(details.Count, Is.EqualTo(occupied.Count * 2), "each row has its detail and its parents line");
             for (var i = 0; i < occupied.Count; i++)
             {
                 var pet = view.Session.Colony.AnimalIn(occupied[i]);
                 Assert.That(names[i].text, Is.EqualTo(pet.Name));
-                Assert.That(details[i].text, Is.EqualTo(LedgerText.AnimalDetail(pet, LedgerNow)));
+                Assert.That(details[i * 2].text, Is.EqualTo(LedgerText.AnimalDetail(pet, LedgerNow)));
             }
 
             var secondPet = view.Session.Colony.Animals.Last();
-            Assert.That(details.Last().text, Is.EqualTo("♂オス・ヤング・22.0g・生後5か月"));
+            Assert.That(details[details.Count - 2].text, Is.EqualTo("♂オス・ヤング・22.0g・生後5か月"));
         }
 
         [Test]
@@ -1400,16 +1412,77 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
-        public void LedgerAnimalRow_Tapped_OpensThatAnimalsCageDetail()
+        public void LedgerAnimalRow_Tapped_ThenSeeCage_OpensThatAnimalsCageDetail()
         {
             var path = CreateTempSavePath();
             view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
             var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
 
             view.OnLedgerAnimalTapped(second.Id);
+            Assert.That(familyTreeModal.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(familyTreeModal.Q<Button>("family-tree-cage-button").style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            view.OnFamilyTreeCageClicked();
 
+            Assert.That(familyTreeModal.style.display.value, Is.EqualTo(DisplayStyle.None));
             Assert.That(view.State, Is.SameAs(second));
             Assert.That(view.CurrentCage, Is.SameAs(view.Session.Colony.CageOf(second)));
+        }
+
+        [Test]
+        public void LedgerAnimalRow_ShowsParentsLine_AndShopAnimalIsUnknown()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            var colony = view.Session.Colony;
+            var mother = colony.AddAnimal(new PetState { Name = "ハナ", SexRevealed = true, Sex = Sex.Female }, colony.AddCage(CageSize.Standard));
+            var father = colony.AddAnimal(new PetState { Name = "タロウ", SexRevealed = true, Sex = Sex.Male }, colony.AddCage(CageSize.Standard));
+            colony.AddAnimal(new PetState { Name = "コハナ", MotherId = mother.Id, FatherId = father.Id }, colony.AddCage(CageSize.Standard));
+
+            RenderLedger();
+
+            var lines = ledgerList.Query<Label>(className: "ledger-row-detail-label").ToList().Select(l => l.text).ToList();
+            Assert.That(lines, Does.Contain("両親：ハナ×タロウ"));
+            Assert.That(lines, Does.Contain("両親：不明"));
+        }
+
+        [Test]
+        public void LedgerAnimalRow_Tapped_ShowsMotherInTreeAndMarksSoldParentGone()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            var colony = view.Session.Colony;
+            var mother = colony.AddAnimal(new PetState { Name = "ハナ", SexRevealed = true, Sex = Sex.Female }, colony.AddCage(CageSize.Standard));
+            var father = colony.AddAnimal(new PetState { Name = "タロウ", SexRevealed = true, Sex = Sex.Male }, colony.AddCage(CageSize.Standard));
+            var child = colony.AddAnimal(new PetState { Name = "コハナ", MotherId = mother.Id, FatherId = father.Id }, colony.AddCage(CageSize.Standard));
+
+            view.OnLedgerAnimalTapped(child.Id);
+            Assert.That(familyTreeModal.Q<Label>("family-tree-title").text, Is.EqualTo("コハナ"));
+            Assert.That(familyTreeModal.Q<VisualElement>("family-tree-mother").Q<Label>().text, Does.StartWith("ハナ"));
+            Assert.That(familyTreeModal.Q<VisualElement>("family-tree-mgm").ClassListContains("family-box--unknown"), Is.True);
+            Assert.That(familyTreeModal.Q<VisualElement>("family-tree-self").Q<Label>().text, Does.EndWith("?"));
+
+            colony.RemoveAnimal(mother);
+            view.OnLedgerAnimalTapped(child.Id);
+            var box = familyTreeModal.Q<VisualElement>("family-tree-mother");
+            Assert.That(box.Q<Label>().text, Does.Contain("ハナ（手放した）"));
+            Assert.That(box.ClassListContains("family-box--gone"), Is.True);
+        }
+
+        [Test]
+        public void LedgerAnimalRow_ForATrayAnimal_IsListedAndTreeHidesCageButton()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            var tray = view.Session.Colony.AddAnimal(new PetState { Name = "トレイっ子" }, null);
+
+            RenderLedger();
+            var lines = ledgerList.Query<Label>(className: "ledger-row-detail-label").ToList().Select(l => l.text).ToList();
+            Assert.That(lines, Does.Contain(IncubatorText.TrayLocation));
+
+            view.OnLedgerAnimalTapped(tray.Id);
+            Assert.That(familyTreeModal.Q<Button>("family-tree-cage-button").style.display.value, Is.EqualTo(DisplayStyle.None));
+            view.OnFamilyTreeCloseClicked();
+            Assert.That(familyTreeModal.style.display.value, Is.EqualTo(DisplayStyle.None));
         }
 
         /// <summary>
@@ -1586,6 +1659,7 @@ namespace TerrariumDays.Tests
             Assert.That(view.Session.Breeding.StartPairing(colony, male.Id, female.Id, ShopNow, view.Session.Calendar), Is.EqualTo(PairingProblem.None));
 
             view.OnLedgerAnimalTapped(female.Id);
+            view.OnFamilyTreeCageClicked();
 
             Assert.That(view.CurrentCage, Is.SameAs(maleCage));
             Assert.That(view.State, Is.SameAs(male));

@@ -159,7 +159,10 @@ namespace TerrariumDays.UI
                     sb.Append('|').Append(HomeView.CageListSignature(colony, nowUtc, tuning));
                     foreach (var pet in colony.Animals)
                     {
-                        sb.Append(';').Append(pet.Id).Append(':').Append((int)Math.Floor(GrowthModel.AgeMonths(pet, nowUtc))).Append(':').Append(pet.SexKnown);
+                        sb.Append(';').Append(pet.Id).Append(':').Append((int)Math.Floor(GrowthModel.AgeMonths(pet, nowUtc))).Append(':').Append(pet.SexKnown)
+                            .Append(':').Append(pet.MotherId).Append(':').Append(pet.FatherId)
+                            .Append(':').Append(FamilyTree.Member(colony, pet.MotherId).Name)
+                            .Append(':').Append(FamilyTree.Member(colony, pet.FatherId).Name);
                     }
 
                     break;
@@ -174,7 +177,8 @@ namespace TerrariumDays.UI
         private void RenderAnimals()
         {
             var occupied = colony.OccupiedCages();
-            if (occupied.Count == 0)
+            var tray = colony.TrayAnimals();
+            if (occupied.Count == 0 && tray.Count == 0)
             {
                 list.Add(EmptyLabel(CageStatusText.NoAnimalsMessage));
                 return;
@@ -187,6 +191,11 @@ namespace TerrariumDays.UI
                 {
                     list.Add(AnimalRow(pet));
                 }
+            }
+
+            foreach (var pet in tray)
+            {
+                list.Add(AnimalRow(pet));
             }
         }
 
@@ -214,6 +223,12 @@ namespace TerrariumDays.UI
 
             body.Add(ProfileLabel(string.Join(" ", CageStatusText.ProfileTokens(pet))));
             body.Add(DetailLabel(LedgerText.AnimalDetail(pet, nowUtc)));
+            if (colony.CageOf(pet) == null)
+            {
+                body.Add(DetailLabel(IncubatorText.TrayLocation));
+            }
+
+            body.Add(DetailLabel(IncubatorText.ParentsLine(FamilyTree.Member(colony, pet.MotherId), FamilyTree.Member(colony, pet.FatherId))));
 
             row.Add(body);
 

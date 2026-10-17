@@ -516,6 +516,48 @@ namespace TerrariumDays.Tests
         }
 
         /// <summary>
+        /// Captures the ledger with a parents line per row and a three-generation family tree
+        /// (grandparents unknown) into Logs/Screens/ledger-parents.png and family-tree.png (Task 18).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureLedgerParentsAndFamilyTree()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var colony = view.Session.Colony;
+            colony.RackCount = Mathf.Max(colony.RackCount, Mathf.CeilToInt((colony.Cages.Count + 4) / (float)Colony.CagesPerRack));
+            var genotype = StarterGenetics.Showcase[StarterGenetics.Showcase.Count - 1].Genotype;
+            PetState Pet(string name, Sex sex, int mother = 0, int father = 0) => new PetState
+            {
+                Name = name,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                SexRevealed = true,
+                Sex = sex,
+                Genotype = genotype.Clone(),
+                Known = KnownGenetics.Unknown(),
+                MotherId = mother,
+                FatherId = father,
+            };
+
+            var mother = colony.AddAnimal(Pet("ハナ", Sex.Female), colony.AddCage(CageSize.Standard));
+            var father = colony.AddAnimal(Pet("タロウ", Sex.Male), colony.AddCage(CageSize.Standard));
+            var child = colony.AddAnimal(Pet("コハナ", Sex.Female, mother.Id, father.Id), colony.AddCage(CageSize.Standard));
+            child.SexRevealed = false;
+
+            NavigatorOf(view).ShowTab(ShellTab.Ledger);
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "ledger-parents");
+
+            view.OnLedgerAnimalTapped(child.Id);
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "family-tree");
+        }
+
+        /// <summary>
         /// Captures the empty breeding tab into Logs/Screens/breeding-empty.png so the tab
         /// bar's now-six buttons (each label unclipped, at least 44px tall) can be checked by
         /// eye alongside the placeholder-panel skeleton (Task 12; Task 13 fills the panel).
