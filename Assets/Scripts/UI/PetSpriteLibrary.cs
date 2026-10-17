@@ -67,6 +67,32 @@ namespace TerrariumDays.UI
             return frames;
         }
 
+        /// <summary>
+        /// Destroys the textures this library recoloured itself. The shared source frames (loaded from
+        /// Resources) are never touched. The library refills its cache lazily if used again.
+        /// </summary>
+        public void ReleaseRecoloured()
+        {
+            foreach (var texture in cache.Values)
+            {
+                if (texture == null)
+                {
+                    continue;
+                }
+
+                if (Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(texture);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
+            }
+
+            cache.Clear();
+        }
+
         public Texture2D Heart { get; }
 
         public Texture2D Zzz { get; }

@@ -1212,6 +1212,46 @@ namespace TerrariumDays.UI
             RefreshShell();
         }
 
+        /// <summary>
+        /// Tells the recolour cache which looks may be on screen (shown residents, visitors, the
+        /// hatch tray and the open cage's pet; the whole colony on the ledger) so LRU eviction
+        /// never destroys a sprite that is being displayed.
+        /// </summary>
+        private void CollectSpriteKeysInUse()
+        {
+            var colony = session.Colony;
+            var keys = new HashSet<string>();
+            void Add(PetState pet)
+            {
+                if (pet != null)
+                {
+                    keys.Add(MorphSprites.KeyFor(pet));
+                }
+            }
+
+            Add(state);
+            foreach (var cage in colony.ShownCages())
+            {
+                Add(colony.ResidentShown(cage));
+                Add(colony.VisitorIn(cage));
+            }
+
+            foreach (var tray in colony.TrayAnimals())
+            {
+                Add(tray);
+            }
+
+            if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Ledger)
+            {
+                foreach (var animal in colony.Animals)
+                {
+                    Add(animal);
+                }
+            }
+
+            MorphSprites.SetKeysInUse(keys);
+        }
+
         private void RefreshShell()
         {
             if (session == null)
@@ -1219,6 +1259,7 @@ namespace TerrariumDays.UI
                 return;
             }
 
+            CollectSpriteKeysInUse();
             var now = GameNowUtc();
             if (moneyLabel != null)
             {
