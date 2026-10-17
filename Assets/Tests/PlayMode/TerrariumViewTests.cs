@@ -24,6 +24,7 @@ namespace TerrariumDays.Tests
         private VisualElement growthGaugeFill;
         private Label breedingStatusLabel;
         private Button nestBoxButton;
+        private Button moveEggsButton;
         private VisualElement hungerBarFill;
         private Label hungerValueLabel;
         private VisualElement hydrationBarFill;
@@ -119,6 +120,7 @@ namespace TerrariumDays.Tests
             growthGaugeFill = new VisualElement { name = "growth-gauge-fill" };
             breedingStatusLabel = new Label { name = "breeding-status-label" };
             nestBoxButton = new Button { name = "nest-box-button" };
+            moveEggsButton = new Button { name = "cage-move-eggs-button" };
             hungerBarFill = new VisualElement { name = "hunger-bar-fill" };
             hungerValueLabel = new Label { name = "hunger-value-label" };
             hydrationBarFill = new VisualElement { name = "hydration-bar-fill" };
@@ -219,6 +221,7 @@ namespace TerrariumDays.Tests
             root.Add(growthGaugeFill);
             root.Add(breedingStatusLabel);
             root.Add(nestBoxButton);
+            root.Add(moveEggsButton);
             root.Add(hungerBarFill);
             root.Add(hungerValueLabel);
             root.Add(hydrationBarFill);
@@ -2176,6 +2179,65 @@ namespace TerrariumDays.Tests
             view.OnCleanAllClicked();
 
             Assert.That(pet.Hunger, Is.EqualTo(hungerBefore));
+        }
+
+        [Test]
+        public void OnMoveEggsButtonClicked_MovesTheCageEggsIntoTheIncubatorAndHidesTheButton()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var cage = view.CurrentCage;
+            colony.Eggs.Add(new Egg { Id = 1, CageId = cage.Id, Place = EggPlace.NestBox });
+            colony.Eggs.Add(new Egg { Id = 2, CageId = cage.Id, Place = EggPlace.Loose });
+            view.Render(view.State, view.Tuning);
+            Assert.That(moveEggsButton.resolvedStyle.display == DisplayStyle.None || moveEggsButton.style.display == DisplayStyle.None, Is.False);
+
+            view.OnMoveEggsButtonClicked();
+
+            Assert.That(IncubatorService.EggsInIncubators(colony), Is.EqualTo(2));
+            Assert.That(feedbackLabel.text, Is.EqualTo("孵卵器へ2個移しました"));
+            Assert.That(moveEggsButton.style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [Test]
+        public void OnMoveEggsButtonClicked_WithFullIncubatorsSaysThereIsNoRoom()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            var cage = view.CurrentCage;
+            for (var i = 0; i < 6; i++)
+            {
+                colony.Eggs.Add(new Egg { Id = 10 + i, Place = EggPlace.Incubator, IncubatorId = colony.Incubators[0].Id, CageId = -1 });
+            }
+
+            colony.Eggs.Add(new Egg { Id = 1, CageId = cage.Id, Place = EggPlace.NestBox });
+
+            view.OnMoveEggsButtonClicked();
+
+            Assert.That(feedbackLabel.text, Is.EqualTo("孵卵器に空きがありません"));
+            Assert.That(colony.EggsIn(cage).Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void HomeView_ShowsEggAndTrayCountsOnTheIncubatorButtonAndToleratesTrayAnimals()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            var colony = view.Session.Colony;
+            colony.Eggs.Add(new Egg { Id = 1, Place = EggPlace.Incubator, IncubatorId = colony.Incubators[0].Id, CageId = -1 });
+            colony.Eggs.Add(new Egg { Id = 2, Place = EggPlace.Incubator, IncubatorId = colony.Incubators[0].Id, CageId = -1 });
+            var button = new Button();
+            var home = new HomeView(new VisualElement(), button);
+
+            home.Render(colony, ShopNow, view.Tuning);
+            Assert.That(button.text, Is.EqualTo("孵卵器（卵2・トレイ0）"));
+
+            colony.AddAnimal(new PetState { Name = "トレイ" }, null);
+            Assert.That(colony.TrayAnimals().Count, Is.EqualTo(1));
+            home.Render(colony, ShopNow, view.Tuning);
+            Assert.That(button.text, Is.EqualTo("孵卵器（卵2・トレイ1）"));
         }
     }
 }

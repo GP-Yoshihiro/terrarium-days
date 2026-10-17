@@ -486,6 +486,36 @@ namespace TerrariumDays.Tests
         }
 
         /// <summary>
+        /// Captures the cage detail with two nest-box eggs (showing "孵卵器へ移す（全部）") into
+        /// Logs/Screens/cage-detail-eggs.png, then the home screen with the incubator counts
+        /// into Logs/Screens/home-incubator-counts.png (Task 17).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureCageEggsAndHomeCounts()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var session = view.Session;
+            var cage = view.CurrentCage;
+            session.Colony.Eggs.Clear();
+            cage.HasNestBox = true;
+            session.Colony.Eggs.Add(new Egg { Id = 1, CageId = cage.Id, Place = EggPlace.NestBox, Fertile = true, LaidAtUtc = session.GameNowUtc });
+            session.Colony.Eggs.Add(new Egg { Id = 2, CageId = cage.Id, Place = EggPlace.NestBox, Fertile = true, LaidAtUtc = session.GameNowUtc });
+            NavigatorOf(view).ShowCageDetail();
+            view.Render(view.State, view.Tuning);
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "cage-detail-eggs");
+
+            view.OnMoveEggsButtonClicked();
+            NavigatorOf(view).ShowHome();
+            yield return new WaitForSeconds(1.5f);
+            yield return Capture(outputDir, "home-incubator-counts");
+        }
+
+        /// <summary>
         /// Captures the empty breeding tab into Logs/Screens/breeding-empty.png so the tab
         /// bar's now-six buttons (each label unclipped, at least 44px tall) can be checked by
         /// eye alongside the placeholder-panel skeleton (Task 12; Task 13 fills the panel).

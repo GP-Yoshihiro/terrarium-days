@@ -10,11 +10,13 @@ namespace TerrariumDays.UI
     public sealed class HomeView
     {
         private readonly VisualElement rackList;
+        private readonly Button incubatorButton;
         private string lastSignature;
 
-        public HomeView(VisualElement rackList)
+        public HomeView(VisualElement rackList, Button incubatorButton = null)
         {
             this.rackList = rackList;
+            this.incubatorButton = incubatorButton;
         }
 
         public event Action<int> CageSelected;
@@ -30,7 +32,9 @@ namespace TerrariumDays.UI
         {
             var signature = new StringBuilder();
             signature.Append(colony.RackCount).Append('|').Append(colony.Cages.Count)
-                .Append('|').Append(string.Join(",", colony.NewRackIndices));
+                .Append('|').Append(string.Join(",", colony.NewRackIndices))
+                .Append('|').Append(IncubatorService.EggsInIncubators(colony))
+                .Append('|').Append(colony.TrayAnimals().Count);
             foreach (var cage in colony.Cages)
             {
                 var pet = colony.AnimalIn(cage);
@@ -71,6 +75,11 @@ namespace TerrariumDays.UI
             }
 
             lastSignature = signature;
+
+            if (incubatorButton != null)
+            {
+                incubatorButton.text = IncubatorText.HomeButton(IncubatorService.EggsInIncubators(colony), colony.TrayAnimals().Count);
+            }
 
             rackList.Clear();
             for (var rack = 0; rack < colony.RackCount; rack++)

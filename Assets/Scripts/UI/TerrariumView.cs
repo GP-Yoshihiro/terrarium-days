@@ -55,6 +55,7 @@ namespace TerrariumDays.UI
         private VisualElement growthGaugeFill;
         private Label breedingStatusLabel;
         private Button nestBoxButton;
+        private Button moveEggsButton;
 
         private VisualElement hungerBarFill;
         private Label hungerValueLabel;
@@ -175,7 +176,7 @@ namespace TerrariumDays.UI
 
             var root = document.rootVisualElement;
             navigator = new ShellNavigator(root);
-            homeView = new HomeView(root.Q("rack-list"));
+            homeView = new HomeView(root.Q("rack-list"), root.Q<Button>("home-incubator-button"));
             cageListView = new CageListView(root.Q("cage-list"));
             moneyLabel = root.Q<Label>("money-label");
             gameDateLabel = root.Q<Label>("game-date-label");
@@ -327,6 +328,11 @@ namespace TerrariumDays.UI
             if (nestBoxButton != null)
             {
                 nestBoxButton.clicked += OnNestBoxButtonClicked;
+            }
+
+            if (moveEggsButton != null)
+            {
+                moveEggsButton.clicked += OnMoveEggsButtonClicked;
             }
 
             debugHungerSliderCallback = evt => OnDebugHungerChanged(evt.newValue);
@@ -657,6 +663,27 @@ namespace TerrariumDays.UI
             navigator?.ShowTab(ShellTab.Breeding);
         }
 
+        /// <summary>Moves every live egg of the current cage into the incubators (★7).</summary>
+        public void OnMoveEggsButtonClicked()
+        {
+            if (session == null || currentCage == null)
+            {
+                return;
+            }
+
+            var result = session.Incubation.MoveAllFromCage(session.Colony, currentCage);
+            SaveCurrentState();
+            ColonyChanged?.Invoke();
+            incubatorView?.Invalidate();
+            if (state != null)
+            {
+                Render(state, tuning);
+            }
+
+            RefreshShell();
+            ShowFeedback(IncubatorText.MoveResult(result.Moved, result.Left));
+        }
+
         /// <summary>Places or removes the current cage's nest box, based on whether it already has one.</summary>
         public void OnNestBoxButtonClicked()
         {
@@ -985,6 +1012,11 @@ namespace TerrariumDays.UI
                 nestBoxButton.clicked -= OnNestBoxButtonClicked;
             }
 
+            if (moveEggsButton != null)
+            {
+                moveEggsButton.clicked -= OnMoveEggsButtonClicked;
+            }
+
             if (debugHungerSliderCallback != null)
             {
                 debugHungerSlider?.UnregisterValueChangedCallback(debugHungerSliderCallback);
@@ -1043,6 +1075,7 @@ namespace TerrariumDays.UI
             growthGaugeFill = root.Q<VisualElement>("growth-gauge-fill");
             breedingStatusLabel = root.Q<Label>("breeding-status-label");
             nestBoxButton = root.Q<Button>("nest-box-button");
+            moveEggsButton = root.Q<Button>("cage-move-eggs-button");
 
             hungerBarFill = root.Q<VisualElement>("hunger-bar-fill");
             hungerValueLabel = root.Q<Label>("hunger-value-label");
@@ -2450,6 +2483,12 @@ namespace TerrariumDays.UI
             if (nestBoxButton != null && currentCage != null && session != null)
             {
                 nestBoxButton.text = BreedingText.NestBoxButtonLabel(currentCage, session.Colony.Inventory);
+            }
+
+            if (moveEggsButton != null && currentCage != null && session != null)
+            {
+                var hasLiveEggs = session.Colony.EggsIn(currentCage).Exists(e => !e.Failed);
+                moveEggsButton.style.display = hasLiveEggs ? DisplayStyle.Flex : DisplayStyle.None;
             }
         }
 

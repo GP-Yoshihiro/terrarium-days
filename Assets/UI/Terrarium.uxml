@@ -39,6 +39,7 @@
                             <ui:Label name="breeding-status-label" text="" class="breeding-status-label" />
                             <ui:Button name="nest-box-button" text="産卵床を置く" class="nest-box-button" />
                         </ui:VisualElement>
+                        <ui:Button name="cage-move-eggs-button" text="孵卵器へ移す（全部）" class="nest-box-button" style="align-self: center; margin-left: 0; margin-top: 12px;" />
                         <ui:VisualElement name="growth-gauge-track" class="gauge-track">
                             <ui:VisualElement name="growth-gauge-fill" class="gauge-fill" />
                         </ui:VisualElement>
