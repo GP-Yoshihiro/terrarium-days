@@ -93,5 +93,14 @@ namespace TerrariumDays.Core
 
         /// <summary>When the next periodic shed is due; food is refused in the days before it.</summary>
         public DateTimeOffset NextShedAtUtc { get; set; } = DateTimeOffset.UtcNow + GameCalendar.RealTimeFor(new CareTuning().YoungShedIntervalGameDays);
+
+        /// <summary>Mother's animal id; 0 = unknown (shop animals, old saves).</summary>
+        public int MotherId { get; set; }
+
+        /// <summary>Father's animal id; 0 = unknown.</summary>
+        public int FatherId { get; set; }
+
+        /// <summary>Until this time the care stats do not drop (hatchlings, phase 5 decision 2); null = no grace.</summary>
+        public DateTimeOffset? CareGraceUntilUtc { get; set; }
     }
 }

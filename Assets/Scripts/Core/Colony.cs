@@ -98,6 +98,24 @@ namespace TerrariumDays.Core
 
         public List<Cage> OccupiedCages() => Cages.FindAll(c => !c.IsEmpty);
 
+        /// <summary>Animals in no cage: the hatchling tray (phase 5 decision 1, plan A).</summary>
+        public List<PetState> TrayAnimals() => Animals.FindAll(a => CageOf(a) == null);
+
+        /// <summary>The lowest-id empty cage, or null.</summary>
+        public Cage FirstEmptyCage()
+        {
+            Cage best = null;
+            foreach (var cage in Cages)
+            {
+                if (cage.IsEmpty && (best == null || cage.Id < best.Id))
+                {
+                    best = cage;
+                }
+            }
+
+            return best;
+        }
+
         public Pairing PairingOf(PetState pet) =>
             pet == null ? null : Pairings.Find(p => p.MaleId == pet.Id || p.FemaleId == pet.Id);
 
