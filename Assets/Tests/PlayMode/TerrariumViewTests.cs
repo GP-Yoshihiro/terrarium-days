@@ -247,6 +247,8 @@ namespace TerrariumDays.Tests
             incubatorPanel.Add(new VisualElement { name = "incubator-card-list" });
             incubatorEggDetail = new Label { name = "incubator-egg-detail" };
             incubatorPanel.Add(incubatorEggDetail);
+            incubatorPanel.Add(new VisualElement { name = "hatch-tray-list" });
+            incubatorPanel.Add(new Label { name = "hatch-tray-empty" });
 
             root.Add(breedingPanel);
             root.Add(incubatorPanel);
@@ -1981,11 +1983,7 @@ namespace TerrariumDays.Tests
 
             // Awake() (skipped by this harness) wires the view's events and the tab-changed
             // render; do the same here so the buttons and slots reach the real handlers.
-            var incubatorView = IncubatorViewOf();
-            incubatorView.TemperatureChangeRequested += view.OnIncubatorTemperatureChangeRequested;
-            incubatorView.WaterRequested += view.OnIncubatorWaterRequested;
-            incubatorView.EggTapped += view.OnIncubatorEggTapped;
-            incubatorView.RemoveRequested += view.OnIncubatorRemoveRequested;
+            view.WireIncubatorEvents();
             RenderIncubator();
         }
 
@@ -2075,6 +2073,109 @@ namespace TerrariumDays.Tests
 
             StringAssert.StartsWith($"卵{egg.Id}：", incubatorEggDetail.text);
             Assert.That(incubatorPanel.Query(className: "egg-slot--selected").ToList().Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void IncubatorTab_RemoveButtonOnlyOnRemovableEggs_RemovalClearsSelectionAndSaves()
+        {
+            OpenIncubatorTab();
+            var colony = view.Session.Colony;
+            view.Session.Incubation.AddDebugEggs(colony, view.Session.GameNowUtc, 2);
+            var dead = colony.Eggs[0];
+            var live = colony.Eggs[1];
+            dead.Fertile = false;
+            dead.LaidAtUtc = view.Session.GameNowUtc - GameCalendar.RealTimeFor(8d);
+            IncubatorViewOf().Invalidate();
+            RenderIncubator();
+
+            Assert.That(incubatorPanel.Q<Button>($"egg-remove-{dead.Id}"), Is.Not.Null);
+            Assert.That(incubatorPanel.Q<Button>($"egg-remove-{live.Id}"), Is.Null);
+
+            view.OnIncubatorEggTapped(dead);
+            Assert.That(IncubatorViewOf().SelectedEggId, Is.EqualTo(dead.Id));
+            ClickIncubatorButton($"egg-remove-{dead.Id}");
+
+            Assert.That(colony.Eggs.Contains(dead), Is.False);
+            Assert.That(IncubatorViewOf().SelectedEggId, Is.Null);
+            var reloaded = new ColonySaveService(new CareTuning(), new EconomyTuning())
+                .LoadOrCreate(view.Session.SavePath, ShopNow, new System.Random(1));
+            Assert.That(reloaded.Eggs.Exists(e => e.Id == dead.Id), Is.False);
+            Assert.That(reloaded.Eggs.Exists(e => e.Id == live.Id), Is.True);
+        }
+
+        private PetState HatchIntoTray()
+        {
+            var session = view.Session;
+            session.Incubation.AddDebugEggs(session.Colony, session.GameNowUtc, 1);
+            var egg = session.Colony.Eggs[session.Colony.Eggs.Count - 1];
+            var pet = new Hatchery(new CareTuning()).Hatch(session.Colony, egg, session.GameNowUtc, 28d);
+            IncubatorViewOf().Invalidate();
+            RenderIncubator();
+            return pet;
+        }
+
+        [Test]
+        public void HatchTray_ShowsAHatchling_AndMoveToCageSeatsItAndEmptiesTheTray()
+        {
+            OpenIncubatorTab();
+            var colony = view.Session.Colony;
+            colony.AddCage(CageSize.Standard);
+            var pet = HatchIntoTray();
+
+            Assert.That(incubatorPanel.Q<VisualElement>($"tray-row-{pet.Id}"), Is.Not.Null);
+            ClickIncubatorButton($"tray-move-{pet.Id}");
+
+            var cage = colony.CageOf(pet);
+            Assert.That(cage, Is.Not.Null);
+            Assert.That(colony.TrayAnimals(), Is.Empty);
+            Assert.That(incubatorPanel.Q<VisualElement>($"tray-row-{pet.Id}"), Is.Null);
+            Assert.That(feedbackLabel.text, Is.EqualTo($"{pet.Name}をケージ{cage.Id}へ移しました"));
+        }
+
+        [Test]
+        public void HatchTray_WithNoEmptyCage_DisablesMoveAndSaysSo()
+        {
+            OpenIncubatorTab();
+            var colony = view.Session.Colony;
+            foreach (var cage in colony.Cages.FindAll(c => c.IsEmpty))
+            {
+                colony.AddAnimal(new PetState { Name = "満室" }, cage);
+            }
+
+            var pet = HatchIntoTray();
+
+            Assert.That(IncubatorButton($"tray-move-{pet.Id}").enabledSelf, Is.False);
+            Assert.That(incubatorPanel.Query<Label>().ToList().Select(l => l.text), Has.Member(IncubatorText.NoEmptyCage));
+        }
+
+        [Test]
+        public void HatchTray_SellAfterConfirm_RemovesItAndRecordsLineage()
+        {
+            OpenIncubatorTab();
+            var colony = view.Session.Colony;
+            var pet = HatchIntoTray();
+            var lineageBefore = colony.Lineage.Count;
+
+            ClickIncubatorButton($"tray-sell-{pet.Id}");
+            ClickConfirmYes();
+
+            Assert.That(colony.AnimalById(pet.Id), Is.Null);
+            Assert.That(colony.TrayAnimals(), Is.Empty);
+            Assert.That(colony.Lineage.Count, Is.EqualTo(lineageBefore + 1));
+        }
+
+        [Test]
+        public void HatchTray_BulkFeedingLeavesTrayHatchlingsAlone()
+        {
+            OpenIncubatorTab();
+            var pet = HatchIntoTray();
+            var hungerBefore = pet.Hunger;
+
+            view.OnFeedAllClicked();
+            view.OnWaterAllClicked();
+            view.OnCleanAllClicked();
+
+            Assert.That(pet.Hunger, Is.EqualTo(hungerBefore));
         }
     }
 }

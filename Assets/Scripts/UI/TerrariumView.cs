@@ -209,13 +209,7 @@ namespace TerrariumDays.UI
                 pairingView.CancelRequested += OnPairingCancelRequested;
             }
 
-            if (incubatorView != null)
-            {
-                incubatorView.TemperatureChangeRequested += OnIncubatorTemperatureChangeRequested;
-                incubatorView.WaterRequested += OnIncubatorWaterRequested;
-                incubatorView.EggTapped += OnIncubatorEggTapped;
-                incubatorView.RemoveRequested += OnIncubatorRemoveRequested;
-            }
+            WireIncubatorEvents();
 
             homeButton.clicked += OnHomeButtonClicked;
             prevCageButton.clicked += OnPrevCageButtonClicked;
@@ -852,6 +846,8 @@ namespace TerrariumDays.UI
                 incubatorView.WaterRequested -= OnIncubatorWaterRequested;
                 incubatorView.EggTapped -= OnIncubatorEggTapped;
                 incubatorView.RemoveRequested -= OnIncubatorRemoveRequested;
+                incubatorView.MoveToCageRequested -= OnTrayMoveToCageRequested;
+                incubatorView.SellRequested -= OnTraySellRequested;
             }
 
             confirmDialog?.Dispose();
@@ -2335,6 +2331,49 @@ namespace TerrariumDays.UI
 
             incubatorView?.ClearSelection();
             AfterIncubatorAction();
+        }
+
+        /// <summary>Subscribes the incubator tab's events; Awake and the PlayMode harness (which skips Awake) both call it.</summary>
+        public void WireIncubatorEvents()
+        {
+            if (incubatorView == null)
+            {
+                return;
+            }
+
+            incubatorView.TemperatureChangeRequested += OnIncubatorTemperatureChangeRequested;
+            incubatorView.WaterRequested += OnIncubatorWaterRequested;
+            incubatorView.EggTapped += OnIncubatorEggTapped;
+            incubatorView.RemoveRequested += OnIncubatorRemoveRequested;
+            incubatorView.MoveToCageRequested += OnTrayMoveToCageRequested;
+            incubatorView.SellRequested += OnTraySellRequested;
+        }
+
+        public void OnTrayMoveToCageRequested(PetState pet)
+        {
+            if (session == null || pet == null)
+            {
+                return;
+            }
+
+            if (Hatchery.MoveToCage(session.Colony, pet) != MoveToCageResult.Ok)
+            {
+                AfterIncubatorAction();
+                return;
+            }
+
+            var cage = session.Colony.CageOf(pet);
+            AfterIncubatorAction();
+            ShowFeedback($"{pet.Name}をケージ{cage.Id}へ移しました");
+        }
+
+        /// <summary>Sells a tray hatchling through the ordinary wholesale confirmation (★13); it has no cage to clear.</summary>
+        public void OnTraySellRequested(PetState pet)
+        {
+            if (pet != null)
+            {
+                OnShopWholesaleRequested(pet.Id);
+            }
         }
 
         private void AfterIncubatorAction()

@@ -17,6 +17,8 @@ namespace TerrariumDays.UI
     {
         private readonly VisualElement cardList;
         private readonly Label eggDetail;
+        private readonly VisualElement trayList;
+        private readonly Label trayEmpty;
         private readonly Dictionary<CandlingStage, Texture2D> pictures = new Dictionary<CandlingStage, Texture2D>();
 
         private string lastSignature;
@@ -26,6 +28,8 @@ namespace TerrariumDays.UI
         {
             cardList = root.Q<VisualElement>("incubator-card-list");
             eggDetail = root.Q<Label>("incubator-egg-detail");
+            trayList = root.Q<VisualElement>("hatch-tray-list");
+            trayEmpty = root.Q<Label>("hatch-tray-empty");
         }
 
         public event Action<Incubator, int> TemperatureChangeRequested;
@@ -35,6 +39,10 @@ namespace TerrariumDays.UI
         public event Action<Egg> EggTapped;
 
         public event Action<Egg> RemoveRequested;
+
+        public event Action<PetState> MoveToCageRequested;
+
+        public event Action<PetState> SellRequested;
 
         public int? SelectedEggId => selectedEggId;
 
@@ -82,6 +90,82 @@ namespace TerrariumDays.UI
             }
 
             UpdateDetail(colony, gameNowUtc, care);
+            RenderTray(colony, gameNowUtc);
+        }
+
+        private void RenderTray(Colony colony, DateTimeOffset gameNowUtc)
+        {
+            if (trayList == null)
+            {
+                return;
+            }
+
+            trayList.Clear();
+            var tray = colony.TrayAnimals();
+            if (trayEmpty != null)
+            {
+                trayEmpty.style.display = tray.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            var hasCage = colony.FirstEmptyCage() != null;
+            foreach (var pet in tray)
+            {
+                trayList.Add(BuildTrayRow(pet, gameNowUtc, hasCage));
+            }
+        }
+
+        private VisualElement BuildTrayRow(PetState pet, DateTimeOffset gameNowUtc, bool hasCage)
+        {
+            var row = new VisualElement { name = $"tray-row-{pet.Id}" };
+            row.AddToClassList("tray-row");
+
+            var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
+            thumb.style.width = 44;
+            thumb.style.height = 44;
+            thumb.style.marginRight = 8;
+            var thumbnail = MorphSprites.Thumbnail(pet);
+            if (thumbnail != null)
+            {
+                thumb.style.backgroundImage = new StyleBackground(thumbnail);
+            }
+
+            row.Add(thumb);
+
+            var texts = new VisualElement { pickingMode = PickingMode.Ignore };
+            texts.style.flexGrow = 1;
+            texts.style.flexShrink = 1;
+            texts.style.flexBasis = 0;
+            texts.Add(new Label(IncubatorText.TrayRow(pet)));
+            var inGrace = pet.CareGraceUntilUtc.HasValue && gameNowUtc < pet.CareGraceUntilUtc.Value;
+            var grace = new Label(IncubatorText.GraceLine(pet, gameNowUtc));
+            grace.AddToClassList(inGrace ? "tray-row__grace" : "tray-row__warning");
+            texts.Add(grace);
+            if (!hasCage)
+            {
+                var noCage = new Label(IncubatorText.NoEmptyCage) { name = $"tray-no-cage-{pet.Id}" };
+                noCage.AddToClassList("tray-row__warning");
+                texts.Add(noCage);
+            }
+
+            foreach (var label in texts.Query<Label>().ToList())
+            {
+                label.style.whiteSpace = WhiteSpace.Normal;
+            }
+
+            row.Add(texts);
+
+            var actions = new VisualElement();
+            actions.style.flexShrink = 0;
+            actions.style.width = 112;
+            var move = new Button { name = $"tray-move-{pet.Id}", text = "ケージへ移す" };
+            move.SetEnabled(hasCage);
+            move.clicked += () => MoveToCageRequested?.Invoke(pet);
+            actions.Add(move);
+            var sell = new Button { name = $"tray-sell-{pet.Id}", text = "売る" };
+            sell.clicked += () => SellRequested?.Invoke(pet);
+            actions.Add(sell);
+            row.Add(actions);
+            return row;
         }
 
         private string Signature(Colony colony, IncubatorService incubation, DateTimeOffset gameNowUtc, double roomC, CareTuning care)
@@ -99,6 +183,12 @@ namespace TerrariumDays.UI
                 }
 
                 text.Append(']');
+            }
+
+            text.Append("|tray:").Append(colony.FirstEmptyCage() != null);
+            foreach (var pet in colony.TrayAnimals())
+            {
+                text.Append(',').Append(pet.Id).Append('=').Append(IncubatorText.GraceLine(pet, gameNowUtc));
             }
 
             text.Append('|').Append(selectedEggId);

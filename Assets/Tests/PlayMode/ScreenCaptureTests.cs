@@ -452,6 +452,40 @@ namespace TerrariumDays.Tests
         }
 
         /// <summary>
+        /// Captures the incubator tab with two hatchlings in the tray, one in care grace and
+        /// one past it, into Logs/Screens/hatch-tray.png (Task 16).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureHatchTray()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var session = view.Session;
+            var hatchery = new Hatchery(new CareTuning());
+            session.Colony.Eggs.Clear();
+            foreach (var leftover in session.Colony.TrayAnimals())
+            {
+                session.Colony.RemoveAnimal(leftover);
+            }
+
+            session.Incubation.AddDebugEggs(session.Colony, session.GameNowUtc, 2);
+            hatchery.Hatch(session.Colony, session.Colony.Eggs[0], session.GameNowUtc, 28d);
+            var expired = hatchery.Hatch(session.Colony, session.Colony.Eggs[0], session.GameNowUtc, 28d);
+            expired.CareGraceUntilUtc = session.GameNowUtc - System.TimeSpan.FromHours(1);
+            foreach (var cage in session.Colony.Cages.FindAll(c => c.IsEmpty))
+            {
+                session.Colony.AddAnimal(new PetState { Name = "満室" }, cage);
+            }
+
+            NavigatorOf(view).ShowTab(ShellTab.Incubator);
+            yield return new WaitForSeconds(0.5f);
+            yield return Capture(outputDir, "hatch-tray");
+        }
+
+        /// <summary>
         /// Captures the empty breeding tab into Logs/Screens/breeding-empty.png so the tab
         /// bar's now-six buttons (each label unclipped, at least 44px tall) can be checked by
         /// eye alongside the placeholder-panel skeleton (Task 12; Task 13 fills the panel).
