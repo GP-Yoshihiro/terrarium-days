@@ -42,7 +42,10 @@ namespace TerrariumDays.Core
         NestBox,
 
         /// <summary>On the cage floor (no nest box): dries out after two game days (§7.7).</summary>
-        Loose
+        Loose,
+
+        /// <summary>In an incubator (<see cref="Egg.IncubatorId"/>); develops at its real temperature (phase 5).</summary>
+        Incubator
     }
 
     public enum EggFailure
@@ -64,6 +67,9 @@ namespace TerrariumDays.Core
         public int MotherId { get; set; }
         public int FatherId { get; set; }
         public int CageId { get; set; } = -1;
+
+        /// <summary>The incubator holding the egg; 0 = not in an incubator (old saves read 0).</summary>
+        public int IncubatorId { get; set; }
         public DateTimeOffset LaidAtUtc { get; set; }
         public EggPlace Place { get; set; } = EggPlace.NestBox;
 
