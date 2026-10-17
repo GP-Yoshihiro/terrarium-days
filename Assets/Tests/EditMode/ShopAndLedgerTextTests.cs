@@ -32,8 +32,8 @@ namespace TerrariumDays.Tests
             Assert.That(ShopText.ItemLabel(ShopCatalog.Find("cage_large", economy)), Is.EqualTo("大型ケージ（装飾3）"));
             Assert.That(ShopText.ItemLabel(ShopCatalog.Find("rack", economy)), Is.EqualTo("ラック（ケージ4つ分）"));
             Assert.That(ShopText.ItemLabel(ShopCatalog.Find("plant_01", economy)), Is.EqualTo("観葉植物"));
-            Assert.That(ShopText.ItemLabel(ShopCatalog.Find(ShopCatalog.NestBoxId, economy)), Is.EqualTo("産卵床（段階4で使えます）"));
-            Assert.That(ShopText.ItemLabel(ShopCatalog.Find("incubator_standard", economy)), Is.EqualTo("標準孵卵器（段階5で使えます）"));
+            Assert.That(ShopText.ItemLabel(ShopCatalog.Find(ShopCatalog.NestBoxId, economy)), Is.EqualTo("産卵床"));
+            Assert.That(ShopText.ItemLabel(ShopCatalog.Find("incubator_standard", economy)), Is.EqualTo("標準孵卵器"));
         }
 
         [Test]

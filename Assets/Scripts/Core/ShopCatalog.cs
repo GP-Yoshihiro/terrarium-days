@@ -58,11 +58,11 @@ namespace TerrariumDays.Core
                 }
             }
 
-            items.Add(new ShopItem(NestBoxId, "産卵床", economy.NestBoxPrice, ShopItemKind.NestBox, usableFromPhase: 4));
+            items.Add(new ShopItem(NestBoxId, "産卵床", economy.NestBoxPrice, ShopItemKind.NestBox, usableFromPhase: 0));
             items.Add(new ShopItem("incubator_standard", "標準孵卵器", economy.StandardIncubatorPrice, ShopItemKind.Incubator,
-                incubator: IncubatorModel.Standard, usableFromPhase: 5));
+                incubator: IncubatorModel.Standard, usableFromPhase: 0));
             items.Add(new ShopItem("incubator_luxury", "高級孵卵器", economy.LuxuryIncubatorPrice, ShopItemKind.Incubator,
-                incubator: IncubatorModel.Luxury, usableFromPhase: 5));
+                incubator: IncubatorModel.Luxury, usableFromPhase: 0));
             return items;
         }
 

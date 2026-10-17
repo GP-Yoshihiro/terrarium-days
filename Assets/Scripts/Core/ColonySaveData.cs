@@ -22,6 +22,7 @@ namespace TerrariumDays.Core
         public int inventoryVersion;
         public List<InventorySaveData> inventory = new List<InventorySaveData>();
         public List<string> incubators = new List<string>();
+        public List<IncubatorSaveData> incubatorStates = new List<IncubatorSaveData>();
         public int shopSeed;
         public bool shopStocked;
         public int shopMonthIndex;
@@ -164,6 +165,16 @@ namespace TerrariumDays.Core
         public string category;
         public long amount;
         public string note;
+    }
+
+    [Serializable]
+    public sealed class IncubatorSaveData
+    {
+        public int id;
+        public string model;
+        public int setTemperatureC;
+        public double humidityPercent;
+        public string appliedUntilUtc;
     }
 
     /// <summary>Reads only the schema version, to choose between loading and migrating.</summary>

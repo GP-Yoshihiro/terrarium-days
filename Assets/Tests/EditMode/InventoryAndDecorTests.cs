@@ -56,7 +56,7 @@ namespace TerrariumDays.Tests
 
             Assert.That(colony.Cages[0].DecorIds, Is.EqualTo(new[] { "rock_01" }));
             Assert.That(colony.Inventory.Count("rock_01"), Is.EqualTo(0));
-            Assert.That(colony.Incubators, Is.EqualTo(new[] { IncubatorModel.Simple }));
+            Assert.That(colony.Incubators.Select(i => i.Model), Is.EqualTo(new[] { IncubatorModel.Simple }));
             Assert.That(colony.IncubatorCount, Is.EqualTo(1));
         }
 
@@ -140,7 +140,7 @@ namespace TerrariumDays.Tests
         public void Incubators_AreCountedFromTheList()
         {
             var colony = NewColony();
-            colony.Incubators.Add(IncubatorModel.Standard);
+            colony.AddIncubator(IncubatorModel.Standard);
 
             Assert.That(colony.IncubatorCount, Is.EqualTo(2));
         }

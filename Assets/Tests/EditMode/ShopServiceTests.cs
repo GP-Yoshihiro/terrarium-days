@@ -167,7 +167,10 @@ namespace TerrariumDays.Tests
 
             Assert.That(shop.BuyItem(colony, "incubator_standard", Now), Is.EqualTo(ShopResult.Ok));
 
-            Assert.That(colony.Incubators, Is.EqualTo(new[] { IncubatorModel.Simple, IncubatorModel.Standard }));
+            Assert.That(colony.Incubators.Select(i => i.Model), Is.EqualTo(new[] { IncubatorModel.Simple, IncubatorModel.Standard }));
+            Assert.That(colony.Incubators[1].Id, Is.EqualTo(2));
+            Assert.That(colony.Incubators[1].SetTemperatureC, Is.EqualTo(28));
+            Assert.That(colony.Incubators[1].HumidityPercent, Is.EqualTo(80d));
             Assert.That(shop.BuyItem(colony, "incubator_luxury", Now), Is.EqualTo(ShopResult.NotEnoughMoney));
         }
 
@@ -269,8 +272,8 @@ namespace TerrariumDays.Tests
             Assert.That(ShopCatalog.Find("cage_standard", economy).Price, Is.EqualTo(6000));
             Assert.That(ShopCatalog.Find("heat_lamp_01", economy).Price, Is.EqualTo(3000));
             Assert.That(ShopCatalog.Find("incubator_luxury", economy).Price, Is.EqualTo(40000));
-            Assert.That(ShopCatalog.Find("incubator_luxury", economy).UsableFromPhase, Is.EqualTo(5));
-            Assert.That(ShopCatalog.Find(ShopCatalog.NestBoxId, economy).UsableFromPhase, Is.EqualTo(4));
+            Assert.That(ShopCatalog.Find("incubator_luxury", economy).UsableFromPhase, Is.EqualTo(0));
+            Assert.That(ShopCatalog.Find(ShopCatalog.NestBoxId, economy).UsableFromPhase, Is.EqualTo(0));
             Assert.That(ShopCatalog.Find("rack", economy).UsableFromPhase, Is.EqualTo(0));
         }
 

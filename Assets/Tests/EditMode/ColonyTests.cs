@@ -21,12 +21,34 @@ namespace TerrariumDays.Tests
             Assert.That(colony.Wallet.Money, Is.EqualTo(50000));
             Assert.That(colony.RackCount, Is.EqualTo(1));
             Assert.That(colony.IncubatorCount, Is.EqualTo(1));
+            var first = colony.Incubators[0];
+            Assert.That(first.Id, Is.EqualTo(1));
+            Assert.That(first.Model, Is.EqualTo(IncubatorModel.Simple));
+            Assert.That(first.SetTemperatureC, Is.EqualTo(28));
+            Assert.That(first.HumidityPercent, Is.EqualTo(80d));
+            Assert.That(first.AppliedUntilUtc, Is.EqualTo(default(DateTimeOffset)));
             Assert.That(colony.Cages, Has.Count.EqualTo(1));
             Assert.That(colony.Cages[0].Size, Is.EqualTo(CageSize.Standard));
             var pet = colony.AnimalIn(colony.Cages[0]);
             Assert.That(pet.Id, Is.EqualTo(1));
             Assert.That(pet.Stage, Is.EqualTo(GrowthStage.Baby));
             Assert.That(colony.CageOf(pet), Is.SameAs(colony.Cages[0]));
+        }
+
+        [Test]
+        public void AddIncubator_UsesMaxIdPlusOneEvenAfterARemoval()
+        {
+            var colony = NewColony();
+
+            var second = colony.AddIncubator(IncubatorModel.Standard);
+            var third = colony.AddIncubator(IncubatorModel.Standard);
+            Assert.That(second.Id, Is.EqualTo(2));
+            Assert.That(third.Id, Is.EqualTo(3));
+
+            colony.Incubators.Remove(second);
+            Assert.That(colony.AddIncubator(IncubatorModel.Luxury).Id, Is.EqualTo(4));
+            Assert.That(colony.IncubatorById(3), Is.SameAs(third));
+            Assert.That(colony.IncubatorById(2), Is.Null);
         }
 
         [Test]

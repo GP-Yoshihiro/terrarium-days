@@ -195,19 +195,38 @@ namespace TerrariumDays.Core
                 GameClockOffset = TimeSpan.FromTicks(Math.Max(0L, data.gameClockOffsetTicks)),
             };
             colony.Incubators.Clear();
-            if (data.incubators != null && data.incubators.Count > 0)
+            if (data.incubatorStates != null && data.incubatorStates.Count > 0)
             {
-                foreach (var incubator in data.incubators)
+                foreach (var state in data.incubatorStates)
                 {
-                    colony.Incubators.Add(TryParseDefined(incubator, out IncubatorModel model) ? model : IncubatorModel.Simple);
+                    colony.Incubators.Add(new Incubator
+                    {
+                        Id = state.id,
+                        Model = TryParseDefined(state.model, out IncubatorModel model) ? model : IncubatorModel.Simple,
+                        SetTemperatureC = state.setTemperatureC,
+                        HumidityPercent = state.humidityPercent,
+                        AppliedUntilUtc = Parse(state.appliedUntilUtc, default),
+                    });
+                }
+            }
+            else if (data.incubators != null && data.incubators.Count > 0)
+            {
+                foreach (var name in data.incubators)
+                {
+                    colony.AddIncubator(TryParseDefined(name, out IncubatorModel model) ? model : IncubatorModel.Simple);
                 }
             }
             else
             {
                 for (var i = 0; i < data.incubatorCount; i++)
                 {
-                    colony.Incubators.Add(IncubatorModel.Simple);
+                    colony.AddIncubator(IncubatorModel.Simple);
                 }
+            }
+
+            if (colony.Incubators.Count == 0)
+            {
+                colony.AddIncubator(IncubatorModel.Simple);
             }
 
             colony.Wallet.Money = data.money;
@@ -464,7 +483,15 @@ namespace TerrariumDays.Core
             };
             foreach (var incubator in colony.Incubators)
             {
-                data.incubators.Add(incubator.ToString());
+                data.incubators.Add(incubator.Model.ToString());
+                data.incubatorStates.Add(new IncubatorSaveData
+                {
+                    id = incubator.Id,
+                    model = incubator.Model.ToString(),
+                    setTemperatureC = incubator.SetTemperatureC,
+                    humidityPercent = incubator.HumidityPercent,
+                    appliedUntilUtc = Format(incubator.AppliedUntilUtc),
+                });
             }
 
             foreach (var entry in colony.Wallet.Ledger)

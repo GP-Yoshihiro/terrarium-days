@@ -50,8 +50,24 @@ namespace TerrariumDays.Core
         /// <summary>Indices of racks bought but not yet visited, for the home screen's new-arrival highlight; cleared per rack once the player selects an occupied cage in it.</summary>
         public List<int> NewRackIndices { get; set; } = new List<int>();
         public Inventory Inventory { get; set; } = new Inventory();
-        public List<IncubatorModel> Incubators { get; set; } = new List<IncubatorModel> { IncubatorModel.Simple };
+        public List<Incubator> Incubators { get; set; } = new List<Incubator> { new Incubator { Id = 1 } };
         public int IncubatorCount => Incubators.Count;
+
+        public Incubator IncubatorById(int id) => Incubators.Find(i => i.Id == id);
+
+        /// <summary>Adds a new incubator (28℃, 80%) with the next id (max + 1).</summary>
+        public Incubator AddIncubator(IncubatorModel model)
+        {
+            var nextId = 1;
+            foreach (var existing in Incubators)
+            {
+                nextId = Math.Max(nextId, existing.Id + 1);
+            }
+
+            var incubator = new Incubator { Id = nextId, Model = model };
+            Incubators.Add(incubator);
+            return incubator;
+        }
         public int NextAnimalId { get; set; } = 1;
         public int NextCageId { get; set; } = 1;
         public int LastBilledMonthIndex { get; set; }

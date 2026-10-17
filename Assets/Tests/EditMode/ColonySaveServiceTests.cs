@@ -272,7 +272,7 @@ namespace TerrariumDays.Tests
             colony.Inventory.Add(ShopCatalog.NestBoxId, 1);
             var cage = colony.AddCage(CageSize.Large);
             cage.DecorIds.Add("driftwood_01");
-            colony.Incubators.Add(IncubatorModel.Luxury);
+            colony.AddIncubator(IncubatorModel.Luxury);
             var pet = colony.Animals[0];
             pet.PersonalityKnown = false;
             pet.PersonalityRevealAtUtc = Now.AddHours(3);
@@ -291,9 +291,70 @@ namespace TerrariumDays.Tests
             Assert.That(loaded.Inventory.Count(ShopCatalog.NestBoxId), Is.EqualTo(1));
             Assert.That(loaded.Cages[0].DecorIds, Is.EqualTo(new[] { "rock_01" }));
             Assert.That(loaded.Cages[1].DecorIds, Is.EqualTo(new[] { "driftwood_01" }));
-            Assert.That(loaded.Incubators, Is.EqualTo(new[] { IncubatorModel.Simple, IncubatorModel.Luxury }));
+            Assert.That(loaded.Incubators.Select(i => i.Model), Is.EqualTo(new[] { IncubatorModel.Simple, IncubatorModel.Luxury }));
             Assert.That(loaded.Animals[0].PersonalityRevealAtUtc, Is.EqualTo(Now.AddHours(3)));
         }
+
+        [Test]
+        public void RoundTrip_KeepsEachIncubatorsStateAndStillWritesTheLegacyFields()
+        {
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+            var second = colony.AddIncubator(IncubatorModel.Standard);
+            second.SetTemperatureC = 31;
+            second.HumidityPercent = 55.5;
+            second.AppliedUntilUtc = Now.AddDays(2);
+
+            service.Save(path, colony);
+            var loaded = service.LoadOrCreate(path, Now, new Random(2));
+
+            Assert.That(loaded.Incubators, Has.Count.EqualTo(2));
+            Assert.That(loaded.Incubators[0].Id, Is.EqualTo(1));
+            Assert.That(loaded.Incubators[0].Model, Is.EqualTo(IncubatorModel.Simple));
+            Assert.That(loaded.Incubators[0].SetTemperatureC, Is.EqualTo(28));
+            Assert.That(loaded.Incubators[0].HumidityPercent, Is.EqualTo(80d));
+            Assert.That(loaded.Incubators[0].AppliedUntilUtc, Is.EqualTo(default(DateTimeOffset)));
+            Assert.That(loaded.Incubators[1].Id, Is.EqualTo(2));
+            Assert.That(loaded.Incubators[1].Model, Is.EqualTo(IncubatorModel.Standard));
+            Assert.That(loaded.Incubators[1].SetTemperatureC, Is.EqualTo(31));
+            Assert.That(loaded.Incubators[1].HumidityPercent, Is.EqualTo(55.5));
+            Assert.That(loaded.Incubators[1].AppliedUntilUtc, Is.EqualTo(Now.AddDays(2)));
+
+            var json = File.ReadAllText(path);
+            Assert.That(json, Does.Contain("\"incubators\":[\"Simple\",\"Standard\"]"));
+            Assert.That(json, Does.Contain("\"incubatorCount\":2"));
+        }
+
+        [Test]
+        public void Load_LegacyIncubatorNames_BecomeDefaultStatesWithSequentialIds()
+        {
+            File.WriteAllText(path, LegacyIncubatorFile("\"incubators\":[\"Simple\",\"Luxury\"]"));
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(colony.Incubators.Select(i => i.Id), Is.EqualTo(new[] { 1, 2 }));
+            Assert.That(colony.Incubators.Select(i => i.Model), Is.EqualTo(new[] { IncubatorModel.Simple, IncubatorModel.Luxury }));
+            Assert.That(colony.Incubators.All(i => i.SetTemperatureC == 28 && i.HumidityPercent == 80d
+                && i.AppliedUntilUtc == default(DateTimeOffset)), Is.True);
+        }
+
+        [Test]
+        public void Load_OnlyAnIncubatorCount_BecomesThatManySimpleIncubators()
+        {
+            File.WriteAllText(path, LegacyIncubatorFile("\"incubatorCount\":2"));
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(colony.Incubators.Select(i => i.Id), Is.EqualTo(new[] { 1, 2 }));
+            Assert.That(colony.Incubators.Select(i => i.Model), Is.EqualTo(new[] { IncubatorModel.Simple, IncubatorModel.Simple }));
+        }
+
+        private static string LegacyIncubatorFile(string incubatorFields) =>
+            "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":50000," +
+            "\"animals\":[{\"id\":1,\"name\":\"レオパ1\",\"sex\":\"Male\",\"weightGrams\":45.0,\"stage\":\"Adult\"," +
+            "\"hatchedAtUtc\":\"2026-09-08T00:00:00.0000000+00:00\",\"hunger\":80,\"hydration\":80,\"cleanliness\":80,\"health\":100," +
+            "\"genomeVersion\":1,\"personality\":\"Calm\",\"personalityKnown\":true}]," +
+            "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1}],\"rackCount\":1," + incubatorFields +
+            ",\"nextAnimalId\":2,\"nextCageId\":2}";
 
         [Test]
         public void AColonyWithNoAnimals_SavesAndLoads()
@@ -341,7 +402,7 @@ namespace TerrariumDays.Tests
             Assert.That(colony.Inventory.Count("plant_01"), Is.EqualTo(1));
             Assert.That(colony.Inventory.Count("water_dish_01"), Is.EqualTo(1));
             Assert.That(colony.Cages.TrueForAll(c => c.DecorIds.Count == 0), Is.True);
-            Assert.That(colony.Incubators, Is.EqualTo(new[] { IncubatorModel.Simple }));
+            Assert.That(colony.Incubators.Select(i => i.Model), Is.EqualTo(new[] { IncubatorModel.Simple }));
             Assert.That(colony.Shop.StockMonthIndex, Is.EqualTo(ShopStock.NeverStocked));
 
             service.Save(path, colony);
@@ -624,7 +685,7 @@ namespace TerrariumDays.Tests
             Assert.That(colony.Animals[0].Sex, Is.EqualTo(Sex.Female));
             Assert.That(colony.Animals[0].Stage, Is.EqualTo(GrowthStage.Baby));
             Assert.That(colony.Cages[0].Size, Is.EqualTo(CageSize.Standard));
-            Assert.That(colony.Incubators, Is.EqualTo(new[] { IncubatorModel.Simple }));
+            Assert.That(colony.Incubators.Select(i => i.Model), Is.EqualTo(new[] { IncubatorModel.Simple }));
             Assert.That(colony.Wallet.Ledger[0].Category, Is.EqualTo(LedgerCategory.Other));
         }
     }
