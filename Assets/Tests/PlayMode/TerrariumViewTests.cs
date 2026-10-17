@@ -2367,5 +2367,103 @@ namespace TerrariumDays.Tests
 
             StringAssert.Contains($"孵卵器{incubator.Id}の湿度が60%を下回りました", feedbackLabel.text, feedbackLabel.text);
         }
+
+        [Test]
+        public void FullLoop_LayMoveToIncubatorHatchAndMoveToCage_WithoutErrors()
+        {
+            view.LoadColony(CreateTempSavePath(), ShopNow, new TimeService(() => ShopNow));
+            view.WireIncubatorEvents();
+            var colony = view.Session.Colony;
+            colony.RemoveAnimal(colony.Animals[0]); // the starter baby would go Weak and crowd out messages
+            var maleCage = colony.AddCage(CageSize.Standard);
+            var male = colony.AddAnimal(new PetState
+            {
+                Name = "タロウ", Sex = Sex.Male, SexRevealed = true, Stage = GrowthStage.Adult,
+                WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30), PersonalityKnown = true,
+            }, maleCage);
+            var femaleCage = colony.AddCage(CageSize.Standard);
+            femaleCage.HasNestBox = true; // without one the eggs are Loose and dry out within one click
+            var female = colony.AddAnimal(new PetState
+            {
+                Name = "ハナ", Sex = Sex.Female, SexRevealed = true, Stage = GrowthStage.Adult,
+                WeightGrams = 55d, HatchedAtUtc = ShopNow.AddDays(-30), PersonalityKnown = true,
+            }, femaleCage);
+            Assert.That(view.Session.Breeding.StartPairing(colony, male.Id, female.Id, ShopNow, view.Session.Calendar), Is.EqualTo(PairingProblem.None));
+            colony.PairingOf(female).SuccessChance = 1d;
+
+            void KeepAnimalsCaredFor()
+            {
+                foreach (var pet in new[] { male, female })
+                {
+                    pet.Hunger = 100d;
+                    pet.Hydration = 100d;
+                    pet.Cleanliness = 100d;
+                    pet.Health = 100d;
+                }
+            }
+
+            // Same pacing as the lay test above: one click is ~15 game days, so Gravid takes a few
+            // clicks and the first clutch (21-28 game days) one or two more; the caps are generous.
+            for (var i = 0; i < 7 && female.Gravid == null; i++)
+            {
+                KeepAnimalsCaredFor();
+                view.OnDebugSimulate12HoursClicked();
+            }
+
+            for (var i = 0; i < 10 && colony.Eggs.Count == 0; i++)
+            {
+                KeepAnimalsCaredFor();
+                view.OnDebugSimulate12HoursClicked();
+            }
+
+            Assert.That(colony.EggsIn(femaleCage).Count, Is.GreaterThan(0), "precondition: an egg must be laid in the nest box");
+
+            // Move the clutch to the incubator through the cage detail's handler.
+            Assert.That(view.SelectCage(femaleCage.Id), Is.True);
+            view.Render(view.State, view.Tuning);
+            view.OnMoveEggsButtonClicked(); // the harness skips Awake, so the click handler is invoked directly
+            Assert.That(colony.EggsIn(femaleCage).Count, Is.EqualTo(0));
+            Assert.That(colony.Eggs.Count, Is.GreaterThan(0));
+            Assert.That(colony.Eggs.All(e => e.Place == EggPlace.Incubator), Is.True);
+
+            // Shortcut to just before hatching: keep one egg (so one cage is enough for the tray
+            // step), make it fertile and nearly developed. The hatch itself is the real simulation.
+            var egg = colony.Eggs[0];
+            colony.Eggs.RemoveAll(e => e != egg);
+            egg.Fertile = true;
+            egg.ChildGenotype = female.Genotype;
+            egg.DevelopmentPercent = 99.5d;
+            colony.Incubators[0].HumidityPercent = 80d; // it drifts while the incubator sat empty during the earlier clicks
+
+            // A 12-hour click is ~15 game days, enough for the dry incubator to kill the egg after it
+            // reaches 100%, so advance one game day (48 real minutes) through the real session instead.
+            KeepAnimalsCaredFor();
+            var report = view.Session.SimulateGameTime(TimeSpan.FromMinutes(48));
+
+            Assert.That(report.Incubation.Hatched.Count, Is.EqualTo(1), $"dev={egg.DevelopmentPercent} failure={egg.Failure}");
+            Assert.That(colony.Eggs.Contains(egg), Is.False);
+            var tray = colony.TrayAnimals();
+            Assert.That(tray.Count, Is.EqualTo(1));
+            var hatchling = tray[0];
+
+            // Seat the hatchling from the incubator tab's tray.
+            colony.AddCage(CageSize.Standard);
+            NavigatorOf().ShowTab(ShellTab.Incubator);
+            IncubatorViewOf().Invalidate();
+            RenderIncubator();
+            ClickIncubatorButton($"tray-move-{hatchling.Id}");
+            Assert.That(colony.CageOf(hatchling), Is.Not.Null);
+            Assert.That(colony.TrayAnimals(), Is.Empty);
+
+            var reloaded = new ColonySaveService(new CareTuning(), new EconomyTuning())
+                .LoadOrCreate(view.Session.SavePath, ShopNow, new System.Random(1));
+            var reloadedPet = reloaded.Animals.First(a => a.Id == hatchling.Id);
+            Assert.That(reloadedPet.MotherId, Is.EqualTo(female.Id));
+            Assert.That(reloadedPet.FatherId, Is.EqualTo(male.Id));
+            Assert.That(reloadedPet.CareGraceUntilUtc.HasValue, Is.True);
+            Assert.That(reloaded.CageOf(reloadedPet), Is.Not.Null);
+
+            LogAssert.NoUnexpectedReceived();
+        }
     }
 }
