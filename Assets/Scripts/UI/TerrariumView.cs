@@ -137,6 +137,7 @@ namespace TerrariumDays.UI
         private ShopView shopView;
         private LedgerView ledgerView;
         private PairingView pairingView;
+        private IncubatorView incubatorView;
         private ConfirmDialog confirmDialog;
         private Label shopMessageLabel;
         private Label cageListEmptyLabel;
@@ -206,6 +207,14 @@ namespace TerrariumDays.UI
             {
                 pairingView.StartRequested += OnPairingStartRequested;
                 pairingView.CancelRequested += OnPairingCancelRequested;
+            }
+
+            if (incubatorView != null)
+            {
+                incubatorView.TemperatureChangeRequested += OnIncubatorTemperatureChangeRequested;
+                incubatorView.WaterRequested += OnIncubatorWaterRequested;
+                incubatorView.EggTapped += OnIncubatorEggTapped;
+                incubatorView.RemoveRequested += OnIncubatorRemoveRequested;
             }
 
             homeButton.clicked += OnHomeButtonClicked;
@@ -620,6 +629,11 @@ namespace TerrariumDays.UI
                 pairingView?.ShowMessage(string.Empty);
             }
 
+            if (tab == ShellTab.Incubator)
+            {
+                incubatorView?.Invalidate();
+            }
+
             RefreshShell();
         }
 
@@ -830,6 +844,14 @@ namespace TerrariumDays.UI
                 pairingView.StartRequested -= OnPairingStartRequested;
                 pairingView.CancelRequested -= OnPairingCancelRequested;
                 pairingView.Dispose();
+            }
+
+            if (incubatorView != null)
+            {
+                incubatorView.TemperatureChangeRequested -= OnIncubatorTemperatureChangeRequested;
+                incubatorView.WaterRequested -= OnIncubatorWaterRequested;
+                incubatorView.EggTapped -= OnIncubatorEggTapped;
+                incubatorView.RemoveRequested -= OnIncubatorRemoveRequested;
             }
 
             confirmDialog?.Dispose();
@@ -1121,6 +1143,9 @@ namespace TerrariumDays.UI
             var breedingPanel = root.Q<VisualElement>("breeding-panel");
             pairingView = breedingPanel != null ? new PairingView(breedingPanel) : null;
 
+            var incubatorPanel = root.Q<VisualElement>("incubator-panel");
+            incubatorView = incubatorPanel != null ? new IncubatorView(incubatorPanel) : null;
+
             var confirmModal = root.Q<VisualElement>("confirm-modal");
             confirmDialog = new ConfirmDialog(confirmModal, root.Q<Label>("confirm-message-label"),
                 root.Q<Button>("confirm-yes-button"), root.Q<Button>("confirm-no-button"));
@@ -1317,6 +1342,11 @@ namespace TerrariumDays.UI
             if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Breeding)
             {
                 pairingView?.Render(session.Colony, session.Breeding, session.Calendar, now, session.Room);
+            }
+
+            if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Incubator)
+            {
+                incubatorView?.Render(session.Colony, session.Incubation, now, session.Room.TemperatureC, tuning);
             }
         }
 
@@ -2259,6 +2289,59 @@ namespace TerrariumDays.UI
                 }
             }
 
+            RefreshShell();
+        }
+
+        // ---- Incubator tab (phase 5 Task 15): temperature, water, egg selection and removal. ----
+
+        public void OnIncubatorTemperatureChangeRequested(Incubator incubator, int delta)
+        {
+            if (session == null || incubator == null)
+            {
+                return;
+            }
+
+            session.Incubation.SetTemperature(incubator, incubator.SetTemperatureC + delta);
+            AfterIncubatorAction();
+        }
+
+        public void OnIncubatorWaterRequested(Incubator incubator)
+        {
+            if (session == null || incubator == null)
+            {
+                return;
+            }
+
+            if (session.Incubation.AddWater(incubator))
+            {
+                ShowFeedback(IncubatorText.MoldWarning(tuning));
+            }
+
+            AfterIncubatorAction();
+        }
+
+        public void OnIncubatorEggTapped(Egg egg)
+        {
+            incubatorView?.ToggleSelection(egg);
+            RefreshShell();
+        }
+
+        public void OnIncubatorRemoveRequested(Egg egg)
+        {
+            if (session == null || egg == null || !session.Incubation.RemoveEgg(session.Colony, egg, GameNowUtc()))
+            {
+                return;
+            }
+
+            incubatorView?.ClearSelection();
+            AfterIncubatorAction();
+        }
+
+        private void AfterIncubatorAction()
+        {
+            SaveCurrentState();
+            ColonyChanged?.Invoke();
+            incubatorView?.Invalidate();
             RefreshShell();
         }
 

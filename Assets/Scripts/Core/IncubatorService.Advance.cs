@@ -58,8 +58,7 @@ namespace TerrariumDays.Core
                     var segmentEnd = boundary < targetUtc ? boundary : targetUtc;
                     var gameDays = GameCalendar.GameDaysBetween(cursor, segmentEnd);
 
-                    var temperatureRandom = BreedingRandom.For(seed, BreedingRandom.IncubatorTemperatureStream, incubator.Id, dayIndex);
-                    var realC = IncubatorRules.RealTemperature(incubator.Model, incubator.SetTemperatureC, roomC, temperatureRandom, care);
+                    var realC = RealTemperatureOnDay(colony, incubator, dayIndex, roomC);
 
                     incubator.HumidityPercent = Math.Max(0d, incubator.HumidityPercent - care.IncubatorHumidityLossPerGameDay * gameDays);
 
@@ -106,6 +105,16 @@ namespace TerrariumDays.Core
             }
 
             return report;
+        }
+
+        /// <summary>The incubator's real temperature on the game day containing <paramref name="utc"/>: the value <see cref="Advance"/> applies that day (for display).</summary>
+        public double RealTemperatureAt(Colony colony, Incubator incubator, DateTimeOffset utc, double roomC) =>
+            RealTemperatureOnDay(colony, incubator, DayIndexAt(colony.CalendarEpochUtc, utc), roomC);
+
+        private double RealTemperatureOnDay(Colony colony, Incubator incubator, int dayIndex, double roomC)
+        {
+            var random = BreedingRandom.For(colony.BreedingSeed, BreedingRandom.IncubatorTemperatureStream, incubator.Id, dayIndex);
+            return IncubatorRules.RealTemperature(incubator.Model, incubator.SetTemperatureC, roomC, random, care);
         }
 
         /// <summary>Game-day number containing <paramref name="utc"/> (day 0 starts at the epoch), robust to rounding at boundaries.</summary>

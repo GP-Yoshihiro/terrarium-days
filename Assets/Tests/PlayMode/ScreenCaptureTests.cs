@@ -418,31 +418,6 @@ namespace TerrariumDays.Tests
 
             var root = view.GetComponent<UIDocument>().rootVisualElement;
 
-            // Capture-only: seven slots in a card show six per row and the wrap to a second row.
-            var card = new VisualElement();
-            card.AddToClassList("incubator-card");
-            var grid = new VisualElement();
-            grid.AddToClassList("egg-grid");
-            for (var i = 0; i < 7; i++)
-            {
-                var slot = new VisualElement();
-                slot.AddToClassList("egg-slot");
-                slot.AddToClassList(i == 6 ? "egg-slot--empty" : "egg-slot--selected");
-                var image = new VisualElement();
-                image.AddToClassList("egg-slot__image");
-                slot.Add(image);
-                var remove = new Button { text = "取り除く" };
-                remove.AddToClassList("egg-slot__remove");
-                slot.Add(remove);
-                grid.Add(slot);
-            }
-
-            card.Add(grid);
-            var cardList = root.Q("incubator-card-list");
-            cardList.Add(card);
-            yield return new WaitForSeconds(0.3f);
-            yield return Capture(outputDir, "incubator-egg-grid");
-            cardList.Remove(card);
             root.Q<Label>("family-tree-title").text = "家系図";
             foreach (var name in new[] { "mgm", "mgf", "pgm", "pgf", "mother", "father", "self" })
             {
@@ -455,6 +430,25 @@ namespace TerrariumDays.Tests
             yield return new WaitForSeconds(0.3f);
             yield return Capture(outputDir, "family-tree-empty");
             root.Q("family-tree-modal").style.display = DisplayStyle.None;
+        }
+
+        /// <summary>
+        /// Captures the incubator tab with three debug eggs in the starter incubator into
+        /// Logs/Screens/incubator-cards.png (Task 15) to check picture, bar and buttons fit.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureIncubatorCards()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            view.Session.Colony.Eggs.Clear();
+            view.Session.Incubation.AddDebugEggs(view.Session.Colony, view.Session.GameNowUtc, 3);
+            NavigatorOf(view).ShowTab(ShellTab.Incubator);
+            yield return new WaitForSeconds(0.5f);
+            yield return Capture(outputDir, "incubator-cards");
         }
 
         /// <summary>

@@ -72,6 +72,8 @@ namespace TerrariumDays.Tests
         private Button confirmNoButton;
         private Label cageListEmptyLabel;
         private VisualElement breedingPanel;
+        private VisualElement incubatorPanel;
+        private Label incubatorEggDetail;
         private Label breedingSeasonLabel;
         private Label breedingMessageLabel;
         private ScrollView breedingList;
@@ -241,7 +243,13 @@ namespace TerrariumDays.Tests
             root.Add(ledgerPanel);
             root.Add(confirmModal);
             root.Add(cageListEmptyLabel);
+            incubatorPanel = new VisualElement { name = "incubator-panel" };
+            incubatorPanel.Add(new VisualElement { name = "incubator-card-list" });
+            incubatorEggDetail = new Label { name = "incubator-egg-detail" };
+            incubatorPanel.Add(incubatorEggDetail);
+
             root.Add(breedingPanel);
+            root.Add(incubatorPanel);
             root.Add(topBar);
             root.Add(debugButton);
             root.Add(debugPanel);
@@ -1961,6 +1969,112 @@ namespace TerrariumDays.Tests
 
             Assert.That(colony.Pairings, Is.Empty);
             StringAssert.Contains("衰弱中です", breedingMessageLabel.text);
+        }
+
+        // ---- Incubator tab (phase 5 Task 15): cards, temperature, water, candled eggs. ----
+
+        private void OpenIncubatorTab()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            NavigatorOf().ShowTab(ShellTab.Incubator);
+
+            // Awake() (skipped by this harness) wires the view's events and the tab-changed
+            // render; do the same here so the buttons and slots reach the real handlers.
+            var incubatorView = IncubatorViewOf();
+            incubatorView.TemperatureChangeRequested += view.OnIncubatorTemperatureChangeRequested;
+            incubatorView.WaterRequested += view.OnIncubatorWaterRequested;
+            incubatorView.EggTapped += view.OnIncubatorEggTapped;
+            incubatorView.RemoveRequested += view.OnIncubatorRemoveRequested;
+            RenderIncubator();
+        }
+
+        private IncubatorView IncubatorViewOf() =>
+            (IncubatorView)typeof(TerrariumView).GetField("incubatorView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+
+        private void RenderIncubator()
+        {
+            var session = view.Session;
+            IncubatorViewOf().Render(session.Colony, session.Incubation, session.GameNowUtc, session.Room.TemperatureC, new CareTuning());
+        }
+
+        private Button IncubatorButton(string name)
+        {
+            var button = incubatorPanel.Q<Button>(name);
+            Assert.That(button, Is.Not.Null, name);
+            return button;
+        }
+
+        private void ClickIncubatorButton(string name) => FindClickAction(IncubatorButton(name).clickable)();
+
+        [Test]
+        public void IncubatorTab_ShowsOneCardForTheStarterIncubator()
+        {
+            OpenIncubatorTab();
+
+            Assert.That(incubatorPanel.Query(className: "incubator-card").ToList().Count, Is.EqualTo(1));
+            var incubator = view.Session.Colony.Incubators[0];
+            Assert.That(incubatorPanel.Query<Label>().ToList().Select(l => l.text), Has.Member(IncubatorText.SetTemperature(28)));
+            Assert.That(incubatorPanel.Query(className: "egg-slot--empty").ToList().Count, Is.EqualTo(IncubatorRules.Capacity(incubator.Model)));
+        }
+
+        [Test]
+        public void IncubatorTab_PlusRaisesTheSettingAndSavesIt_AndStopsAt34()
+        {
+            OpenIncubatorTab();
+            var incubator = view.Session.Colony.Incubators[0];
+
+            ClickIncubatorButton($"incubator-{incubator.Id}-temp-up");
+
+            Assert.That(incubator.SetTemperatureC, Is.EqualTo(29));
+            var reloaded = new ColonySaveService(new CareTuning(), new EconomyTuning())
+                .LoadOrCreate(view.Session.SavePath, ShopNow, new System.Random(1));
+            Assert.That(reloaded.Incubators[0].SetTemperatureC, Is.EqualTo(29));
+
+            for (var i = 0; i < 5; i++)
+            {
+                ClickIncubatorButton($"incubator-{incubator.Id}-temp-up");
+            }
+
+            Assert.That(incubator.SetTemperatureC, Is.EqualTo(34));
+            Assert.That(IncubatorButton($"incubator-{incubator.Id}-temp-up").enabledSelf, Is.False);
+            Assert.That(IncubatorButton($"incubator-{incubator.Id}-temp-down").enabledSelf, Is.True);
+        }
+
+        [Test]
+        public void IncubatorTab_AddWaterRaisesHumidity_AndWarnsAboveTheMouldLine()
+        {
+            OpenIncubatorTab();
+            var incubator = view.Session.Colony.Incubators[0];
+            var tuning = new CareTuning();
+
+            ClickIncubatorButton($"incubator-{incubator.Id}-water");
+            Assert.That(incubator.HumidityPercent, Is.EqualTo(80d + tuning.AddWaterPercent));
+            Assert.That(incubatorPanel.Query<Label>().ToList().Select(l => l.text), Has.Member(IncubatorText.Humidity(incubator.HumidityPercent)));
+
+            incubator.HumidityPercent = tuning.HumidityMoldAbovePercent;
+            ClickIncubatorButton($"incubator-{incubator.Id}-water");
+            Assert.That(feedbackLabel.text, Is.EqualTo(IncubatorText.MoldWarning(tuning)));
+            Assert.That(incubatorPanel.Query(className: "humidity-bar--warning").ToList().Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void IncubatorTab_TappingADebugEggShowsItsDetailLine()
+        {
+            OpenIncubatorTab();
+            var colony = view.Session.Colony;
+            Assert.That(view.Session.Incubation.AddDebugEggs(colony, ShopNow, 3), Is.EqualTo(3));
+            IncubatorViewOf().Invalidate();
+            RenderIncubator();
+            var egg = colony.Eggs[0];
+
+            var slot = incubatorPanel.Q<VisualElement>($"egg-slot-{egg.Id}");
+            Assert.That(slot, Is.Not.Null);
+            // The hand-built tree has no panel, so a ClickEvent would not dispatch; raise the slot's tap event itself.
+            view.OnIncubatorEggTapped(egg);
+
+            StringAssert.StartsWith($"卵{egg.Id}：", incubatorEggDetail.text);
+            Assert.That(incubatorPanel.Query(className: "egg-slot--selected").ToList().Count, Is.EqualTo(1));
         }
     }
 }

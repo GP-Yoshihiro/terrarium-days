@@ -1353,3 +1353,30 @@
     background-color: rgba(255, 255, 255, 0.3);
     border-color: rgba(90, 62, 40, 0.3);
 }
+
+/* Incubator card rows (Task 15). */
+.incubator-temp-button {
+    width: 44px;
+    height: 36px;
+    margin: 0;
+}
+
+.incubator-temp-label {
+    flex-grow: 1;
+    flex-shrink: 1;
+    -unity-text-align: middle-center;
+}
+
+.incubator-humidity-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    height: 40px;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+}
+
+.incubator-water-button {
+    height: 36px;
+    margin: 0;
+}
