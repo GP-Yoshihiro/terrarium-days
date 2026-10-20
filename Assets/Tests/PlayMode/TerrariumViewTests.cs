@@ -2385,7 +2385,12 @@ namespace TerrariumDays.Tests
             var kind = EventSchedule.KindOf(number);
             var startMoney = colony.Wallet.Money;
 
-            // Register two animals at 1,000 yen each through the buttons.
+            // Pin the listing content so the seeded sale rolls are the same on every run.
+            first.Genotype = Genotype.Normal();
+            second.Genotype = Genotype.Normal();
+            RenderEvents();
+
+            // Register two animals at the minimum listing price each through the buttons.
             foreach (var pet in new[] { first, second })
             {
                 ClickEventButton($"event-check-{pet.Id}");
@@ -2400,7 +2405,7 @@ namespace TerrariumDays.Tests
             RenderEvents();
             Assert.That(colony.Events.Entry, Is.Not.Null);
             Assert.That(colony.Events.Entry.Listings.Count, Is.EqualTo(2));
-            Assert.That(colony.Events.Entry.Listings.All(l => l.Price == 1000L), Is.True);
+            Assert.That(colony.Events.Entry.Listings.All(l => l.Price == EventView.MinListingPrice), Is.True);
             Assert.That(colony.Wallet.Money, Is.EqualTo(startMoney - EventSchedule.BoothFee(kind)));
 
             // Save and read back: the entry and its listings survive.
@@ -2472,14 +2477,15 @@ namespace TerrariumDays.Tests
                 }
             }
 
-            // The money ledger carries the fee, the purchase and (when something sold) the sale.
+            // The money ledger carries the fee, the purchase and the sale.
             RenderLedger();
             ClickNamed("ledger-section-money");
             RenderLedger();
             var rows = ledgerList.Query<Label>(className: "ledger-row-detail-label").ToList().Select(l => l.text).ToList();
             Assert.That(rows.Any(r => r.Contains(LedgerText.CategoryLabel(LedgerCategory.BoothFee))), Is.True, "booth fee row");
             Assert.That(rows.Any(r => r.Contains(LedgerText.CategoryLabel(LedgerCategory.AnimalPurchase))), Is.True, "purchase row");
-            Assert.That(rows.Any(r => r.Contains(LedgerText.CategoryLabel(LedgerCategory.EventSale))), Is.EqualTo(summary.Sold.Count > 0), "sale row");
+            Assert.That(summary.Sold.Count, Is.GreaterThan(0), "the pinned cheap listings sell");
+            Assert.That(rows.Any(r => r.Contains(LedgerText.CategoryLabel(LedgerCategory.EventSale))), Is.True, "sale row");
             Assert.That(rows.Any(r => r.Contains(EventSchedule.NameOf(number))), Is.True, "the event name is in the notes");
 
             // Save once more: the summary stays seen and no entry is left.
