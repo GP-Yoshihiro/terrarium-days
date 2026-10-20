@@ -10,7 +10,8 @@ namespace TerrariumDays.Core
         NoEmptyCage,
         NoRackSpace,
         RackLimit,
-        InPairing
+        InPairing,
+        Listed
     }
 
     /// <summary>
@@ -125,6 +126,11 @@ namespace TerrariumDays.Core
             if (colony.PairingOf(pet) != null)
             {
                 return ShopResult.InPairing;
+            }
+
+            if (colony.Events.IsListed(pet.Id))
+            {
+                return ShopResult.Listed;
             }
 
             var pay = WholesalePriceOf(pet);

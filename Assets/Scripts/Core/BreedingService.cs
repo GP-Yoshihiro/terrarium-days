@@ -57,6 +57,11 @@ namespace TerrariumDays.Core
                 return PairingProblem.Gravid;
             }
 
+            if (colony.Events.IsListed(male.Id) || colony.Events.IsListed(female.Id))
+            {
+                return PairingProblem.Listed;
+            }
+
             return colony.PairingOf(male) != null || colony.PairingOf(female) != null
                 ? PairingProblem.AlreadyPairing
                 : PairingProblem.None;
@@ -84,6 +89,11 @@ namespace TerrariumDays.Core
             if (pet.Gravid != null)
             {
                 return PairingProblem.Gravid;
+            }
+
+            if (colony.Events.IsListed(pet.Id))
+            {
+                return PairingProblem.Listed;
             }
 
             if (colony.PairingOf(pet) != null)

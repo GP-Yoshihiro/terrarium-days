@@ -35,6 +35,8 @@ namespace TerrariumDays.UI
                     return "抱卵中です";
                 case PairingProblem.AlreadyPairing:
                     return "ペアリング中です";
+                case PairingProblem.Listed:
+                    return "出品中です";
                 default:
                     return string.Empty;
             }

@@ -15,7 +15,8 @@ namespace TerrariumDays.Core
         TooYoung,
         TooLight,
         Gravid,
-        AlreadyPairing
+        AlreadyPairing,
+        Listed
     }
 
     /// <summary>Breeding conditions and odds (§7.1–7.6). Pure: no Unity, no clock of its own.</summary>
