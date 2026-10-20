@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace TerrariumDays.Core
 {
-    /// <summary>Schema-3 save: the whole colony. JsonUtility shape (public fields, lists only).</summary>
+    /// <summary>Schema-4 save: the whole colony. JsonUtility shape (public fields, lists only).</summary>
     [Serializable]
     public sealed class ColonySaveData
     {
@@ -34,6 +34,7 @@ namespace TerrariumDays.Core
         public List<GravidSaveData> gravidStates = new List<GravidSaveData>();
         public List<EggSaveData> eggs = new List<EggSaveData>();
         public List<LineageSaveData> lineage = new List<LineageSaveData>();
+        public EventStateSaveData events = new EventStateSaveData();
     }
 
     [Serializable]
@@ -199,5 +200,89 @@ namespace TerrariumDays.Core
     public sealed class SchemaProbe
     {
         public int schemaVersion;
+    }
+
+    [Serializable]
+    public sealed class EventStateSaveData
+    {
+        public bool hasEntry;
+        public EventEntrySaveData entry = new EventEntrySaveData();
+        public bool hasSummary;
+        public EventSummarySaveData summary = new EventSummarySaveData();
+        public bool summarySeen;
+
+        /// <summary>The notice event number plus one (0 = none), so a missing field reads as none.</summary>
+        public int noticeNumberPlusOne;
+        public int noticeStage;
+    }
+
+    [Serializable]
+    public sealed class EventEntrySaveData
+    {
+        public int number;
+        public long feePaid;
+        public bool frozen;
+        public int listingSeed;
+        public int nextOfferId;
+        public List<EventListingSaveData> listings = new List<EventListingSaveData>();
+        public List<EventActionSaveData> actions = new List<EventActionSaveData>();
+        public List<EventBoothOfferSaveData> boothOffers = new List<EventBoothOfferSaveData>();
+        public List<EventAnimalLineSaveData> purchases = new List<EventAnimalLineSaveData>();
+    }
+
+    [Serializable]
+    public sealed class EventListingSaveData
+    {
+        public int animalId;
+        public long price;
+        public int tolerancePercent;
+        public long frozenBase;
+        public double frozenChance;
+
+        /// <summary>The action it sold in plus one (0 = unsold).</summary>
+        public int soldInActionPlusOne;
+    }
+
+    [Serializable]
+    public sealed class EventAnimalLineSaveData
+    {
+        public int animalId;
+        public string name;
+        public string morphLabel;
+        public long amount;
+        public int minuteOfDay;
+    }
+
+    [Serializable]
+    public sealed class EventActionSaveData
+    {
+        public int index;
+        public string kind;
+        public string playedAtUtc;
+        public int boothMinuteOfDay;
+        public List<EventAnimalLineSaveData> sales = new List<EventAnimalLineSaveData>();
+    }
+
+    [Serializable]
+    public sealed class EventBoothOfferSaveData
+    {
+        public int offerId;
+        public int actionIndex;
+        public bool hasAnimal;
+        public AnimalSaveData animal;
+        public string morphLabel;
+        public long price;
+        public bool rare;
+        public bool bought;
+    }
+
+    [Serializable]
+    public sealed class EventSummarySaveData
+    {
+        public int number;
+        public long boothFee;
+        public List<EventAnimalLineSaveData> sold = new List<EventAnimalLineSaveData>();
+        public List<EventAnimalLineSaveData> unsold = new List<EventAnimalLineSaveData>();
+        public List<EventAnimalLineSaveData> bought = new List<EventAnimalLineSaveData>();
     }
 }

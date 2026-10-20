@@ -16,10 +16,11 @@ namespace TerrariumDays.Core
         public bool Restocked { get; set; }
         public BreedingReport Breeding { get; set; } = new BreedingReport();
         public IncubationReport Incubation { get; set; } = new IncubationReport();
+        public EventReport Events { get; set; } = new EventReport();
 
         public bool HasEvents => StageUps.Count > 0 || Sheds.Count > 0 || SexReveals.Count > 0 || ElectricityCharged > 0
             || PersonalityReveals.Count > 0 || Restocked || WeakStarted.Count > 0 || WeakRecovered.Count > 0 || Breeding.HasEvents
-            || Incubation.HasEvents;
+            || Incubation.HasEvents || Events.HasEvents;
     }
 
     /// <summary>
@@ -39,6 +40,7 @@ namespace TerrariumDays.Core
         private readonly BreedingService breeding;
         private readonly IncubatorService incubation;
         private readonly Hatchery hatchery;
+        private readonly EventService events;
         private TimeService clock;
 
         public ColonySession(string savePath, TimeService clock, CareTuning care, EconomyTuning economy, System.Random random)
@@ -53,6 +55,7 @@ namespace TerrariumDays.Core
             breeding = new BreedingService(care);
             incubation = new IncubatorService(care);
             hatchery = new Hatchery(care);
+            events = new EventService(care);
         }
 
         public Colony Colony { get; private set; }
@@ -81,6 +84,8 @@ namespace TerrariumDays.Core
 
         public Hatchery Hatchery => hatchery;
 
+        public EventService Events => events;
+
         public void UseClock(TimeService newClock)
         {
             clock = newClock;
@@ -96,6 +101,7 @@ namespace TerrariumDays.Core
             Calendar = new GameCalendar(Colony.CalendarEpochUtc);
             GameNowUtc = realNow + Colony.GameClockOffset;
             var report = ApplyUntil(GameNowUtc);
+            report.Events.PendingNumber = events.PendingNumber(Colony, Calendar, GameNowUtc);
             Resync(realNow);
             if (!SaveBlocked)
             {
@@ -141,6 +147,19 @@ namespace TerrariumDays.Core
             Colony.GameClockOffset += span;
             GameNowUtc += span;
             return ApplyUntil(GameNowUtc);
+        }
+
+        /// <summary>Debug: jumps the game clock to one second past 0:00 on the entered event (or the open one).</summary>
+        public ColonyTickReport SkipToNextEventDay()
+        {
+            var number = Colony.Events.Entry?.Number ?? EventSchedule.NextOpenNumber(Calendar, GameNowUtc);
+            var target = EventSchedule.StartUtc(Calendar, number) + TimeSpan.FromSeconds(1);
+            if (target <= GameNowUtc)
+            {
+                return new ColonyTickReport();
+            }
+
+            return SimulateGameTime(target - GameNowUtc);
         }
 
         public void Save()
@@ -204,6 +223,7 @@ namespace TerrariumDays.Core
             report.Incubation = incubationReport;
             report.ElectricityCharged = BillElectricity(targetUtc);
             report.Restocked = Colony.Shop.EnsureStocked(Calendar.MonthIndexAt(targetUtc), targetUtc, care);
+            report.Events = events.Advance(Colony, Calendar, targetUtc);
             return report;
         }
 

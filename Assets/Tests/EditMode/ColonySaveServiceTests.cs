@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine.TestTools;
 using TerrariumDays.Core;
@@ -904,6 +905,218 @@ namespace TerrariumDays.Tests
             Assert.That(colony.Incubators, Has.Count.EqualTo(2));
             Assert.That(colony.Animals, Has.Count.EqualTo(1));
             Assert.That(colony.Eggs, Has.Count.EqualTo(1));
+        }
+
+        // ---- schema 4: events (phase 6, task 9) ----
+
+        private static readonly DateTimeOffset EventNow = EventTestRoom.Epoch;
+        private readonly EventService events = new EventService(new CareTuning());
+
+        private string EventsJson(Colony colony)
+        {
+            service.Save(path, colony);
+            return UnityEngine.JsonUtility.ToJson(UnityEngine.JsonUtility.FromJson<ColonySaveData>(File.ReadAllText(path)).events);
+        }
+
+        private Colony Registered(int animals, bool frozen)
+        {
+            var colony = EventTestRoom.Create(animals, out var calendar);
+            var requests = EventTestRoom.AtBaseValue(events, colony, 0);
+            requests.RemoveAt(requests.Count - 1);
+            Assert.That(events.Register(colony, calendar, 0, requests, EventNow), Is.EqualTo(EventRegisterResult.Ok));
+            if (frozen)
+            {
+                events.Advance(colony, calendar, EventSchedule.StartUtc(calendar, 0) + TimeSpan.FromMinutes(1));
+            }
+
+            return colony;
+        }
+
+        private Colony LoadAfterEdit(Colony colony, Action<ColonySaveData> edit)
+        {
+            service.Save(path, colony);
+            var data = UnityEngine.JsonUtility.FromJson<ColonySaveData>(File.ReadAllText(path));
+            edit(data);
+            File.WriteAllText(path, UnityEngine.JsonUtility.ToJson(data));
+            return service.LoadOrCreate(path, EventNow, new Random(2));
+        }
+
+        [Test]
+        public void Schema3Save_LoadsWithNoEvent()
+        {
+            File.WriteAllText(path,
+                "{\"schemaVersion\":3,\"calendarEpochUtc\":\"2026-09-20T00:00:00.0000000+00:00\",\"money\":12345," +
+                "\"ledger\":[],\"animals\":[{\"id\":1,\"name\":\"Keeper\",\"sex\":\"Female\"," +
+                "\"weightGrams\":15,\"hatchedAtUtc\":\"\",\"stage\":\"Baby\"," +
+                "\"stageUpDueAtUtc\":\"\",\"hunger\":50,\"hydration\":50,\"cleanliness\":50," +
+                "\"health\":100,\"selectedDecorId\":\"rock_01\",\"unlockedDecorIds\":[\"rock_01\"]," +
+                "\"lastSavedAtUtc\":\"\",\"lastShedAtUtc\":\"\",\"nextShedAtUtc\":\"\"}]," +
+                "\"cages\":[{\"id\":1,\"size\":\"Standard\",\"animalId\":1}]," +
+                "\"rackCount\":0,\"incubatorCount\":1,\"nextAnimalId\":2,\"nextCageId\":2," +
+                "\"lastBilledMonthIndex\":0}");
+
+            var colony = service.LoadOrCreate(path, Now, new Random(1));
+
+            Assert.That(service.LastLoadMigrated, Is.False);
+            Assert.That(File.Exists(ColonySaveService.BackupPathFor(path)), Is.False);
+            Assert.That(colony.Animals.Select(a => a.Name), Is.EqualTo(new[] { "Keeper" }));
+            Assert.That(colony.Wallet.Money, Is.EqualTo(12345));
+            Assert.That(colony.Events.Entry, Is.Null);
+            Assert.That(colony.Events.LastSummary, Is.Null);
+            Assert.That(colony.Events.LastSummarySeen, Is.True);
+            Assert.That(colony.Events.NoticeNumber, Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void EventBeforeTheDay_RoundTrips()
+        {
+            var colony = Registered(3, frozen: false);
+            var before = EventsJson(colony);
+
+            var loaded = service.LoadOrCreate(path, EventNow, new Random(2));
+
+            Assert.That(loaded.Events.Entry.Listings, Has.Count.EqualTo(2));
+            Assert.That(loaded.Events.Entry.Frozen, Is.False);
+            Assert.That(EventsJson(loaded), Is.EqualTo(before));
+        }
+
+        [Test]
+        public void EventMidDay_RoundTrips()
+        {
+            var colony = Registered(3, frozen: true);
+            var calendar = new GameCalendar(colony.CalendarEpochUtc);
+            var day = EventSchedule.StartUtc(calendar, 0) + TimeSpan.FromMinutes(1);
+            Assert.That(events.PlayAction(colony, calendar, EventActionKind.Serve, day, out _), Is.EqualTo(EventActionResult.Ok));
+            for (var i = 0; i < 4 && colony.Events.Entry.BoothOffers.Count == 0; i++)
+            {
+                events.PlayAction(colony, calendar, EventActionKind.Browse, day + TimeSpan.FromMinutes(i + 1), out _);
+            }
+
+            colony.AddCage(CageSize.Standard);
+            var offer = colony.Events.Entry.BoothOffers.Find(o => !o.Bought);
+            Assert.That(offer, Is.Not.Null, "browsing should show a booth animal");
+            Assert.That(events.Buy(colony, offer.OfferId, day + TimeSpan.FromMinutes(9)), Is.EqualTo(EventBuyResult.Ok));
+            colony.Events.NoticeNumber = 0;
+            colony.Events.NoticeStage = 2;
+            var before = EventsJson(colony);
+
+            var loaded = service.LoadOrCreate(path, EventNow, new Random(2));
+
+            Assert.That(loaded.Events.Entry.Frozen, Is.True);
+            Assert.That(loaded.Events.Entry.Actions.Count, Is.GreaterThanOrEqualTo(2));
+            Assert.That(loaded.Events.Entry.Purchases, Has.Count.EqualTo(1));
+            Assert.That(loaded.Events.NoticeNumber, Is.EqualTo(0));
+            Assert.That(loaded.Events.NoticeStage, Is.EqualTo(2));
+            Assert.That(EventsJson(loaded), Is.EqualTo(before));
+        }
+
+        [Test]
+        public void EventSummaryOnly_RoundTripsWithItsUnreadFlag()
+        {
+            var colony = Colony.CreateNew(Now, economy, care, new Random(1));
+            colony.Events.LastSummary = new EventSummary
+            {
+                Number = 3,
+                BoothFee = 10000,
+                Sold = { new EventAnimalLine { AnimalId = 4, Name = "A", MorphLabel = "ノーマル", Amount = 8000, MinuteOfDay = 650 } },
+                Unsold = { new EventAnimalLine { AnimalId = 5, Name = "B", MorphLabel = "ハイポ", Amount = 0 } },
+                Bought = { new EventAnimalLine { AnimalId = 9, Name = "C", MorphLabel = "ノーマル", Amount = 3000, MinuteOfDay = 700 } },
+            };
+            colony.Events.LastSummarySeen = false;
+            var before = EventsJson(colony);
+
+            var loaded = service.LoadOrCreate(path, Now, new Random(2));
+
+            Assert.That(loaded.Events.Entry, Is.Null);
+            Assert.That(loaded.Events.LastSummarySeen, Is.False);
+            Assert.That(loaded.Events.LastSummary.Net, Is.EqualTo(8000 - 3000 - 10000));
+            Assert.That(EventsJson(loaded), Is.EqualTo(before));
+        }
+
+        [Test]
+        public void EventEntry_NegativeNumberIsDropped()
+        {
+            var loaded = LoadAfterEdit(Registered(3, false), d => d.events.entry.number = -1);
+
+            Assert.That(loaded.Events.Entry, Is.Null);
+        }
+
+        [Test]
+        public void EventListing_MissingAnimalIsDropped()
+        {
+            var loaded = LoadAfterEdit(Registered(3, false), d => d.events.entry.listings[0].animalId = 9999);
+
+            Assert.That(loaded.Events.Entry.Listings, Has.Count.EqualTo(1));
+            Assert.That(loaded.Events.Entry.Listings[0].AnimalId, Is.Not.EqualTo(9999));
+        }
+
+        [Test]
+        public void EventListing_BadPriceToleranceAndDuplicateAreDropped()
+        {
+            var loaded = LoadAfterEdit(Registered(4, false), d =>
+            {
+                d.events.entry.listings[0].price = 0;
+                d.events.entry.listings[1].tolerancePercent = 3;
+                d.events.entry.listings.Add(UnityEngine.JsonUtility.FromJson<EventListingSaveData>(UnityEngine.JsonUtility.ToJson(d.events.entry.listings[2])));
+            });
+
+            Assert.That(loaded.Events.Entry.Listings, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void EventListing_MoreThanTheMaximumIsCut()
+        {
+            var loaded = LoadAfterEdit(Registered(3, false), d =>
+            {
+                d.events.entry.number = 1; // a small event: at most 5
+                for (var i = 0; i < 8; i++)
+                {
+                    d.events.entry.listings.Add(new EventListingSaveData { animalId = d.animals[0].id, price = 5000 });
+                }
+            });
+
+            Assert.That(loaded.Events.Entry.Listings.Count, Is.LessThanOrEqualTo(EventSchedule.MaxListings(EventKind.Small)));
+        }
+
+        [Test]
+        public void EventActions_ExtraAreCutAndUnknownKindBecomesServe()
+        {
+            var colony = Registered(3, true);
+            var loaded = LoadAfterEdit(colony, d =>
+            {
+                for (var i = 0; i < 10; i++)
+                {
+                    d.events.entry.actions.Add(new EventActionSaveData { index = 99, kind = i == 0 ? "???" : "Browse", playedAtUtc = "" });
+                }
+            });
+
+            var actions = loaded.Events.Entry.Actions;
+            Assert.That(actions, Has.Count.EqualTo(EventSchedule.ActionCount(EventKind.Big)));
+            Assert.That(actions[0].Kind, Is.EqualTo(EventActionKind.Serve));
+            Assert.That(actions.Select(a => a.Index), Is.EqualTo(Enumerable.Range(0, actions.Count)));
+        }
+
+        [Test]
+        public void EventBoothOffer_WithoutAnAnimalIsDroppedUnlessBought()
+        {
+            var loaded = LoadAfterEdit(Registered(3, true), d =>
+            {
+                d.events.entry.nextOfferId = 1;
+                d.events.entry.boothOffers.Add(new EventBoothOfferSaveData { offerId = 4, hasAnimal = false, price = 1000 });
+                d.events.entry.boothOffers.Add(new EventBoothOfferSaveData { offerId = 7, hasAnimal = false, price = 1000, bought = true });
+            });
+
+            var offers = loaded.Events.Entry.BoothOffers;
+            Assert.That(offers.Select(o => o.OfferId), Is.EqualTo(new[] { 7 }));
+            Assert.That(loaded.Events.Entry.NextOfferId, Is.EqualTo(8));
+        }
+
+        [Test]
+        public void EventNoticeStage_IsClamped()
+        {
+            var loaded = LoadAfterEdit(Registered(3, false), d => d.events.noticeStage = 9);
+
+            Assert.That(loaded.Events.NoticeStage, Is.EqualTo(2));
         }
     }
 }

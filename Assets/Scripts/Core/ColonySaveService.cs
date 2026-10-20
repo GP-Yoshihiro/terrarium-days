@@ -13,7 +13,7 @@ namespace TerrariumDays.Core
     /// </summary>
     public sealed class ColonySaveService
     {
-        public const int CurrentSchemaVersion = 3;
+        public const int CurrentSchemaVersion = 4;
         public const int CurrentGenomeVersion = 1;
         public const int CurrentInventoryVersion = 1;
         private const string TimestampFormat = "o";
@@ -77,7 +77,8 @@ namespace TerrariumDays.Core
                     throw new InvalidDataException("No schema version and not a schema-1 pet save.");
                 }
 
-                if (probe.schemaVersion >= CurrentSchemaVersion)
+                // Schema 3 loads here too: it only lacks the events field (read as no entry).
+                if (probe.schemaVersion >= 3)
                 {
                     return FromSaveData(JsonUtility.FromJson<ColonySaveData>(json), nowUtc, random);
                 }
@@ -443,6 +444,8 @@ namespace TerrariumDays.Core
                 }
             }
 
+            colony.Events = EventsFromSaveData(data.events, colony, nowUtc, random);
+
             var maxAnimalId = Math.Max(
                 colony.Animals.Count > 0 ? colony.Animals.Max(a => a.Id) : 0,
                 colony.Lineage.Count > 0 ? colony.Lineage.Max(r => r.Id) : 0);
@@ -453,6 +456,296 @@ namespace TerrariumDays.Core
             colony.NextEggId = Math.Max(1, Math.Max(data.nextEggId, maxEggId + 1));
 
             return colony;
+        }
+
+        private static EventStateSaveData EventsToSaveData(EventState events)
+        {
+            var data = new EventStateSaveData
+            {
+                summarySeen = events.LastSummarySeen,
+                noticeNumberPlusOne = events.NoticeNumber + 1,
+                noticeStage = events.NoticeStage,
+            };
+            var entry = events.Entry;
+            if (entry != null)
+            {
+                data.hasEntry = true;
+                data.entry = new EventEntrySaveData
+                {
+                    number = entry.Number,
+                    feePaid = entry.FeePaid,
+                    frozen = entry.Frozen,
+                    listingSeed = entry.ListingSeed,
+                    nextOfferId = entry.NextOfferId,
+                };
+                foreach (var l in entry.Listings)
+                {
+                    data.entry.listings.Add(new EventListingSaveData
+                    {
+                        animalId = l.AnimalId,
+                        price = l.Price,
+                        tolerancePercent = l.TolerancePercent,
+                        frozenBase = l.FrozenBase,
+                        frozenChance = l.FrozenChance,
+                        soldInActionPlusOne = l.SoldInAction + 1,
+                    });
+                }
+
+                foreach (var a in entry.Actions)
+                {
+                    var action = new EventActionSaveData
+                    {
+                        index = a.Index,
+                        kind = a.Kind.ToString(),
+                        playedAtUtc = Format(a.PlayedAtUtc),
+                        boothMinuteOfDay = a.BoothMinuteOfDay,
+                    };
+                    foreach (var line in a.Sales)
+                    {
+                        action.sales.Add(LineToSaveData(line));
+                    }
+
+                    data.entry.actions.Add(action);
+                }
+
+                foreach (var o in entry.BoothOffers)
+                {
+                    data.entry.boothOffers.Add(new EventBoothOfferSaveData
+                    {
+                        offerId = o.OfferId,
+                        actionIndex = o.ActionIndex,
+                        hasAnimal = o.Animal != null,
+                        animal = o.Animal != null ? ToAnimalSaveData(o.Animal) : null,
+                        morphLabel = o.MorphLabel,
+                        price = o.Price,
+                        rare = o.Rare,
+                        bought = o.Bought,
+                    });
+                }
+
+                foreach (var line in entry.Purchases)
+                {
+                    data.entry.purchases.Add(LineToSaveData(line));
+                }
+            }
+
+            var summary = events.LastSummary;
+            if (summary != null)
+            {
+                data.hasSummary = true;
+                data.summary = new EventSummarySaveData { number = summary.Number, boothFee = summary.BoothFee };
+                foreach (var line in summary.Sold)
+                {
+                    data.summary.sold.Add(LineToSaveData(line));
+                }
+
+                foreach (var line in summary.Unsold)
+                {
+                    data.summary.unsold.Add(LineToSaveData(line));
+                }
+
+                foreach (var line in summary.Bought)
+                {
+                    data.summary.bought.Add(LineToSaveData(line));
+                }
+            }
+
+            return data;
+        }
+
+        private static EventAnimalLineSaveData LineToSaveData(EventAnimalLine line) => new EventAnimalLineSaveData
+        {
+            animalId = line.AnimalId,
+            name = line.Name,
+            morphLabel = line.MorphLabel,
+            amount = line.Amount,
+            minuteOfDay = line.MinuteOfDay,
+        };
+
+        private static EventAnimalLine LineFromSaveData(EventAnimalLineSaveData d) => new EventAnimalLine
+        {
+            AnimalId = d.animalId,
+            Name = d.name ?? string.Empty,
+            MorphLabel = d.morphLabel ?? string.Empty,
+            Amount = d.amount,
+            MinuteOfDay = d.minuteOfDay,
+        };
+
+        private static List<EventAnimalLine> LinesFromSaveData(List<EventAnimalLineSaveData> list)
+        {
+            var lines = new List<EventAnimalLine>();
+            if (list != null)
+            {
+                foreach (var d in list)
+                {
+                    if (d != null)
+                    {
+                        lines.Add(LineFromSaveData(d));
+                    }
+                }
+            }
+
+            return lines;
+        }
+
+        /// <summary>Bad parts are dropped, never thrown (phase 6 decision 23); an old save has the empty default and reads as no entry.</summary>
+        private EventState EventsFromSaveData(EventStateSaveData data, Colony colony, DateTimeOffset nowUtc, System.Random random)
+        {
+            var events = new EventState();
+            if (data == null)
+            {
+                return events;
+            }
+
+            events.NoticeNumber = data.noticeNumberPlusOne - 1;
+            if (events.NoticeNumber < -1)
+            {
+                events.NoticeNumber = -1;
+            }
+
+            events.NoticeStage = Math.Max(0, Math.Min(2, data.noticeStage));
+            if (data.hasSummary && data.summary != null)
+            {
+                events.LastSummary = new EventSummary
+                {
+                    Number = data.summary.number,
+                    BoothFee = data.summary.boothFee,
+                    Sold = LinesFromSaveData(data.summary.sold),
+                    Unsold = LinesFromSaveData(data.summary.unsold),
+                    Bought = LinesFromSaveData(data.summary.bought),
+                };
+                events.LastSummarySeen = data.summarySeen;
+            }
+            else
+            {
+                events.LastSummarySeen = true;
+            }
+
+            if (data.hasEntry && data.entry != null && data.entry.number >= 0)
+            {
+                events.Entry = EntryFromSaveData(data.entry, colony, nowUtc, random);
+            }
+
+            return events;
+        }
+
+        private EventEntry EntryFromSaveData(EventEntrySaveData d, Colony colony, DateTimeOffset nowUtc, System.Random random)
+        {
+            var kind = EventSchedule.KindOf(d.number);
+            var entry = new EventEntry
+            {
+                Number = d.number,
+                FeePaid = d.feePaid,
+                Frozen = d.frozen,
+                ListingSeed = d.listingSeed,
+            };
+
+            var seen = new HashSet<int>();
+            var maxListings = EventSchedule.MaxListings(kind);
+            if (d.listings != null)
+            {
+                foreach (var l in d.listings)
+                {
+                    if (l == null)
+                    {
+                        continue;
+                    }
+
+                    if (!d.frozen)
+                    {
+                        if (colony.AnimalById(l.animalId) == null
+                            || seen.Contains(l.animalId)
+                            || l.price < EventService.MinPrice
+                            || !EventOdds.IsValidTolerance(l.tolerancePercent)
+                            || entry.Listings.Count >= maxListings)
+                        {
+                            continue;
+                        }
+                    }
+
+                    seen.Add(l.animalId);
+                    entry.Listings.Add(new EventListing
+                    {
+                        AnimalId = l.animalId,
+                        Price = l.price,
+                        TolerancePercent = l.tolerancePercent,
+                        FrozenBase = l.frozenBase,
+                        FrozenChance = l.frozenChance,
+                        SoldInAction = l.soldInActionPlusOne - 1,
+                    });
+                }
+            }
+
+            if (d.actions != null)
+            {
+                var actionCount = EventSchedule.ActionCount(kind);
+                foreach (var a in d.actions)
+                {
+                    if (a == null || entry.Actions.Count >= actionCount)
+                    {
+                        continue;
+                    }
+
+                    entry.Actions.Add(new EventActionRecord
+                    {
+                        Index = entry.Actions.Count,
+                        Kind = TryParseDefined(a.kind, out EventActionKind actionKind) ? actionKind : EventActionKind.Serve,
+                        PlayedAtUtc = TryParseTime(a.playedAtUtc) ?? nowUtc,
+                        BoothMinuteOfDay = a.boothMinuteOfDay,
+                        Sales = LinesFromSaveData(a.sales),
+                    });
+                }
+            }
+
+            if (d.boothOffers != null)
+            {
+                foreach (var o in d.boothOffers)
+                {
+                    if (o == null)
+                    {
+                        continue;
+                    }
+
+                    PetState animal = null;
+                    if (o.hasAnimal && o.animal != null)
+                    {
+                        try
+                        {
+                            animal = FromAnimalSaveData(o.animal, nowUtc, random, owned: false);
+                        }
+                        catch (Exception)
+                        {
+                            animal = null;
+                        }
+                    }
+
+                    if (animal == null && !o.bought)
+                    {
+                        continue;
+                    }
+
+                    entry.BoothOffers.Add(new EventBoothOffer
+                    {
+                        OfferId = o.offerId,
+                        ActionIndex = o.actionIndex,
+                        Animal = o.bought ? null : animal,
+                        MorphLabel = o.morphLabel ?? string.Empty,
+                        Price = o.price,
+                        Rare = o.rare,
+                        Bought = o.bought,
+                    });
+                }
+            }
+
+            var maxOfferId = 0;
+            foreach (var o in entry.BoothOffers)
+            {
+                maxOfferId = Math.Max(maxOfferId, o.OfferId);
+            }
+
+            entry.NextOfferId = Math.Max(1, Math.Max(d.nextOfferId, maxOfferId + 1));
+            entry.Purchases = LinesFromSaveData(d.purchases);
+            return entry;
         }
 
         private static void MoveUnlockedDecorToInventory(Colony colony, List<string> unlockedDecorIds)
@@ -593,6 +886,8 @@ namespace TerrariumDays.Core
             {
                 data.shopOffers.Add(new ShopOfferSaveData { offerId = offer.OfferId, animal = ToAnimalSaveData(offer.Animal) });
             }
+
+            data.events = EventsToSaveData(colony.Events);
 
             foreach (var p in colony.Pairings)
             {

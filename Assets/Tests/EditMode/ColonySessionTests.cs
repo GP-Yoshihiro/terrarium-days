@@ -497,5 +497,99 @@ namespace TerrariumDays.Tests
 
             Assert.That(egg.DevelopmentPercent, Is.EqualTo(referenceEgg.DevelopmentPercent).Within(1e-9));
         }
+
+        [Test]
+        public void SkipToNextEventDay_AfterRegistering_FreezesTheEnteredEvent()
+        {
+            var session = NewSession();
+            session.Load();
+            var number = EventSchedule.NextOpenNumber(session.Calendar, session.GameNowUtc);
+            Assert.That(session.Events.Register(session.Colony, session.Calendar, number, new System.Collections.Generic.List<ListingRequest>(), session.GameNowUtc),
+                Is.EqualTo(EventRegisterResult.Ok));
+
+            var report = session.SkipToNextEventDay();
+
+            Assert.That(report.Events.DayStartedNumber, Is.EqualTo(number));
+            Assert.That(session.Colony.Events.Entry.Frozen, Is.True);
+            Assert.That(session.GameNowUtc, Is.EqualTo(EventSchedule.StartUtc(session.Calendar, number) + TimeSpan.FromSeconds(1)));
+        }
+
+        [Test]
+        public void SkipToNextEventDay_WithoutAnEntry_GoesToOneSecondPastTheOpenEventsStart()
+        {
+            var session = NewSession();
+            session.Load();
+            var number = EventSchedule.NextOpenNumber(session.Calendar, session.GameNowUtc);
+
+            session.SkipToNextEventDay();
+
+            Assert.That(session.GameNowUtc, Is.EqualTo(EventSchedule.StartUtc(session.Calendar, number) + TimeSpan.FromSeconds(1)));
+            Assert.That(session.Colony.Events.Entry, Is.Null);
+        }
+
+        [Test]
+        public void Load_AfterTheEnteredEventsDayIsOver_ReportsItAsPending()
+        {
+            var first = NewSession();
+            first.Load();
+            var number = EventSchedule.NextOpenNumber(first.Calendar, first.GameNowUtc);
+            first.Events.Register(first.Colony, first.Calendar, number, new System.Collections.Generic.List<ListingRequest>(), first.GameNowUtc);
+            first.Save();
+
+            realNow = EventSchedule.EndUtc(first.Calendar, number) + TimeSpan.FromMinutes(5);
+            var second = NewSession();
+            var report = second.Load();
+
+            Assert.That(report.Events.PendingNumber, Is.EqualTo(number));
+        }
+
+        [Test]
+        public void PlayAction_AfterSaveAndReload_GivesTheSameResultAsWithoutReloading()
+        {
+            string Play(bool reload)
+            {
+                var session = NewSession();
+                session.Load();
+                var number = EventSchedule.NextOpenNumber(session.Calendar, session.GameNowUtc);
+                var listings = new System.Collections.Generic.List<ListingRequest>();
+                foreach (var pet in session.Colony.Animals)
+                {
+                    listings.Add(new ListingRequest { AnimalId = pet.Id, Price = session.Events.BaseValueOf(session.Colony, pet, number) });
+                }
+
+                Assert.That(session.Events.Register(session.Colony, session.Calendar, number, listings, session.GameNowUtc), Is.EqualTo(EventRegisterResult.Ok));
+                session.SkipToNextEventDay();
+                session.Save();
+                if (reload)
+                {
+                    session = NewSession();
+                    session.Load();
+                }
+
+                var text = new System.Text.StringBuilder();
+                foreach (var kind in new[] { EventActionKind.Serve, EventActionKind.Browse, EventActionKind.Serve })
+                {
+                    session.Events.PlayAction(session.Colony, session.Calendar, kind, session.GameNowUtc, out var record);
+                    text.Append(record.Kind).Append('|').Append(record.BoothMinuteOfDay).Append('|');
+                    foreach (var sale in record.Sales)
+                    {
+                        text.Append(sale.AnimalId).Append(':').Append(sale.Amount).Append(';');
+                    }
+                }
+
+                foreach (var offer in session.Colony.Events.Entry?.BoothOffers ?? new System.Collections.Generic.List<EventBoothOffer>())
+                {
+                    text.Append(offer.OfferId).Append(':').Append(offer.Price).Append(',');
+                }
+
+                return text.Append(session.Colony.Wallet.Money).ToString();
+            }
+
+            var straight = Play(reload: false);
+            File.Delete(path);
+            var reloaded = Play(reload: true);
+
+            Assert.That(reloaded, Is.EqualTo(straight));
+        }
     }
 }
