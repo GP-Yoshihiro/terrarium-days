@@ -2640,3 +2640,659 @@ namespace TerrariumDays.Core
 git add Assets/Scripts/Core/EventService.Day.cs* Assets/Tests/EditMode/EventDayTests.cs*
 git commit -m "Add the event day: actions, booth purchases and the summary"
 ```
+
+---
+
+### Task 7: イベントの文字と演出の台本（transcriber）
+
+**Files:**
+- Create: `Assets/Scripts/UI/EventText.cs`
+- Create: `Assets/Scripts/UI/EventReplay.cs`
+- Test: `Assets/Tests/EditMode/EventTextTests.cs`
+
+**Produces（Task 12〜14 が使う）:** `EventText`（金額・時刻・通知の文・ログの行・失敗の文・確認の文）と `EventReplay`（`DurationSeconds`・`Script`・`RevealedCount`・`ReplayLine`）。どちらも `TerrariumDays.UI` の名前空間（`BreedingText`・`ShopText` と同じ置き場所。テストのアセンブリは `TerrariumDays.Runtime` を参照しているので UI の型も見える）。
+
+- [ ] **Step 1: テストを書く**
+
+```csharp
+using System.Collections.Generic;
+using NUnit.Framework;
+using TerrariumDays.Core;
+using TerrariumDays.UI;
+
+namespace TerrariumDays.Tests
+{
+    public sealed class EventTextTests
+    {
+        private const string Spring = "ジャパン・レプタイルズ・フェスタ（春）";
+        private const string Marche = "レプタイル・マルシェ";
+
+        private static EventAnimalLine Sale(int minute, long amount, string label = "レイプター♀") =>
+            new EventAnimalLine { AnimalId = minute, Name = "ハナ", MorphLabel = label, Amount = amount, MinuteOfDay = minute };
+
+        [Test]
+        public void Yen_UsesTheEn()
+        {
+            Assert.That(EventText.Yen(28500), Is.EqualTo("28,500円"));
+            Assert.That(EventText.Yen(0), Is.EqualTo("0円"));
+            Assert.That(EventText.Yen(1234567), Is.EqualTo("1,234,567円"));
+        }
+
+        [Test]
+        public void SignedYen_ShowsThePlusOrMinus()
+        {
+            Assert.That(EventText.SignedYen(12000), Is.EqualTo("+12,000円"));
+            Assert.That(EventText.SignedYen(0), Is.EqualTo("0円"));
+            Assert.That(EventText.SignedYen(-3000), Is.EqualTo("−3,000円"));
+        }
+
+        [Test]
+        public void Clock_IsHoursAndMinutes()
+        {
+            Assert.That(EventText.Clock(600), Is.EqualTo("10:00"));
+            Assert.That(EventText.Clock(684), Is.EqualTo("11:24"));
+            Assert.That(EventText.Clock(1019), Is.EqualTo("16:59"));
+        }
+
+        [Test]
+        public void Notices_MatchThePlannedWording()
+        {
+            Assert.That(EventText.DeadlineNotice(1, 3), Is.EqualTo(Marche + "（5月15日）の申し込みはあと3日で締め切りです"));
+            Assert.That(EventText.DeadlineNotice(0, 1), Is.EqualTo(Spring + "の申し込みは今日までです"));
+            Assert.That(EventText.DayStartedNotice(0), Is.EqualTo("今日は" + Spring + "です。イベントタブで遊べます"));
+            Assert.That(EventText.PendingNotice(0), Is.EqualTo(Spring + "の続きがあります（イベントタブ）"));
+            Assert.That(EventText.WithdrawnNotice(new[] { "ハナ", "タロウ" }), Is.EqualTo("出品を取り消しました：ハナ、タロウ"));
+        }
+
+        [Test]
+        public void NoticesOf_ListsTheReportInAFixedOrder()
+        {
+            var report = new EventReport { DeadlineNoticeNumber = 1, DeadlineDaysLeft = 3, DayStartedNumber = 0, PendingNumber = 0 };
+            report.Withdrawn.Add("ハナ");
+
+            Assert.That(EventText.NoticesOf(report), Is.EqualTo(new[]
+            {
+                "出品を取り消しました：ハナ",
+                "今日は" + Spring + "です。イベントタブで遊べます",
+                Spring + "の続きがあります（イベントタブ）",
+                Marche + "（5月15日）の申し込みはあと3日で締め切りです",
+            }));
+            Assert.That(EventText.NoticesOf(new EventReport()), Is.Empty);
+        }
+
+        [Test]
+        public void LogLines_MatchTheSpecExample()
+        {
+            Assert.That(EventText.SaleLine(Sale(684, 28500)), Is.EqualTo("11:24 レイプター♀ 売約（28,500円）"));
+            Assert.That(EventText.BoothLine(705, 2), Is.EqualTo("11:45 他のブースで売り物を2匹見つけた"));
+            Assert.That(EventText.NoSaleLine(652), Is.EqualTo("10:52 売約はなかった"));
+            Assert.That(EventText.OfferLine(new EventBoothOffer { MorphLabel = "ハイポ?", Price = 8000 }), Is.EqualTo("ハイポ? 8,000円"));
+            Assert.That(EventText.OfferLine(new EventBoothOffer { MorphLabel = "マックスノー ベル♂", Price = 120000, Rare = true }),
+                Is.EqualTo("掘り出し物！ マックスノー ベル♂ 120,000円"));
+        }
+
+        [Test]
+        public void Labels_ForThePreparationScreen()
+        {
+            Assert.That(EventText.Chance(0.754d), Is.EqualTo("売れる見込み 75%"));
+            Assert.That(EventText.Tolerance(0), Is.EqualTo("値引きしない"));
+            Assert.That(EventText.Tolerance(15), Is.EqualTo("15%まで値引き"));
+            Assert.That(EventText.ExpectedTotal(12345.6d), Is.EqualTo("期待値の合計 12,346円"));
+            Assert.That(EventText.ActionsLeft(3, 8), Is.EqualTo("残りの行動 3/8"));
+            Assert.That(EventText.Listings(2, 5), Is.EqualTo("出品 2/5匹"));
+        }
+
+        [Test]
+        public void FailureMessages_CoverEveryRefusal()
+        {
+            foreach (EventRegisterResult result in System.Enum.GetValues(typeof(EventRegisterResult)))
+            {
+                Assert.That(EventText.RegisterFailure(result), result == EventRegisterResult.Ok ? Is.Empty : Is.Not.Empty, result.ToString());
+            }
+
+            foreach (EventBuyResult result in System.Enum.GetValues(typeof(EventBuyResult)))
+            {
+                Assert.That(EventText.BuyFailure(result), result == EventBuyResult.Ok ? Is.Empty : Is.Not.Empty, result.ToString());
+            }
+
+            Assert.That(EventText.BuyFailure(EventBuyResult.NoEmptyCage), Is.EqualTo("ケージが足りません"));
+            Assert.That(EventText.BuyFailure(EventBuyResult.NotEnoughMoney), Is.EqualTo("所持金が足りません"));
+            Assert.That(EventText.RegisterFailure(EventRegisterResult.NotEnoughMoney), Is.EqualTo("出店料が足りません"));
+        }
+
+        [Test]
+        public void Confirmations()
+        {
+            Assert.That(EventText.ConfirmRegister(0), Is.EqualTo(Spring + "に申し込みますか？（出店料 10,000円・取り消せません）"));
+            Assert.That(EventText.ConfirmBuy(new EventBoothOffer { MorphLabel = "ハイポ?", Price = 8000 }), Is.EqualTo("ハイポ?を8,000円で買いますか？"));
+        }
+
+        [Test]
+        public void Duration_GrowsWithTheEventsUpToFifteenSeconds()
+        {
+            Assert.That(EventReplay.DurationSeconds(0), Is.EqualTo(10d));
+            Assert.That(EventReplay.DurationSeconds(2), Is.EqualTo(13d));
+            Assert.That(EventReplay.DurationSeconds(9), Is.EqualTo(15d));
+        }
+
+        [Test]
+        public void Script_ServeWithSales_ListsThemInTimeOrder()
+        {
+            var record = new EventActionRecord { Index = 1, Kind = EventActionKind.Serve };
+            record.Sales.Add(Sale(700, 9000));
+            record.Sales.Add(Sale(720, 28500, "ハイポ♂"));
+
+            var lines = EventReplay.Script(record, new List<EventBoothOffer>(), 8);
+
+            Assert.That(lines.Count, Is.EqualTo(3));
+            Assert.That(lines[0].Text, Is.EqualTo("10:52 接客を始めた"));
+            Assert.That(lines[0].Highlight, Is.False);
+            Assert.That(lines[1].Text, Is.EqualTo("11:40 レイプター♀ 売約（9,000円）"));
+            Assert.That(lines[1].Bubble, Is.EqualTo(EventReplay.SaleBubble));
+            Assert.That(lines[1].Highlight, Is.True);
+            Assert.That(lines[2].MinuteOfDay, Is.EqualTo(720));
+            Assert.That(EventReplay.EventCount(record, new List<EventBoothOffer>()), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Script_ServeWithoutSales_SaysSo()
+        {
+            var record = new EventActionRecord { Index = 0, Kind = EventActionKind.Serve };
+
+            var lines = EventReplay.Script(record, new List<EventBoothOffer>(), 8);
+
+            Assert.That(lines.Count, Is.EqualTo(2));
+            Assert.That(lines[1].Text, Is.EqualTo("10:51 売約はなかった"));
+        }
+
+        [Test]
+        public void Script_Browse_ShowsOnlyThisActionsOffers()
+        {
+            var record = new EventActionRecord { Index = 2, Kind = EventActionKind.Browse, BoothMinuteOfDay = 731 };
+            record.Sales.Add(Sale(710, 9000));
+            var offers = new List<EventBoothOffer>
+            {
+                new EventBoothOffer { OfferId = 1, ActionIndex = 0, MorphLabel = "ハイポ?", Price = 8000 },
+                new EventBoothOffer { OfferId = 2, ActionIndex = 2, MorphLabel = "ノーマル♀", Price = 6000 },
+                new EventBoothOffer { OfferId = 3, ActionIndex = 2, MorphLabel = "マックスノー ベル♂", Price = 120000, Rare = true },
+            };
+
+            var lines = EventReplay.Script(record, offers, 8);
+
+            Assert.That(lines.Count, Is.EqualTo(5));
+            Assert.That(lines[0].Text, Is.EqualTo("11:45 他のブースを見に行った"));
+            Assert.That(lines[1].Text, Is.EqualTo("11:50 レイプター♀ 売約（9,000円）"));
+            Assert.That(lines[2].Text, Is.EqualTo("12:11 他のブースで売り物を2匹見つけた"));
+            Assert.That(lines[3].Text, Is.EqualTo("ノーマル♀ 6,000円"));
+            Assert.That(lines[3].OfferId, Is.EqualTo(2));
+            Assert.That(lines[4].Highlight, Is.True);
+            Assert.That(lines[4].Bubble, Is.EqualTo(EventReplay.RareBubble));
+            Assert.That(EventReplay.EventCount(record, offers), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void RevealedCount_ShowsTheFirstLineAtOnceAndAllAtTheEnd()
+        {
+            Assert.That(EventReplay.RevealedCount(4, -1d, 12d), Is.EqualTo(0));
+            Assert.That(EventReplay.RevealedCount(4, 0d, 12d), Is.EqualTo(1));
+            Assert.That(EventReplay.RevealedCount(4, 2.9d, 12d), Is.EqualTo(1));
+            Assert.That(EventReplay.RevealedCount(4, 3d, 12d), Is.EqualTo(2));
+            Assert.That(EventReplay.RevealedCount(4, 11.9d, 12d), Is.EqualTo(4));
+            Assert.That(EventReplay.RevealedCount(4, 99d, 12d), Is.EqualTo(4));
+            Assert.That(EventReplay.RevealedCount(0, 5d, 12d), Is.EqualTo(0));
+        }
+    }
+}
+```
+
+時刻の確かめ：大規模（8行動）の時間帯の長さは420/8＝52分、行動1は10:52から、行動2は11:45から。接客で売約がないときの行は時間帯の終わりの1分前（行動0なら10:51）。
+
+- [ ] **Step 2: `EventText` を書く**（`Assets/Scripts/UI/EventText.cs`）
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using TerrariumDays.Core;
+
+namespace TerrariumDays.UI
+{
+    /// <summary>The event tab's words (phase 6 spec §2.6・§3, planner ★9・★12・★15・★16). Money is "28,500円" here only.</summary>
+    public static class EventText
+    {
+        public const string ListedStatus = "出品中";
+
+        public static string Yen(long yen) => yen.ToString("#,0", CultureInfo.InvariantCulture) + "円";
+
+        public static string SignedYen(long yen) => yen > 0 ? "+" + Yen(yen) : yen < 0 ? "−" + Yen(-yen) : Yen(0);
+
+        public static string Clock(int minuteOfDay) => $"{minuteOfDay / 60}:{minuteOfDay % 60:00}";
+
+        public static string DateLabel(int number) => $"{EventSchedule.MonthOf(number)}月{EventSchedule.EventDayOfMonth}日";
+
+        public static string DeadlineNotice(int number, int daysLeft) =>
+            daysLeft <= 1
+                ? $"{EventSchedule.NameOf(number)}の申し込みは今日までです"
+                : $"{EventSchedule.NameOf(number)}（{DateLabel(number)}）の申し込みはあと{daysLeft}日で締め切りです";
+
+        public static string DayStartedNotice(int number) => $"今日は{EventSchedule.NameOf(number)}です。イベントタブで遊べます";
+
+        public static string PendingNotice(int number) => $"{EventSchedule.NameOf(number)}の続きがあります（イベントタブ）";
+
+        public static string WithdrawnNotice(IEnumerable<string> names) => "出品を取り消しました：" + string.Join("、", names);
+
+        /// <summary>The notices of one report: withdrawn, the day began, unfinished, deadline. The caller folds them like phase 5 (first one + 「ほか○件」).</summary>
+        public static List<string> NoticesOf(EventReport report)
+        {
+            var notices = new List<string>();
+            if (report.Withdrawn.Count > 0)
+            {
+                notices.Add(WithdrawnNotice(report.Withdrawn));
+            }
+
+            if (report.DayStartedNumber >= 0)
+            {
+                notices.Add(DayStartedNotice(report.DayStartedNumber));
+            }
+
+            if (report.PendingNumber >= 0)
+            {
+                notices.Add(PendingNotice(report.PendingNumber));
+            }
+
+            if (report.DeadlineNoticeNumber >= 0)
+            {
+                notices.Add(DeadlineNotice(report.DeadlineNoticeNumber, report.DeadlineDaysLeft));
+            }
+
+            return notices;
+        }
+
+        public static string SaleLine(EventAnimalLine sale) => $"{Clock(sale.MinuteOfDay)} {sale.MorphLabel} 売約（{Yen(sale.Amount)}）";
+
+        public static string NoSaleLine(int minuteOfDay) => $"{Clock(minuteOfDay)} 売約はなかった";
+
+        public static string BoothLine(int minuteOfDay, int offerCount) => $"{Clock(minuteOfDay)} 他のブースで売り物を{offerCount}匹見つけた";
+
+        public static string OfferLine(EventBoothOffer offer) => (offer.Rare ? "掘り出し物！ " : string.Empty) + $"{offer.MorphLabel} {Yen(offer.Price)}";
+
+        /// <summary>A summary row: 「レイプター♀ ハナ 28,500円」.</summary>
+        public static string AnimalLine(EventAnimalLine line) => $"{line.MorphLabel} {line.Name} {Yen(line.Amount)}";
+
+        public static string Chance(double chance) => $"売れる見込み {Math.Round(chance * 100d, MidpointRounding.AwayFromZero):0}%";
+
+        public static string Tolerance(int percent) => percent == 0 ? "値引きしない" : $"{percent}%まで値引き";
+
+        public static string ExpectedTotal(double yen) => "期待値の合計 " + Yen((long)Math.Round(yen, MidpointRounding.AwayFromZero));
+
+        public static string ActionsLeft(int left, int count) => $"残りの行動 {left}/{count}";
+
+        public static string Listings(int count, int max) => $"出品 {count}/{max}匹";
+
+        public static string ConfirmRegister(int number) =>
+            $"{EventSchedule.NameOf(number)}に申し込みますか？（出店料 {Yen(EventSchedule.BoothFee(EventSchedule.KindOf(number)))}・取り消せません）";
+
+        public static string ConfirmBuy(EventBoothOffer offer) => $"{offer.MorphLabel}を{Yen(offer.Price)}で買いますか？";
+
+        public static string RegisterFailure(EventRegisterResult result)
+        {
+            switch (result)
+            {
+                case EventRegisterResult.NotOpen:
+                    return "この回はもう受け付けていません";
+                case EventRegisterResult.Pending:
+                    return "前の回がまだ終わっていません";
+                case EventRegisterResult.AlreadyRegistered:
+                    return "もう申し込んでいます";
+                case EventRegisterResult.TooMany:
+                    return "出品できる数を超えています";
+                case EventRegisterResult.NotEligible:
+                    return "出品できない個体が入っています";
+                case EventRegisterResult.Duplicate:
+                    return "同じ個体が2回入っています";
+                case EventRegisterResult.InvalidPrice:
+                    return "価格が低すぎます";
+                case EventRegisterResult.InvalidTolerance:
+                    return "値引きの幅が正しくありません";
+                case EventRegisterResult.NotEnoughMoney:
+                    return "出店料が足りません";
+                case EventRegisterResult.Frozen:
+                    return "開催日になったので出品は変えられません";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        public static string BuyFailure(EventBuyResult result)
+        {
+            switch (result)
+            {
+                case EventBuyResult.NoEvent:
+                    return "イベントは終わりました";
+                case EventBuyResult.NotFound:
+                    return "売り物が見つかりません";
+                case EventBuyResult.AlreadyBought:
+                    return "もう買いました";
+                case EventBuyResult.NotEnoughMoney:
+                    return "所持金が足りません";
+                case EventBuyResult.NoEmptyCage:
+                    return "ケージが足りません";
+                default:
+                    return string.Empty;
+            }
+        }
+    }
+}
+```
+
+`EventSchedule.EventDayOfMonth`（15）は Task 1 の定数。名前が違ったら Task 1 のコードに合わせて直してよい（値は15のまま）。
+
+- [ ] **Step 3: `EventReplay` を書く**（`Assets/Scripts/UI/EventReplay.cs`）
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using TerrariumDays.Core;
+
+namespace TerrariumDays.UI
+{
+    /// <summary>One line of the replay log. Offer lines carry the offer to buy (OfferId &gt; 0).</summary>
+    public sealed class ReplayLine
+    {
+        public int MinuteOfDay { get; set; }
+        public string Text { get; set; }
+
+        /// <summary>The visitor's speech bubble, or null.</summary>
+        public string Bubble { get; set; }
+
+        public bool Highlight { get; set; }
+        public int OfferId { get; set; }
+    }
+
+    /// <summary>
+    /// The 10–15 s replay of one action (★K・★12). It only shows results that are already decided,
+    /// so skipping or closing the app never changes anything.
+    /// </summary>
+    public static class EventReplay
+    {
+        public const double BaseSeconds = 10d;
+        public const double SecondsPerEvent = 1.5d;
+        public const double MaxSeconds = 15d;
+        public const string ServeBubble = "いらっしゃいませ！";
+        public const string BrowseBubble = "どんな子がいるかな";
+        public const string SaleBubble = "この子にします！";
+        public const string RareBubble = "掘り出し物！";
+
+        public static double DurationSeconds(int events) => Math.Min(MaxSeconds, BaseSeconds + SecondsPerEvent * Math.Max(0, events));
+
+        /// <summary>Sales plus the offers this action found.</summary>
+        public static int EventCount(EventActionRecord record, IList<EventBoothOffer> offers) =>
+            record.Sales.Count + OffersOf(record, offers).Count;
+
+        public static List<ReplayLine> Script(EventActionRecord record, IList<EventBoothOffer> offers, int actionCount)
+        {
+            var start = EventSchedule.ActionWindowStart(record.Index, actionCount);
+            var length = EventSchedule.ActionWindowLength(actionCount);
+            var browse = record.Kind == EventActionKind.Browse;
+            var lines = new List<ReplayLine>
+            {
+                new ReplayLine
+                {
+                    MinuteOfDay = start,
+                    Text = $"{EventText.Clock(start)} {(browse ? "他のブースを見に行った" : "接客を始めた")}",
+                    Bubble = browse ? BrowseBubble : ServeBubble,
+                },
+            };
+
+            var timed = new List<ReplayLine>();
+            foreach (var sale in record.Sales)
+            {
+                timed.Add(new ReplayLine { MinuteOfDay = sale.MinuteOfDay, Text = EventText.SaleLine(sale), Bubble = SaleBubble, Highlight = true });
+            }
+
+            if (browse)
+            {
+                var found = OffersOf(record, offers);
+                timed.Add(new ReplayLine { MinuteOfDay = record.BoothMinuteOfDay, Text = EventText.BoothLine(record.BoothMinuteOfDay, found.Count) });
+                foreach (var offer in found)
+                {
+                    timed.Add(new ReplayLine
+                    {
+                        MinuteOfDay = record.BoothMinuteOfDay,
+                        Text = EventText.OfferLine(offer),
+                        Bubble = offer.Rare ? RareBubble : null,
+                        Highlight = offer.Rare,
+                        OfferId = offer.OfferId,
+                    });
+                }
+            }
+            else if (record.Sales.Count == 0)
+            {
+                timed.Add(new ReplayLine { MinuteOfDay = start + length - 1, Text = EventText.NoSaleLine(start + length - 1) });
+            }
+
+            // OrderBy is stable: the booth line stays before its offers.
+            lines.AddRange(timed.OrderBy(l => l.MinuteOfDay));
+            return lines;
+        }
+
+        /// <summary>Line i appears at duration·i/count; everything is shown once the time is up (or on 「飛ばす」).</summary>
+        public static int RevealedCount(int lineCount, double elapsedSeconds, double durationSeconds)
+        {
+            if (lineCount <= 0 || elapsedSeconds < 0d)
+            {
+                return 0;
+            }
+
+            if (elapsedSeconds >= durationSeconds || durationSeconds <= 0d)
+            {
+                return lineCount;
+            }
+
+            return Math.Min(lineCount, (int)Math.Floor(elapsedSeconds * lineCount / durationSeconds) + 1);
+        }
+
+        private static List<EventBoothOffer> OffersOf(EventActionRecord record, IList<EventBoothOffer> offers)
+        {
+            var found = new List<EventBoothOffer>();
+            if (record.Kind != EventActionKind.Browse || offers == null)
+            {
+                return found;
+            }
+
+            foreach (var offer in offers)
+            {
+                if (offer.ActionIndex == record.Index)
+                {
+                    found.Add(offer);
+                }
+            }
+
+            return found;
+        }
+    }
+}
+```
+
+- [ ] **Step 4: テストを流す**
+
+`scripts/run-unity-tests.sh EditMode -testFilter TerrariumDays.Tests.EventTextTests` → 全部通る。EditMode 全体の件数が減っていないこと。
+
+- [ ] **Step 5: コミット**
+
+```bash
+git add Assets/Scripts/UI/EventText.cs* Assets/Scripts/UI/EventReplay.cs* Assets/Tests/EditMode/EventTextTests.cs*
+git commit -m "Add the event texts and the replay script"
+```
+
+---
+
+### Task 8: 出品中のロック（transcriber）
+
+**Files:**
+- Modify: `Assets/Scripts/Core/BreedingRules.cs`（`PairingProblem` の最後に `Listed`）
+- Modify: `Assets/Scripts/Core/BreedingService.cs`（`CheckPair`・`CheckCandidate`）
+- Modify: `Assets/Scripts/Core/ShopService.cs`（`ShopResult` の最後に `Listed`、`Wholesale`）
+- Modify: `Assets/Scripts/UI/BreedingText.cs`（`ProblemLabel`）・`Assets/Scripts/UI/ShopText.cs`（`FailureMessage`）
+- Test: `Assets/Tests/EditMode/EventLockTests.cs`
+
+**Produces:** 出品中（確定前の回に出品している）個体はペアリングに使えず、卸売り・トレイの「売る」もできない（★C・★10・計画者の判断24）。理由の文は「出品中です」「出品中の個体は売れません」。
+
+- [ ] **Step 1: テストを書く**
+
+```csharp
+using System;
+using NUnit.Framework;
+using TerrariumDays.Core;
+using TerrariumDays.UI;
+
+namespace TerrariumDays.Tests
+{
+    public sealed class EventLockTests
+    {
+        private static readonly DateTimeOffset Epoch = new DateTimeOffset(2026, 9, 27, 0, 0, 0, TimeSpan.Zero);
+        private readonly CareTuning care = new CareTuning();
+        private readonly GameCalendar calendar = new GameCalendar(Epoch);
+
+        private static PetState Adult(Sex sex) =>
+            new PetState
+            {
+                Name = sex == Sex.Male ? "タロウ" : "ハナ",
+                Sex = sex,
+                SexRevealed = true,
+                Stage = GrowthStage.Adult,
+                WeightGrams = 55d,
+                HatchedAtUtc = Epoch.AddDays(-12),
+                Personality = Personality.Calm,
+                PersonalityKnown = true,
+                LastSavedAtUtc = Epoch,
+            };
+
+        private static Colony Room(out PetState male, out PetState female)
+        {
+            var colony = new Colony { CalendarEpochUtc = Epoch };
+            male = colony.AddAnimal(Adult(Sex.Male), colony.AddCage(CageSize.Standard));
+            female = colony.AddAnimal(Adult(Sex.Female), colony.AddCage(CageSize.Standard));
+            return colony;
+        }
+
+        private static void List(Colony colony, PetState pet)
+        {
+            colony.Events.Entry = new EventEntry { Number = 0, FeePaid = 10000 };
+            colony.Events.Entry.Listings.Add(new EventListing { AnimalId = pet.Id, Price = 5000 });
+        }
+
+        [Test]
+        public void ListedAnimals_CannotPair()
+        {
+            var breeding = new BreedingService(care);
+            var colony = Room(out var male, out var female);
+            Assert.That(breeding.CheckPair(colony, male, female, Epoch, calendar), Is.EqualTo(PairingProblem.None));
+
+            List(colony, male);
+            Assert.That(breeding.CheckPair(colony, male, female, Epoch, calendar), Is.EqualTo(PairingProblem.Listed));
+            Assert.That(breeding.CheckCandidate(colony, male, Epoch, calendar), Is.EqualTo(PairingProblem.Listed));
+            Assert.That(breeding.CheckCandidate(colony, female, Epoch, calendar), Is.EqualTo(PairingProblem.None));
+            Assert.That(breeding.StartPairing(colony, male.Id, female.Id, Epoch, calendar), Is.EqualTo(PairingProblem.Listed));
+            Assert.That(colony.Pairings, Is.Empty);
+
+            List(colony, female);
+            Assert.That(breeding.CheckPair(colony, male, female, Epoch, calendar), Is.EqualTo(PairingProblem.Listed));
+        }
+
+        [Test]
+        public void ListedAnimals_CannotBeSoldToTheShop()
+        {
+            var shop = new ShopService(new EconomyTuning(), care);
+            var colony = Room(out var male, out var female);
+            List(colony, male);
+
+            Assert.That(shop.Wholesale(colony, male.Id, Epoch), Is.EqualTo(ShopResult.Listed));
+            Assert.That(colony.AnimalById(male.Id), Is.SameAs(male));
+            Assert.That(shop.Wholesale(colony, female.Id, Epoch), Is.EqualTo(ShopResult.Ok));
+        }
+
+        [Test]
+        public void TheLock_EndsWithTheEvent()
+        {
+            var breeding = new BreedingService(care);
+            var colony = Room(out var male, out var female);
+            List(colony, male);
+
+            colony.Events.Entry = null;
+
+            Assert.That(breeding.CheckPair(colony, male, female, Epoch, calendar), Is.EqualTo(PairingProblem.None));
+        }
+
+        [Test]
+        public void Texts_ForTheLock()
+        {
+            Assert.That(BreedingText.ProblemLabel(PairingProblem.Listed), Is.EqualTo("出品中です"));
+            Assert.That(ShopText.FailureMessage(ShopResult.Listed), Is.EqualTo("出品中の個体は売れません"));
+        }
+    }
+}
+```
+
+`ShopService` のコンストラクタ・`colony.Pairings` の名前が違ったら、既存の `ShopServiceTests`・`BreedingServiceTests` の作り方に合わせる（中身は変えない）。
+
+- [ ] **Step 2: 列挙を足す**
+
+`BreedingRules.cs` の `PairingProblem` の `AlreadyPairing` の後に `,` と `Listed` を足す（最後に足す。計画者の判断18）。`ShopService.cs` の `ShopResult` の `InPairing` の後に `,` と `Listed` を足す。
+
+- [ ] **Step 3: 判定を足す**
+
+`BreedingService.CheckPair` の、メスの `Gravid` の判定（`return PairingProblem.Gravid;` の `}`）の直後、`AlreadyPairing` の `return` の前に：
+
+```csharp
+            if (colony.Events.IsListed(male.Id) || colony.Events.IsListed(female.Id))
+            {
+                return PairingProblem.Listed;
+            }
+```
+
+`BreedingService.CheckCandidate` の `pet.Gravid` の判定の直後、`colony.PairingOf(pet) != null` の判定の前に：
+
+```csharp
+            if (colony.Events.IsListed(pet.Id))
+            {
+                return PairingProblem.Listed;
+            }
+```
+
+`ShopService.Wholesale` の `InPairing` の判定の直後、`var pay = ...` の前に：
+
+```csharp
+            if (colony.Events.IsListed(pet.Id))
+            {
+                return ShopResult.Listed;
+            }
+```
+
+- [ ] **Step 4: 文を足す**
+
+`BreedingText.ProblemLabel` の `case PairingProblem.AlreadyPairing:` の2行の後に：
+
+```csharp
+                case PairingProblem.Listed:
+                    return "出品中です";
+```
+
+`ShopText.FailureMessage` の `case ShopResult.InPairing:` の2行の後に：
+
+```csharp
+                case ShopResult.Listed:
+                    return "出品中の個体は売れません";
+```
+
+- [ ] **Step 5: テストを流す**
+
+`scripts/run-unity-tests.sh EditMode -testFilter TerrariumDays.Tests.EventLockTests` → 全部通る。続けて EditMode 全体を流し、`BreedingServiceTests`・`ShopServiceTests`・`BreedingTextTests` が落ちていないこと（列挙を最後に足したので既存の値は変わらない）。PlayMode はここでは流さなくてよい（Task 14 で画面に出す）。
+
+- [ ] **Step 6: コミット**
+
+```bash
+git add Assets/Scripts/Core/BreedingRules.cs Assets/Scripts/Core/BreedingService.cs Assets/Scripts/Core/ShopService.cs Assets/Scripts/UI/BreedingText.cs Assets/Scripts/UI/ShopText.cs Assets/Tests/EditMode/EventLockTests.cs*
+git commit -m "Lock listed animals out of pairing and wholesale"
+```
