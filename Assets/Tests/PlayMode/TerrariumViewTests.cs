@@ -277,8 +277,34 @@ namespace TerrariumDays.Tests
             prepSurface.Add(new Button { name = "event-prep-save-button" });
             prepSurface.Add(new Button { name = "event-prep-register-button" });
             eventsPanel.Add(prepSurface);
-            eventsPanel.Add(new VisualElement { name = "event-day" });
-            eventsPanel.Add(new VisualElement { name = "event-result" });
+            var daySurface = new VisualElement { name = "event-day" };
+            daySurface.Add(new Label { name = "event-day-title" });
+            daySurface.Add(new Label { name = "event-day-left" });
+            daySurface.Add(new VisualElement { name = "event-day-stage" });
+            daySurface.Add(new VisualElement { name = "event-day-offers" });
+            foreach (var buttonName in new[] { "serve", "browse", "serve-all", "skip", "finish" })
+            {
+                daySurface.Add(new Button { name = $"event-day-{buttonName}-button" });
+            }
+
+            daySurface.Add(new ScrollView { name = "event-day-log" });
+            eventsPanel.Add(daySurface);
+            var resultSurface = new VisualElement { name = "event-result" };
+            resultSurface.Add(new Label { name = "event-result-title" });
+            foreach (var blockName in new[] { "sold", "unsold", "bought" })
+            {
+                resultSurface.Add(new VisualElement { name = $"event-result-{blockName}" });
+            }
+
+            resultSurface.Add(new Label { name = "event-result-totals" });
+            resultSurface.Add(new Button { name = "event-result-close-button" });
+            eventsPanel.Add(resultSurface);
+            var buyModal = new VisualElement { name = "event-buy-modal" };
+            buyModal.Add(new Label { name = "event-buy-message" });
+            buyModal.Add(new Label { name = "event-buy-reason" });
+            buyModal.Add(new Button { name = "event-buy-yes-button" });
+            buyModal.Add(new Button { name = "event-buy-no-button" });
+            root.Add(buyModal);
 
             root.Add(breedingPanel);
             root.Add(incubatorPanel);
@@ -2160,6 +2186,116 @@ namespace TerrariumDays.Tests
             // A render with nothing changed must keep the picked value.
             RenderEvents();
             Assert.That(parse(priceLabel.text), Is.EqualTo(parse(priceBefore) + 1000L));
+        }
+
+        // ---- Events tab (phase 6 Task 13): the event day and result screens. ----
+
+        private PetState OpenEventDay(long listingPrice = 1000L)
+        {
+            var second = OpenEventTab(out var number);
+            var session = view.Session;
+            var requests = new List<ListingRequest> { new ListingRequest { AnimalId = second.Id, Price = listingPrice, TolerancePercent = 0 } };
+            Assert.That(session.Events.Register(session.Colony, session.Calendar, number, requests, session.GameNowUtc), Is.EqualTo(EventRegisterResult.Ok));
+            session.SkipToNextEventDay();
+            RenderEvents();
+            return second;
+        }
+
+        private void ClickEventButton(string name) => FindClickAction(EventElement<Button>(name).clickable)();
+
+        private EventView EventViewOf() =>
+            (EventView)typeof(TerrariumView).GetField("eventView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+
+        private static bool Shown(VisualElement element) => element.resolvedStyle.display != DisplayStyle.None && element.style.display != DisplayStyle.None;
+
+        [Test]
+        public void EventDay_AfterSkippingToTheDay_ShowsTheDaySurface()
+        {
+            OpenEventDay();
+
+            Assert.That(Shown(EventElement<VisualElement>("event-day")), Is.True);
+            Assert.That(Shown(EventElement<VisualElement>("event-prep")), Is.False);
+            StringAssert.Contains("残りの行動", EventElement<Label>("event-day-left").text);
+        }
+
+        [Test]
+        public void EventDay_ServeLocksTheButtonsUntilSkipped_AndUsesOneAction()
+        {
+            OpenEventDay();
+            var before = view.Session.Events.ActionsLeft(view.Session.Colony);
+
+            ClickEventButton("event-day-serve-button");
+
+            Assert.That(EventViewOf().Playing, Is.True);
+            Assert.That(EventElement<Button>("event-day-serve-button").enabledSelf, Is.False);
+            Assert.That(EventElement<Button>("event-day-browse-button").enabledSelf, Is.False);
+            Assert.That(EventElement<Button>("event-day-serve-all-button").enabledSelf, Is.False);
+            Assert.That(view.Session.Events.ActionsLeft(view.Session.Colony), Is.EqualTo(before - 1));
+
+            ClickEventButton("event-day-skip-button");
+
+            Assert.That(EventViewOf().Playing, Is.False);
+            Assert.That(EventElement<ScrollView>("event-day-log").Query<Label>().ToList().Count, Is.GreaterThan(0));
+            StringAssert.Contains($"{before - 1}/", EventElement<Label>("event-day-left").text);
+            Assert.That(EventElement<Button>("event-day-serve-button").enabledSelf, Is.True);
+        }
+
+        [Test]
+        public void EventDay_ACheapListing_SellsOutOfTheCageAndPaysTheOwner()
+        {
+            var second = OpenEventDay();
+            var colony = view.Session.Colony;
+            var money = colony.Wallet.Money;
+
+            while (colony.Events.Entry != null && colony.AnimalById(second.Id) != null && view.Session.Events.ActionsLeft(colony) > 0)
+            {
+                ClickEventButton("event-day-serve-button");
+                ClickEventButton("event-day-skip-button");
+            }
+
+            Assert.That(colony.AnimalById(second.Id), Is.Null);
+            Assert.That(colony.Wallet.Money, Is.GreaterThan(money));
+        }
+
+        [Test]
+        public void EventDay_Browse_ShowsOffers_AndAFullRoomDisablesTheBuyButton()
+        {
+            OpenEventDay();
+            var colony = view.Session.Colony;
+            foreach (var cage in colony.Cages)
+            {
+                if (cage.IsEmpty)
+                {
+                    colony.AddAnimal(new PetState { Name = "ふさぎ" }, cage);
+                }
+            }
+
+            ClickEventButton("event-day-browse-button");
+            ClickEventButton("event-day-skip-button");
+
+            var offer = colony.Events.Entry.BoothOffers[0];
+            ClickEventButton($"event-offer-buy-{offer.OfferId}");
+            StringAssert.Contains(offer.MorphLabel, eventsPanel.parent.Q<Label>("event-buy-message").text);
+            Assert.That(eventsPanel.parent.Q<Button>("event-buy-yes-button").enabledSelf, Is.False);
+            Assert.That(eventsPanel.parent.Q<Label>("event-buy-reason").text, Is.EqualTo("ケージが足りません"));
+        }
+
+        [Test]
+        public void EventDay_ServeAll_ShowsTheResult_AndCloseGoesBackToThePrepOfTheNextEvent()
+        {
+            OpenEventDay();
+
+            ClickEventButton("event-day-serve-all-button");
+            ClickConfirmYes();
+
+            Assert.That(Shown(EventElement<VisualElement>("event-result")), Is.True);
+            StringAssert.Contains("差し引き", EventElement<Label>("event-result-totals").text);
+
+            ClickEventButton("event-result-close-button");
+
+            Assert.That(Shown(EventElement<VisualElement>("event-prep")), Is.True);
+            Assert.That(Shown(EventElement<VisualElement>("event-result")), Is.False);
+            Assert.That(view.Session.Colony.Events.Entry, Is.Null);
         }
 
         // ---- Incubator tab (phase 5 Task 15): cards, temperature, water, candled eggs. ----

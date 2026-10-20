@@ -810,6 +810,85 @@ namespace TerrariumDays.Tests
         }
 
         /// <summary>
+        /// Captures the real event day (mid-replay twice 0.25 s apart, offers found, buy dialog)
+        /// and the result screen into Logs/Screens/event-day-*.png (event-day-result.png is the result screen) (phase 6 Task 13).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureEventDay()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var session = view.Session;
+            var colony = session.Colony;
+
+            // The scene plays on the shared save file: put it back as it was when this capture ends.
+            var savedBytes = File.Exists(session.SavePath) ? File.ReadAllBytes(session.SavePath) : null;
+            foreach (var old in colony.Animals.ToList())
+            {
+                colony.RemoveAnimal(old);
+            }
+
+            for (var i = 0; i < 4; i++)
+            {
+                var cage = colony.FirstEmptyCage() ?? colony.AddCage(CageSize.Standard);
+                colony.AddAnimal(new PetState { Name = "ピコ" + i, WeightGrams = 80d + 20d * i, Stage = GrowthStage.Adult }, cage);
+            }
+
+            colony.Wallet.Earn(System.Math.Max(0L, -colony.Wallet.Money) + 200000L, LedgerCategory.EventSale, "capture", session.GameNowUtc);
+            foreach (var pet in colony.Animals)
+            {
+                pet.Weak = false;
+                pet.Gravid = null;
+            }
+
+            // The scene's colony comes from a shared save: forget any event an earlier capture left behind.
+            colony.Events.Entry = null;
+            colony.Events.LastSummary = null;
+            var number = session.Events.OpenNumber(colony, session.Calendar, session.GameNowUtc);
+            var requests = colony.Animals.OrderBy(p => p.Id).Where(p => EventRules.Check(colony, p) == ListingProblem.None).Take(3).Select(p => new ListingRequest { AnimalId = p.Id, Price = 30000L, TolerancePercent = 10 }).ToList();
+            Assert.That(session.Events.Register(colony, session.Calendar, number, requests, session.GameNowUtc), Is.EqualTo(EventRegisterResult.Ok));
+            session.SkipToNextEventDay();
+
+            var document = view.GetComponent<UIDocument>();
+            NavigatorOf(view).ShowTab(ShellTab.Events);
+            yield return new WaitForSeconds(0.5f);
+            yield return Capture(outputDir, "event-day-start");
+
+            ClickNamed(document, "event-day-browse-button");
+            yield return new WaitForSeconds(4f);
+            yield return Capture(outputDir, "event-day-replay-a");
+            yield return new WaitForSeconds(0.25f);
+            yield return Capture(outputDir, "event-day-replay-b");
+
+            ClickNamed(document, "event-day-skip-button");
+            yield return new WaitForSeconds(0.5f);
+            yield return Capture(outputDir, "event-day-offers");
+
+            var offer = colony.Events.Entry.BoothOffers.First(o => !o.Bought);
+            ClickNamed(document, $"event-offer-buy-{offer.OfferId}");
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "event-day-buy");
+            ClickNamed(document, "event-buy-no-button");
+
+            ClickNamed(document, "event-day-serve-all-button");
+            ClickNamed(document, "confirm-yes-button");
+            yield return new WaitForSeconds(0.5f);
+            yield return Capture(outputDir, "event-day-result");
+
+            if (savedBytes != null)
+            {
+                File.WriteAllBytes(session.SavePath, savedBytes);
+            }
+            else
+            {
+                File.Delete(session.SavePath);
+            }
+        }
+
+        /// <summary>
         /// Captures the three event surfaces and the buy confirmation with stand-in text into
         /// Logs/Screens/event-*.png so the frame layout can be checked before the screens are filled.
         /// </summary>

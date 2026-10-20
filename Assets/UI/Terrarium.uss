@@ -1606,3 +1606,75 @@
 .event-button-disable:disabled {
     opacity: 0.45;
 }
+
+.event-cases {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 55%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.event-case {
+    width: 56px;
+    height: 45px;
+    margin: 2px;
+    background-image: url("/Assets/Resources/Event/booth_case.png");
+    -unity-background-scale-mode: scale-to-fit;
+    justify-content: flex-end;
+}
+
+.event-case-price {
+    font-size: 9px;
+    color: rgb(255, 255, 255);
+    -unity-text-align: lower-center;
+}
+
+.event-sold-tag {
+    position: absolute;
+    left: 4px;
+    top: 8px;
+    width: 48px;
+    height: 28px;
+    background-image: url("/Assets/Resources/Event/sold_tag.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.event-visitor {
+    position: absolute;
+    bottom: 8px;
+    width: 48px;
+    height: 80px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.event-bubble {
+    position: absolute;
+    bottom: 92px;
+    min-width: 56px;
+    padding: 6px 8px 8px 22px;
+    background-image: url("/Assets/Resources/Event/bubble.png");
+    -unity-slice-left: 20;
+    -unity-slice-top: 8;
+    -unity-slice-right: 8;
+    -unity-slice-bottom: 8;
+}
+
+.event-bubble-label {
+    font-size: 12px;
+    color: rgb(90, 62, 40);
+    white-space: nowrap;
+}
+
+.event-log-line {
+    font-size: 13px;
+    color: rgb(90, 62, 40);
+    white-space: normal;
+}
+
+.event-log-highlight {
+    color: rgb(214, 96, 20);
+    -unity-font-style: bold;
+}

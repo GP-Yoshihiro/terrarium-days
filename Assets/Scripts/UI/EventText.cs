@@ -98,6 +98,8 @@ namespace TerrariumDays.UI
         public static string ConfirmRegister(int number) =>
             $"{EventSchedule.NameOf(number)}に申し込みますか？（出店料 {Yen(EventSchedule.BoothFee(EventSchedule.KindOf(number)))}・取り消せません）";
 
+        public const string ConfirmServeAll = "残りの行動を全部接客にしますか？まだ買っていない売り物は買えなくなります";
+
         public static string ConfirmBuy(EventBoothOffer offer) => $"{offer.MorphLabel}を{Yen(offer.Price)}で買いますか？";
 
         public static string RegisterFailure(EventRegisterResult result)

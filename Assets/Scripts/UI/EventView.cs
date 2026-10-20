@@ -13,7 +13,7 @@ namespace TerrariumDays.UI
     /// reset by <see cref="Invalidate"/> or when the event changes, never by a per-frame Render.
     /// Actions leave as events; TerrariumView applies them, saves and re-renders.
     /// </summary>
-    public sealed class EventView
+    public sealed partial class EventView
     {
         public const long PriceStep = 1000L;
         public const long MinListingPrice = 1000L;
@@ -59,7 +59,7 @@ namespace TerrariumDays.UI
         private int number = -1;
         private int max;
 
-        public EventView(VisualElement root)
+        public EventView(VisualElement root, VisualElement modalRoot = null)
         {
             prep = root.Q<VisualElement>("event-prep");
             day = root.Q<VisualElement>("event-day");
@@ -82,6 +82,8 @@ namespace TerrariumDays.UI
             {
                 saveButton.clicked += () => SaveRequested?.Invoke(BuildRequests());
             }
+
+            InitDay(root, modalRoot ?? root);
         }
 
         public event Action<int, List<ListingRequest>> RegisterRequested;
@@ -93,6 +95,10 @@ namespace TerrariumDays.UI
         {
             picks.Clear();
             lastSignature = null;
+            daySignature = null;
+            logSignature = null;
+            casesSignature = null;
+            resultSignature = null;
         }
 
         public void ShowMessage(string text)
@@ -115,13 +121,27 @@ namespace TerrariumDays.UI
             var calendar = session.Calendar;
             var entry = colony.Events.Entry;
 
-            var showResult = colony.Events.LastSummary != null && !colony.Events.LastSummarySeen;
-            var showDay = !showResult && entry != null && EventSchedule.HasStarted(calendar, entry.Number, nowUtc);
+            sessionRef = session;
+            if (Playing && (replayEntry == null || !replayEntry.Actions.Contains(replayRecord)))
+            {
+                EndReplay();
+            }
+
+            var showResult = !Playing && colony.Events.LastSummary != null && !colony.Events.LastSummarySeen;
+            var showDay = !showResult && (Playing || (entry != null && EventSchedule.HasStarted(calendar, entry.Number, nowUtc)));
             SetDisplay(result, showResult);
             SetDisplay(day, showDay);
             SetDisplay(prep, !showResult && !showDay);
-            if (showResult || showDay)
+            if (showResult)
             {
+                RenderResult(colony.Events.LastSummary);
+                UpdateBuyModal();
+                return;
+            }
+
+            if (showDay)
+            {
+                RefreshDay();
                 return;
             }
 

@@ -874,6 +874,7 @@ namespace TerrariumDays.UI
         {
             petActor?.Tick(Time.deltaTime);
             drawOrder?.Apply();
+            eventView?.Tick(Time.unscaledDeltaTime);
 
             clockTimer -= Time.unscaledDeltaTime;
             if (clockTimer <= 0f)
@@ -986,6 +987,11 @@ namespace TerrariumDays.UI
             {
                 eventView.RegisterRequested -= OnEventRegisterRequested;
                 eventView.SaveRequested -= OnEventSaveRequested;
+                eventView.ActionRequested -= OnEventActionRequested;
+                eventView.ServeAllRequested -= OnEventServeAllRequested;
+                eventView.FinishRequested -= OnEventFinishRequested;
+                eventView.CloseRequested -= OnEventCloseRequested;
+                eventView.BuyConfirmed -= OnEventBuyConfirmed;
             }
 
             confirmDialog?.Dispose();
@@ -1307,7 +1313,7 @@ namespace TerrariumDays.UI
             incubatorView = incubatorPanel != null ? new IncubatorView(incubatorPanel) : null;
 
             var eventsPanel = root.Q<VisualElement>("events-panel");
-            eventView = eventsPanel != null ? new EventView(eventsPanel) : null;
+            eventView = eventsPanel != null ? new EventView(eventsPanel, root) : null;
 
             var confirmModal = root.Q<VisualElement>("confirm-modal");
             confirmDialog = new ConfirmDialog(confirmModal, root.Q<Label>("confirm-message-label"),
@@ -2536,6 +2542,102 @@ namespace TerrariumDays.UI
 
             eventView.RegisterRequested += OnEventRegisterRequested;
             eventView.SaveRequested += OnEventSaveRequested;
+            eventView.ActionRequested += OnEventActionRequested;
+            eventView.ServeAllRequested += OnEventServeAllRequested;
+            eventView.FinishRequested += OnEventFinishRequested;
+            eventView.CloseRequested += OnEventCloseRequested;
+            eventView.BuyConfirmed += OnEventBuyConfirmed;
+        }
+
+        private void OnEventActionRequested(EventActionKind kind)
+        {
+            if (session == null || eventView == null || eventView.Playing)
+            {
+                return;
+            }
+
+            var entry = session.Colony.Events.Entry;
+            if (session.Events.PlayAction(session.Colony, session.Calendar, kind, GameNowUtc(), out var record) != EventActionResult.Ok)
+            {
+                return;
+            }
+
+            // The result is final and saved before the replay starts (★12).
+            SaveCurrentState();
+            eventView.BeginReplay(record, entry);
+            ColonyChanged?.Invoke();
+            RefreshShell();
+        }
+
+        private void OnEventServeAllRequested()
+        {
+            if (session == null || eventView == null || eventView.Playing)
+            {
+                return;
+            }
+
+            confirmDialog?.Show(EventText.ConfirmServeAll, ConfirmEventServeAll);
+        }
+
+        private void ConfirmEventServeAll()
+        {
+            if (session.Events.ServeAllRemaining(session.Colony, session.Calendar, GameNowUtc(), out _) != EventActionResult.Ok)
+            {
+                return;
+            }
+
+            SaveCurrentState();
+            eventView?.CloseBuy();
+            eventView?.Invalidate();
+            ColonyChanged?.Invoke();
+            RefreshShell();
+        }
+
+        private void OnEventFinishRequested()
+        {
+            if (session == null || !session.Events.Finish(session.Colony))
+            {
+                return;
+            }
+
+            SaveCurrentState();
+            eventView?.CloseBuy();
+            eventView?.Invalidate();
+            ColonyChanged?.Invoke();
+            RefreshShell();
+        }
+
+        private void OnEventCloseRequested()
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            session.Events.DismissSummary(session.Colony);
+            SaveCurrentState();
+            eventView?.Invalidate();
+            ColonyChanged?.Invoke();
+            RefreshShell();
+        }
+
+        private void OnEventBuyConfirmed(int offerId)
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            var result = session.Events.Buy(session.Colony, offerId, GameNowUtc());
+            eventView?.CloseBuy();
+            if (result == EventBuyResult.Ok)
+            {
+                SaveCurrentState();
+                eventView?.Invalidate();
+                ColonyChanged?.Invoke();
+            }
+
+            RefreshShell();
         }
 
         private void OnEventRegisterRequested(int number, List<ListingRequest> requests)
