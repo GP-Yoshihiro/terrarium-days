@@ -3296,3 +3296,77 @@ namespace TerrariumDays.Tests
 git add Assets/Scripts/Core/BreedingRules.cs Assets/Scripts/Core/BreedingService.cs Assets/Scripts/Core/ShopService.cs Assets/Scripts/UI/BreedingText.cs Assets/Scripts/UI/ShopText.cs Assets/Tests/EditMode/EventLockTests.cs*
 git commit -m "Lock listed animals out of pairing and wholesale"
 ```
+
+---
+
+## Task 9〜16 の書き方
+
+ここからは配線・セーブ・画面の作業なので、完全なコードではなく「何を・どこに・どう確かめるか」を書く。行番号は計画を書いた時点（main 12284bb＋Task 1〜8）の目安で、先に `grep -n` で場所を確かめてから直す。Core の型と API は Task 1〜8 の **Produces** のとおりに使い、名前を変えない。
+
+---
+
+### Task 9: セッションとセーブ（スキーマ4・異常系・デバッグの時計）（programmer）
+
+**Files:**
+- Modify: `Assets/Scripts/Core/ColonySession.cs`
+- Modify: `Assets/Scripts/Core/ColonySaveData.cs`
+- Modify: `Assets/Scripts/Core/ColonySaveService.cs`
+- Test: `Assets/Tests/EditMode/ColonySessionTests.cs`・`Assets/Tests/EditMode/ColonySaveServiceTests.cs`（足す）
+
+**Produces（Task 12〜15 が使う）:** `ColonySession.Events`（`EventService`）、`ColonyTickReport.Events`（`EventReport`）、`ColonySession.SkipToNextEventDay()`（`ColonyTickReport` を返す）、スキーマ4のセーブ。
+
+**セッション**
+1. `ColonyTickReport`（`ColonySession.cs:6`）に `public EventReport Events { get; set; } = new EventReport();` を足し、`HasEvents` に `|| Events.HasEvents` を足す。
+2. `ColonySession` に `private readonly EventService events;` と `public EventService Events => events;` を足す（`breeding`・`incubation` と同じ並び。コンストラクタで `new EventService(care)`）。
+3. `ApplyUntil`（`:157`）の最後、`report.Restocked = ...`（`:206`）の後・`return report;` の前に `report.Events = events.Advance(Colony, Calendar, targetUtc);`。個体の時間を進めた後に呼ぶので、閉じている間に0:00を過ぎた回は開いた時点の個体で固定される（計画者の判断16）。
+4. `Load()`（`:89`）で `ApplyUntil` の後に `report.Events.PendingNumber = events.PendingNumber(Colony, Calendar, GameNowUtc);`。続きの通知はアプリを開いたときだけ（★9）。
+5. `SkipToNextEventDay()`：`var number = Colony.Events.Entry?.Number ?? EventSchedule.NextOpenNumber(Calendar, GameNowUtc);`、`var target = EventSchedule.StartUtc(Calendar, number) + TimeSpan.FromSeconds(1);`、`target <= GameNowUtc` なら空の `ColonyTickReport` を返し、そうでなければ `return SimulateGameTime(target - GameNowUtc);`（★14。既存の `SimulateGameTime`（`:134`）と同じくゲーム時計のずれに加える）。
+
+**セーブ（スキーマ4、計画者の判断22・23）**
+1. `ColonySaveService.CurrentSchemaVersion`（`:16`）を4にする。**`:80` の `probe.schemaVersion >= CurrentSchemaVersion` を `>= 3` に変える**。そのままだとスキーマ3のファイルが `MigrateLegacy`（段階1・2用）に回って中身が消える。3→4 はバックアップを作らない（欄を足すだけ）。
+2. `ColonySaveData.cs` に足す型（すべて `[Serializable]`、欄は小文字始まり、既存の `*SaveData` と同じ書き方）：
+   - `EventStateSaveData`：`hasEntry`、`entry`（`EventEntrySaveData`）、`hasSummary`、`summary`（`EventSummarySaveData`）、`summarySeen`（bool。`hasSummary` が false なら読むときに true 扱い）、`noticeNumberPlusOne`（0＝なし）、`noticeStage`。
+   - `EventEntrySaveData`：`number`、`feePaid`、`frozen`、`listingSeed`、`nextOfferId`、`listings`（`EventListingSaveData` の List）、`actions`（`EventActionSaveData`）、`boothOffers`（`EventBoothOfferSaveData`）、`purchases`（`EventAnimalLineSaveData`）。
+   - `EventListingSaveData`：`animalId`、`price`、`tolerancePercent`、`frozenBase`、`frozenChance`、`soldInActionPlusOne`（0＝売れていない）。
+   - `EventAnimalLineSaveData`：`animalId`、`name`、`morphLabel`、`amount`、`minuteOfDay`。
+   - `EventActionSaveData`：`index`、`kind`（string。`EventActionKind` の名前）、`playedAtUtc`（既存の時刻の欄と同じ書き方）、`boothMinuteOfDay`、`sales`。
+   - `EventBoothOfferSaveData`：`offerId`、`actionIndex`、`hasAnimal`、`animal`（`AnimalSaveData`）、`morphLabel`、`price`、`rare`、`bought`。
+   - `EventSummarySaveData`：`number`、`boothFee`、`sold`・`unsold`・`bought`（`EventAnimalLineSaveData` の List）。合計と差し引きは `EventSummary` が計算する（`TotalSales`・`PurchaseTotal`・`Net`）ので保存しない。
+   - `ColonySaveData`（`:8`）に `public EventStateSaveData events = new EventStateSaveData();`。
+3. 書き出し：`ToSaveData`（`:529` 付近の `schemaVersion = CurrentSchemaVersion` の近く）で `events` を作る。ブースの個体は `ToAnimalSaveData`（`:680`）で書く（ショップの売り物 `:594` と同じ）。
+4. 読み込み：`FromSaveData`（`:185`）の最後で `colony.Events` を作る。ブースの個体は `FromAnimalSaveData(a, nowUtc, random, owned: false)`（`:469`、ショップ `:320` と同じ）。旧ファイル（スキーマ3）は `events` が空の既定値になり、`hasEntry`＝false・`noticeNumberPlusOne`＝0 で「申し込みなし」に読める。
+5. 異常系（計画者の判断23。例外を出さずにその部分だけ捨てて読み込む）：
+   - `entry.number < 0` → 申し込みを捨てる（`Entry = null`）。
+   - 固定前（`frozen`＝false）の出品：個体がいない・同じ個体の重複・価格が `EventService.MinPrice` 未満・`EventOdds.IsValidTolerance` が false・`MaxListings` を超えた分 → その出品を取り消す。固定後の出品は売れた個体がもういないので個体の有無で捨てない。
+   - `actions` が `ActionCount` を超えた分は切り捨て。`kind` が読めなければ `Serve`。`index` は並び順で振り直す。
+   - `hasAnimal`＝false か個体が読めないブースの売り物は、`bought`＝true のもの以外捨てる。`nextOfferId` は残った売り物の最大の番号＋1 より小さければ直す（最低1）。
+   - `noticeStage` は0〜2に丸める。
+
+**テスト（足すもの。既存のテストの書き方に合わせる）**
+- `ColonySaveServiceTests`：申し込み（固定前・出品2件）／当日（固定・行動2回・ブースの売り物1件と買った1件）／結果だけ（`LastSummary` と未読）の3つの往復で中身が同じ。スキーマ3のファイル（既存のテストのスキーマ3の JSON を使う）が `MigrateLegacy` を通らずに読めて `Events.Entry` が null・バックアップが作られない。異常系：番号−1、価格0の出品、重複、許容幅3、行動が10回、`kind`＝"???"、個体のないブースの売り物。
+- `ColonySessionTests`：①申し込んでから `SkipToNextEventDay` → `report.Events.DayStartedNumber == 番号`・固定済み。②申し込まずに `SkipToNextEventDay` → 受付中の回の0:00の1秒後。③申し込み済みで開催日の終わりを過ぎてから `Load` → `report.Events.PendingNumber == 番号`。④保存して読み直したあと同じ選択で `PlayAction` すると読み直す前と同じ結果（Task 6 の再現性がセーブを通っても保たれる）。
+
+**確かめ方:** EditMode 全体を流す（624＋Task 1〜9 の分。減っていないこと）。PlayMode も1回流す（セッションの変更で既存の画面テストが落ちていないこと）。
+
+---
+
+### Task 10: 来場者とブースの絵（graphics）
+
+**Files:**
+- Create: `tools/sprites/event_sprites.py`（`tools/sprites/candling_sprites.py`・`gecko_sprites.py` と同じ書き方・同じパレットの考え方）
+- Create: `Assets/Resources/Event/*.png`（と Unity が作る `.meta`。インポート設定は `Assets/Resources/Candling` の既存の png に合わせる：Point・圧縮なし・Sprite）
+
+**Produces（Task 11・13 が使う）:** 次のファイル名。名前を変えない。
+- `booth_bg.png`：自分のブースの背景（机・ケース・のぼり）。横長、画面の上半分に置く。
+- `booth_case.png`：机の上の展示ケース1つ（出品の数だけ並べる。売れたケースは Task 13 で「SOLD」の札を重ねる）。
+- `sold_tag.png`：売約の札。
+- `visitor_a_0.png`・`visitor_a_1.png`、`visitor_b_0/1`、`visitor_c_0/1`：来場者3種類×歩きの2コマ（spec §2.6 の「2〜3種類・2コマ」）。右向きだけ作り、左向きは画面で反転する。
+- `bubble.png`：吹き出し（9スライスで伸ばせる形。中の文字は画面が書く）。
+- `other_booth.png`：「他のブースを見る」の演出で出す別のブース。
+
+**確かめ方:** スクリプトを流して png ができること。`sips -Z 800` で縮めた一覧（来場者の2コマを並べたもの）を HQ に見せる。ドット絵の線の太さ・輪郭・影の向きを既存の個体・ケージの絵とそろえる。
+
+**コミット:** `git commit -m "Add the event booth and visitor sprites"`
+
+---
+
