@@ -52,6 +52,7 @@ iOS build notes:
 - `Assets/Scripts/Core/Incubator.cs`, `IncubatorRules.cs`, `IncubatorService*.cs` — one incubator's state (model, set temperature, humidity), its numbers (capacity, real temperature, daily failure) and the per-game-day egg advance; reports go through `IncubationReport`
 - `Assets/Scripts/Core/Candling.cs` (`Candling`, `HatchSex`) — what candling shows and the temperature-dependent hatch sex; `Core/Hatchery.cs` — hatching into the tray and tray → cage. An animal that is in no cage is in the hatchery tray (`Colony.TrayAnimals()`); code must not assume every animal has a cage
 - `Assets/Scripts/Core/FamilyTree.cs` — family tree and the light `LineageRecord` kept for animals that left; `Core/SpriteCachePolicy.cs` — LRU eviction for the pet sprite cache
+- `Assets/Scripts/Core/EventSchedule.cs`, `EventOdds.cs`, `EventRules.cs`, `EventDemand.cs`, `BoothStockGenerator.cs`, `EventState.cs`, `EventService*.cs` — 段階6（完了）のイベント販売：毎月15日の予定と出店料・上限（`EventSchedule`）、売れる確率（`EventOdds`）、出品の可否と乱数の種（`EventRules`）、他のブースの売り物（`BoothStockGenerator`）、申し込み・行動・集計（`EventService`）。仕様は GAME.md §16。セーブはスキーマ4
 - `Assets/Scripts/Gameplay/` — care actions, status, and growth
 - `Assets/Scripts/UI/` — views and input adapters only
 - Code map before reading code: `python3 ~/.claude/skills/minimal-read-edit/scripts/cs-outline.py Assets/Scripts` (types and methods with line numbers; ~21 KB vs 327 KB of source; add `--grep Word` to filter, pass one .cs file for its outline). Then Read only the line range you need (skill `minimal-read-edit`).
@@ -61,6 +62,7 @@ iOS build notes:
 
 ## Common commands (macOS)
 - Verify Unity tests: `scripts/run-unity-tests.sh` (or `scripts/run-unity-tests.sh EditMode`); results in `Logs/*-results.xml`
+- 段階6完了時のテスト件数：EditMode 730 passed、PlayMode 118 passed / 17 skipped（減らさない）
 - Summarise results/logs (totals + failures only — use this instead of reading XML/logs): `scripts/test-summary.py`
 - iOS build → Xcode build: `scripts/build-ios.sh`
 - iOS build → install and launch on the connected iPhone: `scripts/build-ios.sh --run`
