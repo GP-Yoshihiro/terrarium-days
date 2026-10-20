@@ -3468,3 +3468,30 @@ git commit -m "Lock listed animals out of pairing and wholesale"
 
 ---
 
+
+### Task 15: PlayMode の通しの確認（programmer）
+
+**Files:**
+- Test: `Assets/Tests/PlayMode/TerrariumViewTests.cs`（足す）
+
+**中身:** 1つのテストで、新しい部屋 → イベントタブで2匹を価格1,000円で出品して申し込む → 保存して読み直す（`Entry` と出品が残る）→ デバッグ「次のイベントの当日へ」→ 通知が出る → イベントタブが当日の面 → 「他のブースを見る」を1回（演出を飛ばす）→ 売り物を1匹買う（空きケージがなければデバッグの「ケージを追加」を先に押す）→ 「残りを全部接客にする」→ 結果の面で売れた個体・買った個体・差し引きが `LastSummary` と合う → 「閉じる」→ 次の回の準備の面で「出品中」の表示がどの個体にも無い → 台帳（`ledger-panel`）に出店料・売れた・購入の行がある（★13 の文）。最後にもう一度保存して読み直し、`LastSummarySeen`＝true・`Entry`＝null のまま。
+
+あわせて、アプリを閉じている間に開催日の終わりを過ぎた場合：申し込んで、`SimulateGameTime` で開催日の翌日まで進めてから `Load` し直す → 「…の続きがあります（イベントタブ）」が出て、当日の面から続けられる。
+
+**確かめ方:** PlayMode 全体を流す（103 passed / 14 skipped ＋この段階の分。skipped は `[Explicit]` のキャプチャ）。EditMode 全体も流す。
+
+**コミット:** `git commit -m "Add the event loop PlayMode test"`
+
+---
+
+### Task 16: 説明の更新と実機の確認（programmer → HQ が利用者に頼む）
+
+**Files:**
+- Modify: `GAME.md`（イベントの章：回の予定・出店料・出品の上限・行動の数・売れる確率の考え方・値引きの幅・ブースの売り物・出品中のロック・通知。数字は Task 1・2 の定数と同じにする）
+- Modify: `CLAUDE.md`（段階6の行を「完了」にする。新しい Core の型（`EventSchedule`・`EventOdds`・`EventService` など）と、テストの件数を更新する。既存の書き方に合わせる）
+
+**確かめ方:** EditMode・PlayMode を全部流して件数を記録する（Review Focus と同じ形）。`scripts/capture-screens.sh` で Task 11〜13 のキャプチャを撮り直して HQ に見せる。
+
+**実機の確認（HQ が利用者に頼む。作業者はしない）:** iPhone で ①申し込み → ②デバッグ「次のイベントの当日へ」→ ③接客と他のブースを見る（演出の長さ・来場者の動き・吹き出しが読めるか）→ ④ブースで買う → ⑤結果の画面 → ⑥アプリを閉じて開き直しても結果が残る、を見てもらう。
+
+**コミット:** `git commit -m "Document phase 6 events"`
