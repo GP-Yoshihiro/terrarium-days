@@ -160,6 +160,12 @@ namespace TerrariumDays.Core
                 }
             }
 
+            // A loaded entry can be exhausted with nothing left to buy; finish it so the event cannot stay open forever.
+            if (entry.Frozen)
+            {
+                FinishIfDone(colony, entry);
+            }
+
             return report;
         }
 

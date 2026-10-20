@@ -68,7 +68,9 @@ namespace TerrariumDays.Tests
         [Test]
         public void SameChoices_GiveSameResults()
         {
-            Assert.That(Transcript(Mixed, 0d), Is.EqualTo(Transcript(Mixed, 0d)));
+            var transcript = Transcript(Mixed, 0d);
+            Assert.That(transcript, Does.Match(@"\d+:\d+:\d+;|\d+:[^:\n]+:\d+:(True|False)"), "the transcript must hold a sale or an offer line");
+            Assert.That(transcript, Is.EqualTo(Transcript(Mixed, 0d)));
         }
 
         [Test]

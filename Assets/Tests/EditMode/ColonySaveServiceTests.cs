@@ -1066,16 +1066,89 @@ namespace TerrariumDays.Tests
         [Test]
         public void EventListing_MoreThanTheMaximumIsCut()
         {
-            var loaded = LoadAfterEdit(Registered(3, false), d =>
+            var loaded = LoadAfterEdit(Registered(8, false), d =>
             {
                 d.events.entry.number = 1; // a small event: at most 5
-                for (var i = 0; i < 8; i++)
+                d.events.entry.listings.Clear();
+                foreach (var animal in d.animals.Take(7))
                 {
-                    d.events.entry.listings.Add(new EventListingSaveData { animalId = d.animals[0].id, price = 5000 });
+                    d.events.entry.listings.Add(new EventListingSaveData { animalId = animal.id, price = 5000 });
                 }
             });
 
-            Assert.That(loaded.Events.Entry.Listings.Count, Is.LessThanOrEqualTo(EventSchedule.MaxListings(EventKind.Small)));
+            Assert.That(loaded.Events.Entry.Listings.Count, Is.EqualTo(EventSchedule.MaxListings(EventKind.Small)));
+        }
+
+        [Test]
+        public void EventListing_FrozenSoldInActionIsClamped()
+        {
+            var loaded = LoadAfterEdit(Registered(3, true), d =>
+            {
+                d.events.entry.listings[0].soldInActionPlusOne = -7;
+                d.events.entry.listings[1].soldInActionPlusOne = 99;
+            });
+
+            var listings = loaded.Events.Entry.Listings;
+            Assert.That(listings[0].SoldInAction, Is.EqualTo(-1));
+            Assert.That(listings[1].SoldInAction, Is.EqualTo(EventSchedule.ActionCount(EventKind.Big) - 1));
+        }
+
+        [Test]
+        public void EventListing_FrozenBadChanceIsRecomputed()
+        {
+            var loaded = LoadAfterEdit(Registered(3, true), d =>
+            {
+                d.events.entry.listings[0].frozenChance = double.NaN;
+                d.events.entry.listings[1].frozenChance = 7d;
+            });
+
+            foreach (var listing in loaded.Events.Entry.Listings)
+            {
+                Assert.That(listing.FrozenChance, Is.InRange(0d, 1d));
+            }
+        }
+
+        [Test]
+        public void EventListing_FrozenBadChanceWithoutBaseIsDropped()
+        {
+            var loaded = LoadAfterEdit(Registered(3, true), d =>
+            {
+                d.events.entry.listings[0].frozenChance = double.NaN;
+                d.events.entry.listings[0].frozenBase = 0;
+            });
+
+            Assert.That(loaded.Events.Entry.Listings, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void EventListing_FrozenDuplicateAndMaximumAreCut()
+        {
+            var duplicate = LoadAfterEdit(Registered(3, true), d =>
+                d.events.entry.listings.Add(UnityEngine.JsonUtility.FromJson<EventListingSaveData>(UnityEngine.JsonUtility.ToJson(d.events.entry.listings[0]))));
+            Assert.That(duplicate.Events.Entry.Listings, Has.Count.EqualTo(2));
+
+            var capped = LoadAfterEdit(Registered(8, true), d => d.events.entry.number = 1);
+            Assert.That(capped.Events.Entry.Listings.Count, Is.EqualTo(EventSchedule.MaxListings(EventKind.Small)));
+        }
+
+        [Test]
+        public void EventEntry_LoadedWithEveryActionPlayedCanFinish()
+        {
+            var colony = Registered(3, true);
+            var loaded = LoadAfterEdit(colony, d =>
+            {
+                for (var i = 0; i < 10; i++)
+                {
+                    d.events.entry.actions.Add(new EventActionSaveData { index = i, kind = "Serve", playedAtUtc = "" });
+                }
+            });
+            Assert.That(loaded.Events.Entry, Is.Not.Null);
+
+            var calendar = new GameCalendar(loaded.CalendarEpochUtc);
+            events.Advance(loaded, calendar, EventSchedule.StartUtc(calendar, 0) + TimeSpan.FromMinutes(1));
+
+            Assert.That(loaded.Events.Entry, Is.Null);
+            Assert.That(loaded.Events.LastSummary, Is.Not.Null);
         }
 
         [Test]

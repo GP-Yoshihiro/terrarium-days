@@ -124,16 +124,17 @@ Exact decay rates, action amounts, and stage thresholds must live in one tuning 
 - **Family tree**: a family-tree screen (opened by tapping an animal row in the ledger's Animals list; its 「ケージを見る」 button goes on to the cage detail and is hidden for tray pets) shows an animal's parents and grandparents; the ledger detail also lists mother and father. An animal that has been sold leaves a light record (id, name, morph, sex) so the tree does not break.
 - **Debug**: the debug panel has an "add eggs to incubator" button that puts up to three fertile eggs at 90% into the first incubator with room; one 12-hour debug step is about 15 game days, enough to reach a hatch.
 
-## 16. イベント販売（段階6）
-- **開催の予定**: 毎月15日、ゲーム内の10:00〜17:00。4・7・10・12月は大規模（ジャパン・レプタイルズ・フェスタ、春・夏・秋・冬）、それ以外は小規模（レプタイル・マルシェ）。イベントの番号はゲーム開始からの月の通し番号（2026年4月＝0）。申し込みは前日の14日まで、いちばん近い未開催のイベントだけ受け付ける。
-- **出店料・出品の上限・行動の数**: 小規模は出店料3,000円・出品は最大5匹・行動5回、大規模は出店料10,000円・出品は最大10匹・行動8回。出店料は申し込み時に台帳へ記録する。
-- **出品**: 申し込み画面で出品する個体を選び、価格と値引きの許容幅（0・5・10・15・20%）を決める。トレイにいる個体・抱卵中・ペアリング中・衰弱中の個体は出品できない。出品中の個体は「出品中」と表示され、問屋への売却ができない。
-- **当日の流れ**: 当日は行動を1回ずつ選ぶ。「接客」は自分のブースで客に応対し、「他のブースを見る」は来場者の動きと吹き出しを見て、相手のブースの売り物を買える。行動を全部使い切るか、終了ボタンで途中で終えると集計に進む。アプリを閉じて開き直しても途中の状態と結果が残り、当日を過ぎてから遊んでも同じ結果になる。
-- **売れる確率の考え方**: 基準値は相場（需要込み）。実効の価格＝価格 ×（1 − 許容幅 ÷ 2）、r＝実効の価格 ÷ 基準値として、イベント全体の売れる確率 P＝上限 ÷（1＋exp(k(r−1)))、k＝ln3 ÷ 0.3、最大98%（上限は小規模1.2・大規模1.5）。全行動を接客に使うと全体がちょうど P になるよう、1回の接客の確率は 1 −（1 − P）^(1/行動の数)。ブースを見る行動の接客は、その0.6倍。結果は乱数の種（イベントの番号、出品の内容と価格、行動の番号、行動の種類）で決まり、遊んだ時刻には依存しない。
-- **値引き**: 売値＝価格 ×（1 − 許容幅 × u）を100円単位に丸める。
-- **ブースの売り物**: 他のブースは1回1〜3匹。珍しい個体が1匹以上出る確率は小規模15%・大規模25%。値段は相場 × 需要 × 1.0〜1.15で、値切りはできない。卵は売らない。空きケージがないと買えない（「ケージが足りません」、「購入」は押せない）。珍しい個体はショップには出ない。
-- **集計と台帳**: 売れた個体は手放し（家系の記録は残る）、売上は行動を遊んだ時刻・イベント名つきで台帳に記録する。
-- **通知**: 終わっていない当日の続きがあるとき、イベントのタブへ誘う文をアプリ内のお知らせに出す。端末へのプッシュ通知は出さない。
-- **セーブ**: スキーマ4。スキーマ3以前のファイルは「申し込みなし」で読める。
+## 16. Event sales (phase 6)
+- **Schedule**: an event happens on the 15th of every game month, from 10:00 to 17:00 game time. April, July, October and December are big events (Japan Reptiles Festa: spring, summer, autumn, winter); all other months are small events (Reptile Marche). The event number counts months from the game start (April 2026 = 0). Registration is open until the 14th, and only the nearest event that has not happened yet can be registered for.
+- **Fee, listing cap, actions** (`EventSchedule`): small = 3,000 yen fee, at most 5 listings, 5 actions; big = 10,000 yen fee, at most 10 listings, 8 actions. The fee is written to the ledger at registration and is not refunded.
+- **Listing**: on the prep screen the player picks the animals to list, a price and a discount tolerance (0, 5, 10, 15 or 20%). Listings can be edited until the day before. At 0:00 on the event day everything is frozen (animals, prices, odds and the random seed). Animals in the tray, incubating eggs, in a pairing, or weak cannot be listed. A listed animal is shown as "出品中" and is locked everywhere: pairing, wholesale sale (including the tray sell) and the cage alert. A listed animal that disappears from the room is withdrawn at the next catch-up.
+- **The day**: the day waits for the player, whatever the clock says. The player picks one action at a time. "Serve" works the player's own booth. "Browse" watches the other visitors and booths, and the player can buy from other booths. There is also "serve all remaining", which plays every remaining action as Serve. There is no early-end button: the event moves to the result once every action is played and nothing is left to buy. Each action is replayed as a short scene, which can be skipped. Closing and reopening the app keeps the state and the result, and playing after the day has passed gives the same result.
+- **Sale odds** (`EventOdds`): the base value is the market price including demand. Effective price = price x (1 - tolerance / 2); r = effective price / base value. The chance that a listing sells over the whole event is P = cap / (1 + exp(k (r - 1))) with k = ln 3 / 0.3, at most 98%, where the cap is 1.2 for small and 1.5 for big events. The per-action chance is 1 - (1 - P)^(1 / action count), so serving every action gives exactly P. A Browse action uses 0.6 times that per-action chance. Results depend only on a seed (event number, listings and prices, action index, action kind), never on the time played.
+- **Discount**: sale price = price x (1 - tolerance x u), rounded to 100 yen.
+- **Other booths**: browsing shows 1 to 3 animals per action. The chance of at least one rare animal is 15% (small) or 25% (big). The price is market price x demand x 1.0 to 1.15, with no haggling. Eggs are never sold. Buying needs an empty cage; otherwise the dialog says "ケージが足りません" and the buy button is disabled. Rare animals never appear in the shop. The buy dialog has 購入 and キャンセル.
+- **Result and ledger**: sold animals leave the room (their lineage record stays). Sales go to the ledger as "イベント売上" and the fee as "出店料", each stamped with the play time and the event name. The result screen stays until the player closes it.
+- **Notices** (in-app only, no push notifications): 3 days before the deadline and again the day before; the event day starting; an unfinished day waiting to be continued; and a withdrawn-listing notice.
+- **Debug**: the debug panel has a "jump to the next event day" button.
+- **Save**: schema 4. Schema 3 and older files load as "not registered".
 
 Detailed specs: docs/superpowers/specs/2026-09-25-breeder-sim-design.md, docs/superpowers/specs/2026-10-17-phase5-incubation-design.md, docs/superpowers/specs/2026-10-20-phase6-events-design.md

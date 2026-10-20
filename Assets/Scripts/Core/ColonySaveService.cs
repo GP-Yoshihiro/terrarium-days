@@ -8,7 +8,7 @@ using UnityEngine;
 namespace TerrariumDays.Core
 {
     /// <summary>
-    /// Saves and loads the colony (schema 3). Schema 1/2 single-pet saves are migrated into
+    /// Saves and loads the colony (schema 4). Schema 1/2 single-pet saves are migrated into
     /// cage 1 and the original file is kept as a backup.
     /// </summary>
     public sealed class ColonySaveService
@@ -651,16 +651,30 @@ namespace TerrariumDays.Core
                         continue;
                     }
 
+                    if (seen.Contains(l.animalId) || entry.Listings.Count >= maxListings)
+                    {
+                        continue;
+                    }
+
+                    var chance = l.frozenChance;
                     if (!d.frozen)
                     {
                         if (colony.AnimalById(l.animalId) == null
-                            || seen.Contains(l.animalId)
                             || l.price < EventService.MinPrice
-                            || !EventOdds.IsValidTolerance(l.tolerancePercent)
-                            || entry.Listings.Count >= maxListings)
+                            || !EventOdds.IsValidTolerance(l.tolerancePercent))
                         {
                             continue;
                         }
+                    }
+                    else if (double.IsNaN(chance) || chance < 0d || chance > 1d)
+                    {
+                        // Bad chance: recompute it from the frozen base value, or drop the listing when that is unusable.
+                        if (l.frozenBase <= 0 || !EventOdds.IsValidTolerance(l.tolerancePercent))
+                        {
+                            continue;
+                        }
+
+                        chance = EventOdds.SaleChance(l.price, l.tolerancePercent, l.frozenBase, kind);
                     }
 
                     seen.Add(l.animalId);
@@ -670,8 +684,8 @@ namespace TerrariumDays.Core
                         Price = l.price,
                         TolerancePercent = l.tolerancePercent,
                         FrozenBase = l.frozenBase,
-                        FrozenChance = l.frozenChance,
-                        SoldInAction = l.soldInActionPlusOne - 1,
+                        FrozenChance = chance,
+                        SoldInAction = System.Math.Max(-1, System.Math.Min(l.soldInActionPlusOne - 1, EventSchedule.ActionCount(kind) - 1)),
                     });
                 }
             }

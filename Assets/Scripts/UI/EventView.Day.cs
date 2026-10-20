@@ -249,7 +249,7 @@ namespace TerrariumDays.UI
             browseButton.SetEnabled(canAct);
             serveAllButton.SetEnabled(canAct);
             skipButton.SetEnabled(Playing);
-            finishButton.style.visibility = !Playing && left == 0 && visible.Count > 0 ? Visibility.Visible : Visibility.Hidden;
+            finishButton.style.visibility = !Playing && left == 0 ? Visibility.Visible : Visibility.Hidden;
             finishButton.SetEnabled(!Playing && left == 0);
             UpdateLog();
             UpdateVisitor();

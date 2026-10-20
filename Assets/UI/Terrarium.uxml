@@ -198,7 +198,7 @@
                 <ui:Label name="event-buy-reason" text="" class="event-buy-reason" />
                 <ui:VisualElement class="confirm-button-row">
                     <ui:Button name="event-buy-yes-button" text="購入" class="confirm-yes-button event-button-disable" />
-                    <ui:Button name="event-buy-no-button" text="やめる" class="confirm-no-button" />
+                    <ui:Button name="event-buy-no-button" text="キャンセル" class="confirm-no-button" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
