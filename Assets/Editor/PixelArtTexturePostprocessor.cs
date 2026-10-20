@@ -17,6 +17,8 @@ namespace TerrariumDays.Editor
             "Assets/Resources/Event/",
         };
 
+        public override uint GetVersion() => 2;
+
         private void OnPreprocessTexture()
         {
             if (!IsPixelArt(assetPath))
@@ -37,8 +39,8 @@ namespace TerrariumDays.Editor
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             if (assetPath == "Assets/Resources/Event/bubble.png")
             {
-                // 9-slice: 4 art px at the 2x output scale = 8 px on every side.
-                importer.spriteBorder = new Vector4(8, 8, 8, 8);
+                // 9-slice (left, bottom, right, top): 8 px borders at output scale; left is 20 so the tail (logical x 5..9) is never stretched.
+                importer.spriteBorder = new Vector4(20, 8, 8, 8);
             }
         }
 
