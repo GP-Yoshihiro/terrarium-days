@@ -125,6 +125,51 @@
                         <ui:Label name="hatch-tray-empty" text="孵化トレイは空です" class="hatch-tray-empty" />
                     </ui:ScrollView>
                 </ui:VisualElement>
+                <ui:VisualElement name="events-panel" class="panel">
+                    <ui:VisualElement name="event-prep" class="event-surface">
+                        <ui:Label name="event-prep-title" text="" class="event-title" />
+                        <ui:Label name="event-prep-info" text="" class="event-info" />
+                        <ui:ScrollView name="event-prep-list" class="event-list" />
+                        <ui:Label name="event-prep-total" text="" class="event-total" />
+                        <ui:Label name="event-prep-count" text="" class="event-info" />
+                        <ui:Label name="event-prep-message" text="" class="event-message" />
+                        <ui:VisualElement class="event-button-row">
+                            <ui:Button name="event-prep-save-button" text="出品を直す" class="event-button" />
+                            <ui:Button name="event-prep-register-button" text="申し込む" class="event-button" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="event-day" class="event-surface">
+                        <ui:Label name="event-day-title" text="" class="event-title" />
+                        <ui:Label name="event-day-left" text="" class="event-info" />
+                        <ui:VisualElement name="event-day-stage" class="event-stage" />
+                        <ui:VisualElement name="event-day-offers" class="event-offers" />
+                        <ui:VisualElement class="event-button-row">
+                            <ui:Button name="event-day-serve-button" text="接客する" class="event-button" />
+                            <ui:Button name="event-day-browse-button" text="他のブースを見る" class="event-button" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="event-button-row">
+                            <ui:Button name="event-day-serve-all-button" text="残りを全部接客にする" class="event-button" />
+                            <ui:Button name="event-day-skip-button" text="飛ばす" class="event-button" />
+                            <ui:Button name="event-day-finish-button" text="集計へ" class="event-button" />
+                        </ui:VisualElement>
+                        <ui:ScrollView name="event-day-log" class="event-log" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="event-result" class="event-surface">
+                        <ui:Label name="event-result-title" text="" class="event-title" />
+                        <ui:ScrollView class="event-list">
+                            <ui:Label text="売れた" class="event-section-title" />
+                            <ui:VisualElement name="event-result-sold" class="event-result-block" />
+                            <ui:Label text="売れ残り" class="event-section-title" />
+                            <ui:VisualElement name="event-result-unsold" class="event-result-block" />
+                            <ui:Label text="仕入れ" class="event-section-title" />
+                            <ui:VisualElement name="event-result-bought" class="event-result-block" />
+                        </ui:ScrollView>
+                        <ui:Label name="event-result-totals" text="" class="event-total" />
+                        <ui:VisualElement class="event-button-row">
+                            <ui:Button name="event-result-close-button" text="閉じる" class="event-button" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
                 <ui:VisualElement name="placeholder-panel" class="panel">
                     <ui:Label name="placeholder-label" text="" class="placeholder-label" />
                 </ui:VisualElement>
@@ -144,6 +189,16 @@
                 <ui:VisualElement class="confirm-button-row">
                     <ui:Button name="confirm-yes-button" text="はい" class="confirm-yes-button" />
                     <ui:Button name="confirm-no-button" text="いいえ" class="confirm-no-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="event-buy-modal" class="milestone-modal-overlay" style="display: none;">
+            <ui:VisualElement class="milestone-modal-card">
+                <ui:Label name="event-buy-message" text="" class="milestone-message-label" />
+                <ui:Label name="event-buy-reason" text="" class="event-buy-reason" />
+                <ui:VisualElement class="confirm-button-row">
+                    <ui:Button name="event-buy-yes-button" text="購入" class="confirm-yes-button event-button-disable" />
+                    <ui:Button name="event-buy-no-button" text="やめる" class="confirm-no-button" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

@@ -764,6 +764,90 @@ namespace TerrariumDays.Tests
             return null;
         }
 
+        /// <summary>
+        /// Captures the three event surfaces and the buy confirmation with stand-in text into
+        /// Logs/Screens/event-*.png so the frame layout can be checked before the screens are filled.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureEventFrames()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var root = Object.FindFirstObjectByType<UIDocument>().rootVisualElement;
+            NavigatorOf(view).ShowTab(ShellTab.Events);
+
+            void Show(string surface)
+            {
+                foreach (var n in new[] { "event-prep", "event-day", "event-result" })
+                {
+                    root.Q(n).style.display = n == surface ? DisplayStyle.Flex : DisplayStyle.None;
+                }
+            }
+
+            void Text(string n, string text) => root.Q<Label>(n).text = text;
+
+            void Row(VisualElement parent, string cls, string text, params string[] buttons)
+            {
+                var row = new VisualElement();
+                row.AddToClassList(cls);
+                parent.Add(row);
+                var label = new Label(text);
+                label.AddToClassList(cls == "event-offer-row" ? "event-offer-label" : "event-listing-name");
+                row.Add(label);
+                foreach (var b in buttons)
+                {
+                    var button = new Button { text = b };
+                    button.AddToClassList(cls == "event-offer-row" ? "event-offer-buy" : "event-listing-plus");
+                    row.Add(button);
+                }
+            }
+
+            Show("event-prep");
+            Text("event-prep-title", "第7回 春のレプタイルフェア 4月15日");
+            Text("event-prep-info", "出店料 10,000円 / 出品は最大10匹 / 締め切り 4月14日");
+            var prepList = root.Q<ScrollView>("event-prep-list");
+            for (var i = 0; i < 6; i++)
+            {
+                Row(prepList, "event-listing-row", "ヒョウモントカゲモドキ 28,500円 売れる確率 62%", "+");
+            }
+
+            Text("event-prep-total", "期待値の合計 84,000円");
+            Text("event-prep-count", "出品 2/10匹");
+            Text("event-prep-message", "出店料 10,000円を払います");
+            yield return Capture(outputDir, "event-prep");
+
+            Show("event-day");
+            Text("event-day-title", "第7回 春のレプタイルフェア");
+            Text("event-day-left", "残りの行動 3/8");
+            var offers = root.Q("event-day-offers");
+            Row(offers, "event-offer-row", "ノーマル 12,000円", "購入");
+            Row(offers, "event-offer-row", "タンジェリン 30,000円", "購入");
+            var log = root.Q<ScrollView>("event-day-log");
+            for (var i = 0; i < 6; i++)
+            {
+                log.Add(new Label("接客 " + (i + 1) + ": ヒョウモンさんが27,000円で買いました"));
+            }
+
+            yield return Capture(outputDir, "event-day");
+
+            Show("event-result");
+            Text("event-result-title", "第7回 春のレプタイルフェア 結果");
+            root.Q("event-result-sold").Add(new Label("ヒョウモン 27,000円"));
+            root.Q("event-result-unsold").Add(new Label("コーン 売れ残り"));
+            root.Q("event-result-bought").Add(new Label("ノーマル 12,000円"));
+            Text("event-result-totals", "売上 27,000円 / 仕入れ 12,000円 / 出店料 10,000円 / 差し引き 5,000円");
+            yield return Capture(outputDir, "event-result");
+
+            Text("event-buy-message", "ノーマルを12,000円で買いますか");
+            Text("event-buy-reason", "ケージが足りません");
+            root.Q<Button>("event-buy-yes-button").SetEnabled(false);
+            root.Q("event-buy-modal").style.display = DisplayStyle.Flex;
+            yield return Capture(outputDir, "event-buy-modal");
+        }
+
         private IEnumerator Capture(string outputDir, string name)
         {
             yield return null;

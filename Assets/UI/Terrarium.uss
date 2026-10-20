@@ -1380,3 +1380,221 @@
     height: 36px;
     margin: 0;
 }
+
+/* Event tab frame. One surface (prep, day or result) is shown at a time. */
+.event-surface {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.event-title {
+    flex-shrink: 0;
+    margin: 8px 16px 0;
+    font-size: 18px;
+    -unity-font-style: bold;
+    color: rgb(90, 62, 40);
+}
+
+.event-info {
+    flex-shrink: 0;
+    margin: 4px 16px 0;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    white-space: normal;
+}
+
+.event-section-title {
+    margin: 8px 0 4px 0;
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(140, 110, 80);
+}
+
+.event-list {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    min-height: 0;
+    padding: 0 12px;
+}
+
+.event-total {
+    flex-shrink: 0;
+    margin: 6px 16px 0;
+    white-space: normal;
+    font-size: 16px;
+    -unity-font-style: bold;
+    color: rgb(90, 62, 40);
+}
+
+.event-message {
+    height: 24px;
+    min-height: 24px;
+    flex-shrink: 0;
+    margin: 4px 16px;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.event-result-block {
+    flex-direction: column;
+}
+
+.event-button-row {
+    flex-shrink: 0;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 4px 12px 0;
+}
+
+.event-button {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-height: 44px;
+    margin: 0 4px 4px 4px;
+    padding: 0 4px;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgb(255, 167, 38);
+    color: rgb(255, 255, 255);
+    font-size: 14px;
+    -unity-font-style: bold;
+    white-space: normal;
+}
+
+.event-button:disabled {
+    opacity: 0.45;
+}
+
+.event-stage {
+    height: 40%;
+    flex-shrink: 0;
+    margin: 6px 12px 0;
+    border-radius: 10px;
+    background-image: url("/Assets/Resources/Event/booth_bg.png");
+    -unity-background-scale-mode: scale-and-crop;
+    overflow: hidden;
+}
+
+.event-offers {
+    flex-direction: column;
+    padding: 4px 12px 0;
+}
+
+.event-offer-row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 44px;
+    margin: 0 0 4px 0;
+    padding: 4px 8px;
+    border-radius: 10px;
+    background-color: rgba(90, 62, 40, 0.08);
+}
+
+.event-offer-label {
+    flex-grow: 1;
+    flex-shrink: 1;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    white-space: normal;
+}
+
+.event-offer-buy {
+    width: 80px;
+    min-height: 40px;
+    margin: 0;
+    border-radius: 10px;
+    border-width: 0;
+    background-color: rgb(255, 167, 38);
+    color: rgb(255, 255, 255);
+    font-size: 14px;
+    -unity-font-style: bold;
+}
+
+.event-offer-buy:disabled {
+    opacity: 0.45;
+}
+
+.event-log {
+    height: 150px;
+    min-height: 150px;
+    flex-shrink: 0;
+    margin: 4px 12px 8px;
+    padding: 4px 8px;
+    border-radius: 10px;
+    background-color: rgba(90, 62, 40, 0.08);
+}
+
+.event-listing-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: 56px;
+    margin: 0 0 6px 0;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background-color: rgba(90, 62, 40, 0.08);
+}
+
+.event-listing-check {
+    width: 32px;
+    margin: 0 6px 0 0;
+}
+
+.event-listing-name {
+    flex-grow: 1;
+    flex-basis: 0;
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    white-space: normal;
+}
+
+.event-listing-price {
+    font-size: 14px;
+    color: rgb(90, 62, 40);
+    margin: 0 4px;
+}
+
+.event-listing-minus,
+.event-listing-plus {
+    width: 36px;
+    height: 36px;
+    margin: 0 2px;
+    padding: 0;
+    border-radius: 8px;
+    border-width: 0;
+    background-color: rgba(90, 62, 40, 0.4);
+    color: rgb(255, 255, 255);
+    font-size: 16px;
+    -unity-font-style: bold;
+}
+
+.event-listing-tolerance,
+.event-listing-chance {
+    font-size: 13px;
+    color: rgb(90, 62, 40);
+    margin: 0 4px;
+}
+
+.event-listing-reason {
+    width: 100%;
+    font-size: 12px;
+    color: rgb(170, 70, 50);
+    white-space: normal;
+}
+
+.event-buy-reason {
+    min-height: 20px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: rgb(170, 70, 50);
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.event-button-disable:disabled {
+    opacity: 0.45;
+}
