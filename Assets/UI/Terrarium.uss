@@ -1389,6 +1389,7 @@
 
 .event-title {
     flex-shrink: 0;
+    white-space: normal;
     margin: 8px 16px 0;
     font-size: 18px;
     -unity-font-style: bold;
@@ -1540,13 +1541,20 @@
 }
 
 .event-listing-check {
-    width: 32px;
+    width: 36px;
+    height: 36px;
     margin: 0 6px 0 0;
+    padding: 0;
+    border-radius: 8px;
+    border-width: 0;
+    background-color: rgba(90, 62, 40, 0.2);
+    color: rgb(90, 62, 40);
+    font-size: 18px;
 }
 
 .event-listing-name {
     flex-grow: 1;
-    flex-basis: 0;
+    flex-basis: 80%;
     font-size: 14px;
     color: rgb(90, 62, 40);
     white-space: normal;

@@ -145,6 +145,7 @@ namespace TerrariumDays.UI
         private LedgerView ledgerView;
         private PairingView pairingView;
         private IncubatorView incubatorView;
+        private EventView eventView;
         private ConfirmDialog confirmDialog;
         private Label shopMessageLabel;
         private Label cageListEmptyLabel;
@@ -217,6 +218,7 @@ namespace TerrariumDays.UI
             }
 
             WireIncubatorEvents();
+            WireEventEvents();
 
             homeButton.clicked += OnHomeButtonClicked;
             prevCageButton.clicked += OnPrevCageButtonClicked;
@@ -672,6 +674,12 @@ namespace TerrariumDays.UI
                 incubatorView?.Invalidate();
             }
 
+            if (tab == ShellTab.Events)
+            {
+                eventView?.Invalidate();
+                eventView?.ShowMessage(string.Empty);
+            }
+
             RefreshShell();
         }
 
@@ -972,6 +980,12 @@ namespace TerrariumDays.UI
                 incubatorView.RemoveRequested -= OnIncubatorRemoveRequested;
                 incubatorView.MoveToCageRequested -= OnTrayMoveToCageRequested;
                 incubatorView.SellRequested -= OnTraySellRequested;
+            }
+
+            if (eventView != null)
+            {
+                eventView.RegisterRequested -= OnEventRegisterRequested;
+                eventView.SaveRequested -= OnEventSaveRequested;
             }
 
             confirmDialog?.Dispose();
@@ -1292,6 +1306,9 @@ namespace TerrariumDays.UI
             var incubatorPanel = root.Q<VisualElement>("incubator-panel");
             incubatorView = incubatorPanel != null ? new IncubatorView(incubatorPanel) : null;
 
+            var eventsPanel = root.Q<VisualElement>("events-panel");
+            eventView = eventsPanel != null ? new EventView(eventsPanel) : null;
+
             var confirmModal = root.Q<VisualElement>("confirm-modal");
             confirmDialog = new ConfirmDialog(confirmModal, root.Q<Label>("confirm-message-label"),
                 root.Q<Button>("confirm-yes-button"), root.Q<Button>("confirm-no-button"));
@@ -1493,6 +1510,11 @@ namespace TerrariumDays.UI
             if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Incubator)
             {
                 incubatorView?.Render(session.Colony, session.Incubation, now, session.Room.TemperatureC, tuning);
+            }
+
+            if (navigator != null && navigator.Screen == ShellScreen.Main && navigator.Tab == ShellTab.Events)
+            {
+                eventView?.Render(session, now);
             }
         }
 
@@ -2502,6 +2524,53 @@ namespace TerrariumDays.UI
 
             incubatorView?.ClearSelection();
             AfterIncubatorAction();
+        }
+
+        /// <summary>Subscribes the events tab's actions; Awake and the PlayMode harness (which skips Awake) both call it.</summary>
+        public void WireEventEvents()
+        {
+            if (eventView == null)
+            {
+                return;
+            }
+
+            eventView.RegisterRequested += OnEventRegisterRequested;
+            eventView.SaveRequested += OnEventSaveRequested;
+        }
+
+        private void OnEventRegisterRequested(int number, List<ListingRequest> requests)
+        {
+            confirmDialog?.Show(EventText.ConfirmRegister(number), () => ConfirmEventRegister(number, requests));
+        }
+
+        private void ConfirmEventRegister(int number, List<ListingRequest> requests)
+        {
+            var result = session.Events.Register(session.Colony, session.Calendar, number, requests, GameNowUtc());
+            if (result != EventRegisterResult.Ok)
+            {
+                eventView?.ShowMessage(EventText.RegisterFailure(result));
+                return;
+            }
+
+            eventView?.ShowMessage(string.Empty);
+            SaveCurrentState();
+            eventView?.Invalidate();
+            ColonyChanged?.Invoke();
+        }
+
+        private void OnEventSaveRequested(List<ListingRequest> requests)
+        {
+            var result = session.Events.UpdateListings(session.Colony, session.Calendar, requests, GameNowUtc());
+            if (result != EventRegisterResult.Ok)
+            {
+                eventView?.ShowMessage(EventText.RegisterFailure(result));
+                return;
+            }
+
+            eventView?.ShowMessage("出品を直しました");
+            SaveCurrentState();
+            eventView?.Invalidate();
+            RefreshShell();
         }
 
         /// <summary>Subscribes the incubator tab's events; Awake and the PlayMode harness (which skips Awake) both call it.</summary>

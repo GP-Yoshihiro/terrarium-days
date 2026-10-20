@@ -1,5 +1,6 @@
 using System.Collections;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using TerrariumDays.Core;
@@ -449,6 +450,50 @@ namespace TerrariumDays.Tests
             NavigatorOf(view).ShowTab(ShellTab.Incubator);
             yield return new WaitForSeconds(0.5f);
             yield return Capture(outputDir, "incubator-cards");
+        }
+
+        /// <summary>
+        /// Captures the event preparation screen into Logs/Screens/event-prep.png (three animals
+        /// checked, not yet entered) and event-prep-entered.png (after entering) (phase 6 Task 12).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureEventPrep()
+        {
+            TerrariumView view = null;
+            string outputDir = null;
+            yield return SetupScene(v => view = v, dir => outputDir = dir);
+            yield return new WaitForSeconds(1.5f);
+
+            var session = view.Session;
+            var colony = session.Colony;
+            for (var i = 0; i < 4; i++)
+            {
+                var cage = colony.AddCage(CageSize.Standard);
+                colony.AddAnimal(new PetState { Name = "ピコ" + i, WeightGrams = 80d + 20d * i, Stage = GrowthStage.Adult }, cage);
+            }
+
+            colony.Wallet.Earn(System.Math.Max(0L, -colony.Wallet.Money) + 50000L, LedgerCategory.EventSale, "capture", session.GameNowUtc);
+            foreach (var pet in colony.Animals)
+            {
+                pet.Weak = false;
+                pet.Gravid = null;
+            }
+
+            var document = view.GetComponent<UIDocument>();
+            NavigatorOf(view).ShowTab(ShellTab.Events);
+            yield return new WaitForSeconds(0.5f);
+            foreach (var pet in colony.Animals.OrderBy(p => p.Id).Take(3))
+            {
+                ClickNamed(document, $"event-check-{pet.Id}");
+            }
+
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "event-prep");
+
+            ClickNamed(document, "event-prep-register-button");
+            ClickNamed(document, "confirm-yes-button");
+            yield return new WaitForSeconds(0.5f);
+            yield return Capture(outputDir, "event-prep-entered");
         }
 
         /// <summary>

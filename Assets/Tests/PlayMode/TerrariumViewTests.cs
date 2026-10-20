@@ -75,6 +75,7 @@ namespace TerrariumDays.Tests
         private Label cageListEmptyLabel;
         private VisualElement breedingPanel;
         private VisualElement incubatorPanel;
+        private VisualElement eventsPanel;
         private Label incubatorEggDetail;
         private Label breedingSeasonLabel;
         private Label breedingMessageLabel;
@@ -265,8 +266,23 @@ namespace TerrariumDays.Tests
             incubatorPanel.Add(new VisualElement { name = "hatch-tray-list" });
             incubatorPanel.Add(new Label { name = "hatch-tray-empty" });
 
+            eventsPanel = new VisualElement { name = "events-panel" };
+            var prepSurface = new VisualElement { name = "event-prep" };
+            prepSurface.Add(new Label { name = "event-prep-title" });
+            prepSurface.Add(new Label { name = "event-prep-info" });
+            prepSurface.Add(new ScrollView { name = "event-prep-list" });
+            prepSurface.Add(new Label { name = "event-prep-total" });
+            prepSurface.Add(new Label { name = "event-prep-count" });
+            prepSurface.Add(new Label { name = "event-prep-message" });
+            prepSurface.Add(new Button { name = "event-prep-save-button" });
+            prepSurface.Add(new Button { name = "event-prep-register-button" });
+            eventsPanel.Add(prepSurface);
+            eventsPanel.Add(new VisualElement { name = "event-day" });
+            eventsPanel.Add(new VisualElement { name = "event-result" });
+
             root.Add(breedingPanel);
             root.Add(incubatorPanel);
+            root.Add(eventsPanel);
             root.Add(topBar);
             root.Add(debugButton);
             root.Add(debugPanel);
@@ -2048,6 +2064,102 @@ namespace TerrariumDays.Tests
 
             Assert.That(colony.Pairings, Is.Empty);
             StringAssert.Contains("衰弱中です", breedingMessageLabel.text);
+        }
+
+        // ---- Events tab (phase 6 Task 12): the preparation screen. ----
+
+        private PetState OpenEventTab(out int number)
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            NavigatorOf().ShowTab(ShellTab.Events);
+            view.WireEventEvents();
+            var session = view.Session;
+            number = session.Events.OpenNumber(session.Colony, session.Calendar, session.GameNowUtc);
+            var second = session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, session.Colony.AddCage(CageSize.Standard));
+            RenderEvents();
+            return second;
+        }
+
+        private void RenderEvents()
+        {
+            var eventView = (EventView)typeof(TerrariumView).GetField("eventView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+            eventView.Render(view.Session, view.Session.GameNowUtc);
+        }
+
+        private T EventElement<T>(string name) where T : VisualElement
+        {
+            var element = eventsPanel.Q<T>(name);
+            Assert.That(element, Is.Not.Null, name);
+            return element;
+        }
+
+        private IEnumerable<string> EventTexts() => eventsPanel.Query<Label>().ToList().Select(l => l.text);
+
+        [Test]
+        public void EventsTab_ShowsThePrepSurfaceWithTheNameAndFee()
+        {
+            OpenEventTab(out var number);
+
+            Assert.That(eventsPanel.Q("event-prep").style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(eventsPanel.Q("event-day").style.display.value, Is.EqualTo(DisplayStyle.None));
+            Assert.That(eventsPanel.Q("event-result").style.display.value, Is.EqualTo(DisplayStyle.None));
+            StringAssert.Contains(EventSchedule.NameOf(number), EventElement<Label>("event-prep-title").text);
+            StringAssert.Contains(EventText.Yen(EventSchedule.BoothFee(EventSchedule.KindOf(number))), EventElement<Label>("event-prep-info").text);
+        }
+
+        [Test]
+        public void EventsTab_GravidAnimalCannotBeChecked_AndShowsTheReason()
+        {
+            var second = OpenEventTab(out _);
+            second.Gravid = new GravidState();
+            // The signature changes with the animal's problem, so the next render rebuilds the rows.
+            RenderEvents();
+
+            Assert.That(EventElement<Button>($"event-check-{second.Id}").enabledSelf, Is.False);
+            Assert.That(EventTexts(), Has.Member("抱卵中"));
+        }
+
+        [Test]
+        public void EventsTab_RegisteringTwoAnimals_PaysTheFeeAndMakesTheEntry()
+        {
+            var second = OpenEventTab(out var number);
+            var colony = view.Session.Colony;
+            var first = colony.Animals.First(a => a.Id != second.Id);
+            var before = colony.Wallet.Money;
+
+            FindClickAction(EventElement<Button>($"event-check-{first.Id}").clickable)();
+            FindClickAction(EventElement<Button>($"event-check-{second.Id}").clickable)();
+            FindClickAction(EventElement<Button>("event-prep-register-button").clickable)();
+            ClickConfirmYes();
+            RenderEvents();
+
+            Assert.That(colony.Wallet.Money, Is.EqualTo(before - EventSchedule.BoothFee(EventSchedule.KindOf(number))));
+            Assert.That(colony.Events.Entry, Is.Not.Null);
+            Assert.That(colony.Events.Entry.Listings.Count, Is.EqualTo(2));
+            StringAssert.Contains("申し込み済み", EventElement<Label>("event-prep-title").text);
+        }
+
+        [Test]
+        public void EventsTab_PlusRaisesThePriceByOneStep_AndLowersTheChance()
+        {
+            var second = OpenEventTab(out _);
+            var priceLabel = EventElement<Label>($"event-price-{second.Id}");
+            var chanceLabel = EventElement<Label>($"event-chance-{second.Id}");
+            var priceBefore = priceLabel.text;
+            var chanceBefore = chanceLabel.text;
+
+            FindClickAction(EventElement<Button>($"event-plus-{second.Id}").clickable)();
+
+            Assert.That(priceLabel.text, Is.Not.EqualTo(priceBefore));
+            var parse = new Func<string, long>(t => long.Parse(t.Replace("円", string.Empty).Replace(",", string.Empty)));
+            Assert.That(parse(priceLabel.text), Is.EqualTo(parse(priceBefore) + 1000L));
+            var percent = new Func<string, int>(t => int.Parse(new string(t.Where(char.IsDigit).ToArray())));
+            Assert.That(percent(chanceLabel.text), Is.LessThan(percent(chanceBefore)));
+
+            // A render with nothing changed must keep the picked value.
+            RenderEvents();
+            Assert.That(parse(priceLabel.text), Is.EqualTo(parse(priceBefore) + 1000L));
         }
 
         // ---- Incubator tab (phase 5 Task 15): cards, temperature, water, candled eggs. ----
