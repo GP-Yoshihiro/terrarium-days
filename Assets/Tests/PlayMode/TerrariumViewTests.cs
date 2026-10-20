@@ -2188,6 +2188,70 @@ namespace TerrariumDays.Tests
             Assert.That(parse(priceLabel.text), Is.EqualTo(parse(priceBefore) + 1000L));
         }
 
+        // ---- Phase 6 Task 14: notices, the listed status, the debug skip. ----
+
+        private static void InvokeHandleReport(TerrariumView target, ColonyTickReport report) =>
+            typeof(TerrariumView).GetMethod("HandleReport", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(target, new object[] { report });
+
+        [Test]
+        public void ListedAnimal_ShowsTheListedStatusOnTheRackAndInTheCageRow()
+        {
+            var second = OpenEventTab(out var number);
+            var session = view.Session;
+            var requests = new List<ListingRequest> { new ListingRequest { AnimalId = second.Id, Price = 1000L, TolerancePercent = 0 } };
+            Assert.That(session.Events.Register(session.Colony, session.Calendar, number, requests, session.GameNowUtc), Is.EqualTo(EventRegisterResult.Ok));
+
+            var rackList = new VisualElement();
+            new HomeView(rackList).Render(session.Colony, session.GameNowUtc, view.Tuning);
+            var texts = rackList.Query<Label>(className: "rack-alert").ToList().ConvertAll(l => l.text);
+            Assert.That(texts.Exists(t => t.Contains(EventText.ListedStatus)), Is.True);
+
+            var cage = session.Colony.CageOf(second);
+            StringAssert.Contains(EventText.ListedStatus, CageStatusText.AlertsFor(session.Colony, cage, second, session.GameNowUtc, view.Tuning));
+        }
+
+        [Test]
+        public void ShopWholesale_OfAListedAnimal_IsRefusedWithTheListedMessage()
+        {
+            var second = OpenEventTab(out var number);
+            var session = view.Session;
+            var requests = new List<ListingRequest> { new ListingRequest { AnimalId = second.Id, Price = 1000L, TolerancePercent = 0 } };
+            Assert.That(session.Events.Register(session.Colony, session.Calendar, number, requests, session.GameNowUtc), Is.EqualTo(EventRegisterResult.Ok));
+            var money = session.Colony.Wallet.Money;
+
+            view.OnShopWholesaleRequested(second.Id);
+
+            Assert.That(shopMessageLabel.text, Is.EqualTo("出品中の個体は売れません"));
+            Assert.That(session.Colony.Animals.Contains(second), Is.True);
+            Assert.That(session.Colony.Wallet.Money, Is.EqualTo(money));
+        }
+
+        [Test]
+        public void DebugNextEventDay_ForARegisteredEvent_ShowsTheDayStartedNotice()
+        {
+            var second = OpenEventTab(out var number);
+            var session = view.Session;
+            var requests = new List<ListingRequest> { new ListingRequest { AnimalId = second.Id, Price = 1000L, TolerancePercent = 0 } };
+            Assert.That(session.Events.Register(session.Colony, session.Calendar, number, requests, session.GameNowUtc), Is.EqualTo(EventRegisterResult.Ok));
+
+            view.OnDebugNextEventDayClicked();
+
+            StringAssert.Contains(EventText.DayStartedNotice(number), feedbackLabel.text);
+        }
+
+        [Test]
+        public void EventDeadlineNotice_AppearsThreeDaysBeforeTheDeadline()
+        {
+            OpenEventTab(out var number);
+            var session = view.Session;
+            var days = EventSchedule.GameDaysUntilStart(session.Calendar, number, session.GameNowUtc);
+            var report = session.SimulateGameTime(GameCalendar.RealTimeFor(days - 3d + 0.1d));
+            InvokeHandleReport(view, report);
+
+            Assert.That(report.Events.DeadlineNoticeNumber, Is.EqualTo(number));
+            StringAssert.Contains(EventText.DeadlineNotice(number, 3), feedbackLabel.text);
+        }
+
         // ---- Events tab (phase 6 Task 13): the event day and result screens. ----
 
         private PetState OpenEventDay(long listingPrice = 1000L)

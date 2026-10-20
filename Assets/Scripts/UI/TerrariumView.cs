@@ -101,6 +101,7 @@ namespace TerrariumDays.UI
         private Button debug60xButton;
         private Button debug600xButton;
         private Button debugSimulate12hButton;
+        private Button debugNextEventDayButton;
         private Button debugClearSaveButton;
         private Button debugAddCageButton;
         private Button debugAddPetButton;
@@ -321,6 +322,11 @@ namespace TerrariumDays.UI
             if (debugSimulate12hButton != null)
             {
                 debugSimulate12hButton.clicked += OnDebugSimulate12HoursClicked;
+            }
+
+            if (debugNextEventDayButton != null)
+            {
+                debugNextEventDayButton.clicked += OnDebugNextEventDayClicked;
             }
 
             if (debugClearSaveButton != null)
@@ -576,6 +582,12 @@ namespace TerrariumDays.UI
 
             breedingMessages.AddRange(BreedingText.Messages(report.Breeding, tuning));
             breedingMessages.AddRange(IncubatorText.Messages(report.Incubation, session.Breeding.Care));
+            breedingMessages.AddRange(EventText.NoticesOf(report.Events));
+            if (report.Events.HasEvents)
+            {
+                eventView?.Invalidate();
+            }
+
             foreach (var pet in report.PersonalityReveals)
             {
                 // Tray hatchlings are never the selected pet, so announce their reveal here.
@@ -1114,6 +1126,11 @@ namespace TerrariumDays.UI
                 debugSimulate12hButton.clicked -= OnDebugSimulate12HoursClicked;
             }
 
+            if (debugNextEventDayButton != null)
+            {
+                debugNextEventDayButton.clicked -= OnDebugNextEventDayClicked;
+            }
+
             if (debugClearSaveButton != null)
             {
                 debugClearSaveButton.clicked -= OnDebugClearSaveClicked;
@@ -1286,6 +1303,7 @@ namespace TerrariumDays.UI
             debug60xButton = root.Q<Button>("debug-60x-button");
             debug600xButton = root.Q<Button>("debug-600x-button");
             debugSimulate12hButton = root.Q<Button>("debug-simulate-12h-button");
+            debugNextEventDayButton = root.Q<Button>("debug-next-event-day-button");
             debugClearSaveButton = root.Q<Button>("debug-clear-save-button");
             debugAddCageButton = root.Q<Button>("debug-add-cage-button");
             debugAddPetButton = root.Q<Button>("debug-add-pet-button");
@@ -2021,6 +2039,17 @@ namespace TerrariumDays.UI
             SaveCurrentState();
         }
 
+        public void OnDebugNextEventDayClicked()
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            HandleReport(session.SkipToNextEventDay());
+            SaveCurrentState();
+        }
+
         public void OnDebugClearSaveClicked()
         {
             if (session == null || string.IsNullOrEmpty(session.SavePath))
@@ -2377,6 +2406,12 @@ namespace TerrariumDays.UI
             var pet = session.Colony.AnimalById(animalId);
             if (pet == null)
             {
+                return;
+            }
+
+            if (session.Colony.Events.IsListed(pet.Id))
+            {
+                ShowShopMessage(ShopText.FailureMessage(ShopResult.Listed));
                 return;
             }
 

@@ -142,6 +142,19 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void Alerts_ForAListedAnimal_ShowsTheListedStatus()
+        {
+            var colony = new Colony { CalendarEpochUtc = Epoch };
+            var pet = colony.AddAnimal(Adult(Sex.Male, "タロウ"), colony.AddCage(CageSize.Standard));
+            Assert.That(BreedingText.Alerts(colony, colony.CageOf(pet), pet), Is.Empty);
+
+            colony.Events.Entry = new EventEntry { Number = 0 };
+            colony.Events.Entry.Listings.Add(new EventListing { AnimalId = pet.Id, Price = 1000L });
+
+            Assert.That(BreedingText.Alerts(colony, colony.CageOf(pet), pet), Is.EqualTo(new[] { "出品中" }));
+        }
+
+        [Test]
         public void Alerts_ForTheHomeThumbnails()
         {
             var colony = new Colony { CalendarEpochUtc = Epoch };

@@ -182,6 +182,11 @@ namespace TerrariumDays.UI
                 alerts.Add("ペアリング中");
             }
 
+            if (shown != null && colony.Events.IsListed(shown.Id))
+            {
+                alerts.Add(EventText.ListedStatus);
+            }
+
             if (shown != null && shown.Gravid != null)
             {
                 alerts.Add("抱卵中");
