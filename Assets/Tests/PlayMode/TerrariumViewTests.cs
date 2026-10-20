@@ -2371,6 +2371,147 @@ namespace TerrariumDays.Tests
             Assert.That(view.Session.Colony.Events.Entry, Is.Null);
         }
 
+        // ---- Events tab (phase 6 Task 15): the whole loop through the real UI. ----
+
+        private ColonySaveService EventSaveService() => new ColonySaveService(new CareTuning(), new EconomyTuning());
+
+        [Test]
+        public void EventLoop_RegisterPlayBuyAndLedger()
+        {
+            var second = OpenEventTab(out var number);
+            var session = view.Session;
+            var colony = session.Colony;
+            var first = colony.Animals.First(a => a.Id != second.Id);
+            var kind = EventSchedule.KindOf(number);
+            var startMoney = colony.Wallet.Money;
+
+            // Register two animals at 1,000 yen each through the buttons.
+            foreach (var pet in new[] { first, second })
+            {
+                ClickEventButton($"event-check-{pet.Id}");
+                for (var i = 0; i < 100; i++)
+                {
+                    ClickEventButton($"event-minus-{pet.Id}");
+                }
+            }
+
+            ClickEventButton("event-prep-register-button");
+            ClickConfirmYes();
+            RenderEvents();
+            Assert.That(colony.Events.Entry, Is.Not.Null);
+            Assert.That(colony.Events.Entry.Listings.Count, Is.EqualTo(2));
+            Assert.That(colony.Events.Entry.Listings.All(l => l.Price == 1000L), Is.True);
+            Assert.That(colony.Wallet.Money, Is.EqualTo(startMoney - EventSchedule.BoothFee(kind)));
+
+            // Save and read back: the entry and its listings survive.
+            session.Save();
+            var reloaded = EventSaveService().LoadOrCreate(session.SavePath, ShopNow, new System.Random(1));
+            Assert.That(reloaded.Events.Entry, Is.Not.Null);
+            Assert.That(reloaded.Events.Entry.Number, Is.EqualTo(number));
+            Assert.That(reloaded.Events.Entry.Listings.Count, Is.EqualTo(2));
+
+            // Jump to the day: the notice appears and the tab shows the day surface.
+            view.OnDebugNextEventDayClicked();
+            StringAssert.Contains(EventText.DayStartedNotice(number), feedbackLabel.text);
+            RenderEvents();
+            Assert.That(Shown(EventElement<VisualElement>("event-day")), Is.True);
+
+            // Look at the other booths once, skipping the animation, then buy one offer.
+            view.OnDebugAddCageClicked();
+            colony.Wallet.Money = 1_000_000L;
+            var moneyBeforeDay = colony.Wallet.Money;
+            ClickEventButton("event-day-browse-button");
+            ClickEventButton("event-day-skip-button");
+            var offer = colony.Events.Entry.BoothOffers[0];
+            ClickEventButton($"event-offer-buy-{offer.OfferId}");
+            Assert.That(eventsPanel.parent.Q<Button>("event-buy-yes-button").enabledSelf, Is.True);
+            FindClickAction(eventsPanel.parent.Q<Button>("event-buy-yes-button").clickable)();
+            Assert.That(offer.Bought, Is.True);
+
+            // Serve every remaining action, which ends the day and shows the result.
+            ClickEventButton("event-day-serve-all-button");
+            ClickConfirmYes();
+            Assert.That(Shown(EventElement<VisualElement>("event-result")), Is.True);
+
+            var summary = colony.Events.LastSummary;
+            Assert.That(summary, Is.Not.Null);
+            Assert.That(summary.Number, Is.EqualTo(number));
+            Assert.That(summary.Bought.Count, Is.EqualTo(1));
+            Assert.That(summary.PurchaseTotal, Is.EqualTo(offer.Price));
+            Assert.That(summary.Sold.Count + summary.Unsold.Count, Is.EqualTo(2));
+            foreach (var line in summary.Sold)
+            {
+                Assert.That(colony.AnimalById(line.AnimalId), Is.Null, "a sold animal leaves the colony");
+            }
+
+            foreach (var line in summary.Unsold)
+            {
+                Assert.That(colony.AnimalById(line.AnimalId), Is.Not.Null, "an unsold animal stays");
+            }
+
+            Assert.That(summary.Net, Is.EqualTo(summary.TotalSales - summary.PurchaseTotal - summary.BoothFee));
+            Assert.That(colony.Wallet.Money - moneyBeforeDay, Is.EqualTo(summary.TotalSales - summary.PurchaseTotal));
+            var totals = EventElement<Label>("event-result-totals").text;
+            StringAssert.Contains(EventText.SignedYen(summary.Net), totals);
+            StringAssert.Contains(EventText.Yen(summary.TotalSales), totals);
+            StringAssert.Contains(EventText.Yen(summary.PurchaseTotal), totals);
+
+            // Closing returns to the prep of the next event with nothing marked as listed.
+            ClickEventButton("event-result-close-button");
+            Assert.That(Shown(EventElement<VisualElement>("event-prep")), Is.True);
+            Assert.That(colony.Events.Entry, Is.Null);
+            Assert.That(colony.Events.LastSummarySeen, Is.True);
+            Assert.That(EventTexts(), Has.None.EqualTo(EventText.ListedStatus));
+            foreach (var cage in colony.Cages)
+            {
+                var shown = colony.AnimalIn(cage);
+                Assert.That(shown == null || !colony.Events.IsListed(shown.Id), Is.True);
+                if (shown != null)
+                {
+                    Assert.That(CageStatusText.AlertsFor(colony, cage, shown, session.GameNowUtc, view.Tuning), Does.Not.Contain(EventText.ListedStatus));
+                }
+            }
+
+            // The money ledger carries the fee, the purchase and (when something sold) the sale.
+            RenderLedger();
+            ClickNamed("ledger-section-money");
+            RenderLedger();
+            var rows = ledgerList.Query<Label>(className: "ledger-row-detail-label").ToList().Select(l => l.text).ToList();
+            Assert.That(rows.Any(r => r.Contains(LedgerText.CategoryLabel(LedgerCategory.BoothFee))), Is.True, "booth fee row");
+            Assert.That(rows.Any(r => r.Contains(LedgerText.CategoryLabel(LedgerCategory.AnimalPurchase))), Is.True, "purchase row");
+            Assert.That(rows.Any(r => r.Contains(LedgerText.CategoryLabel(LedgerCategory.EventSale))), Is.EqualTo(summary.Sold.Count > 0), "sale row");
+            Assert.That(rows.Any(r => r.Contains(EventSchedule.NameOf(number))), Is.True, "the event name is in the notes");
+
+            // Save once more: the summary stays seen and no entry is left.
+            session.Save();
+            var final = EventSaveService().LoadOrCreate(session.SavePath, ShopNow, new System.Random(1));
+            Assert.That(final.Events.LastSummarySeen, Is.True);
+            Assert.That(final.Events.Entry, Is.Null);
+        }
+
+        [Test]
+        public void EventLoop_AppClosedPastTheEventDay_ResumesTheDaySurfaceOnLoad()
+        {
+            var second = OpenEventTab(out var number);
+            var session = view.Session;
+            var requests = new List<ListingRequest> { new ListingRequest { AnimalId = second.Id, Price = 1000L, TolerancePercent = 0 } };
+            Assert.That(session.Events.Register(session.Colony, session.Calendar, number, requests, session.GameNowUtc), Is.EqualTo(EventRegisterResult.Ok));
+
+            // The app is closed while the whole event day passes.
+            var untilNextDay = EventSchedule.EndUtc(session.Calendar, number) + TimeSpan.FromHours(1) - session.GameNowUtc;
+            session.SimulateGameTime(untilNextDay);
+            session.Save();
+
+            view.LoadColony(session.SavePath, ShopNow, new TimeService(() => ShopNow));
+            view.WireEventEvents();
+            RenderEvents();
+
+            StringAssert.Contains(EventText.PendingNotice(number), feedbackLabel.text);
+            Assert.That(view.Session.Colony.Events.Entry, Is.Not.Null);
+            Assert.That(Shown(EventElement<VisualElement>("event-day")), Is.True);
+            Assert.That(view.Session.Events.ActionsLeft(view.Session.Colony), Is.GreaterThan(0));
+        }
+
         // ---- Incubator tab (phase 5 Task 15): cards, temperature, water, candled eggs. ----
 
         private void OpenIncubatorTab()
