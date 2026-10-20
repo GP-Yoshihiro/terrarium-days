@@ -3370,3 +3370,51 @@ git commit -m "Lock listed animals out of pairing and wholesale"
 
 ---
 
+
+### Task 11: イベントタブの枠（準備・当日・結果・買う確認）（graphics）
+
+**Files:**
+- Modify: `Assets/UI/Terrarium.uxml`（`placeholder-panel`（`:128`）の前に `events-panel` を足す。ほかのタブの `*-panel` と同じ `class="panel"`）
+- Modify: `Assets/UI/Terrarium.uss`
+- Modify: `Assets/Scripts/UI/ShellNavigator.cs`（`events-panel` を `Q` して、`ShowTab` で `tab == ShellTab.Events` のとき出す。`hasPanel` に足す。`PlaceholderTextFor` の `ShellTab.Events` の行（「イベントは段階6で追加されます」、`:74`）を消す）
+- Modify: `Assets/Tests/EditMode/ShellTests.cs:72`（イベントタブで `placeholder-panel` が出ず `events-panel` が出る、に書き換える）
+
+**Produces（Task 12・13 が `Q` で使う名前。変えない）:**
+- `events-panel` の中に3つの面：`event-prep`・`event-day`・`event-result`（同時に1つだけ出す。出し分けは Task 12・13）。
+- 準備：`event-prep-title`（回の名前と日付）、`event-prep-info`（出店料・出品の上限・締め切り）、`event-prep-list`（ScrollView。出品できる個体の行がここに入る）、`event-prep-total`（期待値の合計）、`event-prep-count`（「出品 2/5匹」）、`event-prep-register-button`（「申し込む」）、`event-prep-save-button`（「出品を直す」）、`event-prep-message`。行の雛形は USS のクラス `event-listing-row`・`event-listing-check`・`event-listing-name`・`event-listing-price`・`event-listing-minus`・`event-listing-plus`・`event-listing-tolerance`・`event-listing-chance`・`event-listing-reason`（出せない理由）で、行そのものは Task 12 がコードで作る。
+- 当日：`event-day-title`、`event-day-left`（「残りの行動 3/8」）、`event-day-stage`（ブースの絵と来場者が動く領域。`booth_bg` を背景に、ケース・来場者・吹き出しは Task 13 が子として足す）、`event-day-log`（ScrollView。画面の下に固定、spec §2.6）、`event-day-serve-button`（「接客する」）、`event-day-browse-button`（「他のブースを見る」）、`event-day-serve-all-button`（「残りを全部接客にする」）、`event-day-skip-button`（「飛ばす」）、`event-day-finish-button`（「集計へ」）、`event-day-offers`（ブースの売り物の行。行は `event-offer-row`・`event-offer-label`・`event-offer-buy`）。
+- 結果：`event-result-title`、`event-result-sold`・`event-result-unsold`・`event-result-bought`（それぞれ一覧）、`event-result-totals`（売上・仕入れ・出店料・差し引き）、`event-result-close-button`（「閉じる」）。
+- 買う確認：`event-buy-modal`（既存の確認ダイアログとは別。`ConfirmDialog` は「はい」を押せなくできないため）。中に `event-buy-message`、`event-buy-reason`（「ケージが足りません」など）、`event-buy-yes-button`、`event-buy-no-button`。
+
+**見た目:** 縦長の画面で、当日は上から 題・残りの行動 → ブースの絵（画面の約4割）→ 売り物（あるときだけ）→ ボタン2列 → ログ（下に固定、4〜5行見える）。押せないボタンは既存の無効のボタンと同じ見た目。金額の文字は他のタブと同じ大きさ。
+
+**確かめ方:** UXML だけで仮の文字を入れた状態の3面と買う確認を、`ScreenCaptureTests` に `CaptureEventFrames`（`[Explicit]`、既存の Capture と同じ書き方）を足して撮り、`sips -Z 800` で HQ に見せる。EditMode の `ShellTests` を流す。仮の文字はコミット前に UXML から消す（Task 12・13 が入れる）。
+
+**コミット:** `git commit -m "Add the event tab layout"`
+
+---
+
+### Task 12: 準備の画面（programmer、キャプチャあり）
+
+**Files:**
+- Create: `Assets/Scripts/UI/EventView.cs`（`IncubatorView`（`Assets/Scripts/UI/IncubatorView.cs`）と同じ形：コンストラクタで `VisualElement root` を受け取り `Q` する、`Invalidate()`、`Render(...)`）
+- Modify: `Assets/Scripts/UI/TerrariumView.cs`（`incubatorView = ...`（`:1293`）の近くで `eventView` を作る、`:1495` の近くで `navigator.Tab == ShellTab.Events` のとき `eventView?.Render(session, now)`、`OnTabChanged`（`:645`）で `eventView?.Invalidate()`）
+- Test: `Assets/Tests/PlayMode/TerrariumViewTests.cs`（足す）
+
+**中身（spec §2.1・§2.2、★2・★3・★B・★M・★N）:**
+- 面の出し分け：`Colony.Events.LastSummary != null && !LastSummarySeen` → 結果（Task 13）。それ以外で `Entry != null && HasStarted(Entry.Number)` → 当日（Task 13）。それ以外 → 準備。
+- 準備の対象の回：`Entry != null` ならその回（出品を直す）、なければ `session.Events.OpenNumber(...)`。
+- 題：`EventSchedule.NameOf(n)`＋`EventText.DateLabel(n)`。情報：出店料 `EventText.Yen(BoothFee)`・出品の上限 `MaxListings`・締め切り（14日）。申し込み済みなら「申し込み済み（出店料は返りません）」。
+- 個体の行（手元の全個体、番号の順）：チェック・名前とモルフ（`EventRules.MorphLabel`）・価格（−／＋で1,000円ずつ、最低1,000円）・値引きの幅（押すたびに 0→5→10→15→20→0%、`EventText.Tolerance`）・`EventText.Chance(session.Events.ChanceOf(...))`。`EventRules.Check` が `None` でない個体はチェックできず、理由（トレイ・抱卵中・ペアリング中・衰弱中）を出す。上限に達したら残りのチェックを押せなくする。
+- 価格の初期値は `session.Events.BaseValueOf(...)` を1,000円に丸めた値（最低1,000円）。許容幅の初期値は0%。申し込み済みの回では保存されている出品の値を出す。
+- 期待値の合計：チェックした個体の `EventOdds.ExpectedValue(price, tol, chance)` の和を `EventText.ExpectedTotal`。
+- 「申し込む」：`ConfirmDialog` で `EventText.ConfirmRegister(n)` → はいで `session.Events.Register(...)`。失敗は `EventText.RegisterFailure` を `event-prep-message` に出す。成功したら保存（`session.Save()`）して描き直す。
+- 「出品を直す」（申し込み済みのときだけ出す）：`UpdateListings` → 保存。0匹にもできる（★2）。
+- 画面で選んでいる途中の値（チェック・価格・幅）は `EventView` が持ち、`Invalidate` か回が変わったときだけ初期値に戻す。毎フレームの `Render` で消さない。
+- 確率は描くたびに計算し直す（0:00 まで変わりうる、★N）。
+
+**テスト（PlayMode、`TerrariumViewTests` の既存の作り方で）:** ①イベントタブで準備の面が出て、回の名前と出店料が出る。②抱卵中の個体はチェックできず「抱卵中」と出る。③2匹チェックして申し込むと所持金が出店料だけ減り `Entry` ができ、題に「申し込み済み」が出る。④＋を押すと価格が1,000円上がり、売れる見込みが下がる。
+
+**キャプチャ:** `ScreenCaptureTests` に `CaptureEventPrep`（申し込み前に3匹チェックした状態・申し込み済み）を足し、`sips -Z 800` で HQ に見せる。
+
+**コミット:** `git commit -m "Add the event preparation screen"`
