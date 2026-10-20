@@ -14,6 +14,7 @@ namespace TerrariumDays.Editor
             "Assets/Resources/Gecko/",
             "Assets/Resources/Effects/",
             "Assets/Resources/Candling/",
+            "Assets/Resources/Event/",
         };
 
         private void OnPreprocessTexture()
@@ -25,6 +26,7 @@ namespace TerrariumDays.Editor
 
             var importer = (TextureImporter)assetImporter;
             importer.textureType = assetPath.StartsWith("Assets/Resources/Candling/")
+                || assetPath.StartsWith("Assets/Resources/Event/")
                 ? TextureImporterType.Sprite
                 : TextureImporterType.Default;
             importer.filterMode = FilterMode.Point;
@@ -33,6 +35,11 @@ namespace TerrariumDays.Editor
             importer.npotScale = TextureImporterNPOTScale.None;
             importer.wrapMode = TextureWrapMode.Clamp;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
+            if (assetPath == "Assets/Resources/Event/bubble.png")
+            {
+                // 9-slice: 4 art px at the 2x output scale = 8 px on every side.
+                importer.spriteBorder = new Vector4(8, 8, 8, 8);
+            }
         }
 
         private static bool IsPixelArt(string path)
