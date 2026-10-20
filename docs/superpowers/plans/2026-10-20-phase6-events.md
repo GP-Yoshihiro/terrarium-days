@@ -3418,3 +3418,53 @@ git commit -m "Lock listed animals out of pairing and wholesale"
 **キャプチャ:** `ScreenCaptureTests` に `CaptureEventPrep`（申し込み前に3匹チェックした状態・申し込み済み）を足し、`sips -Z 800` で HQ に見せる。
 
 **コミット:** `git commit -m "Add the event preparation screen"`
+
+---
+
+### Task 13: 当日の画面と結果の画面（programmer、キャプチャあり）
+
+**Files:**
+- Modify: `Assets/Scripts/UI/EventView.cs`（Task 12 の続き。長くなったら `EventView.Day.cs` に `partial` で分けてよい）
+- Modify: `Assets/Scripts/UI/TerrariumView.cs`（買う確認の `event-buy-modal` の開け閉め。毎フレームの `Update` から `eventView?.Tick(Time.unscaledDeltaTime)` を呼ぶ）
+- Test: `Assets/Tests/PlayMode/TerrariumViewTests.cs`（足す）
+
+**中身（spec §2.3〜2.7、★5・★11・★12・★O・★R）:**
+- 当日の面：題（回の名前）、`EventText.ActionsLeft(session.Events.ActionsLeft(colony), ActionCount)`、ブースの絵（`Resources.Load<Sprite>("Event/booth_bg")` など。Task 10 のファイル名）。出品のケースを並べ、売れた出品のケースに `sold_tag` を重ねる。
+- 「接客する」「他のブースを見る」：`session.Events.PlayAction(colony, calendar, kind, GameNowUtc(), out record)` → `Ok` なら保存（結果は押した時点で確定。演出を飛ばしてもアプリを閉じても変わらない）→ 演出を始める。`NotYet`・`NoActionsLeft` などはボタンを押せなくしてあるので起きないが、起きたら何もしない。
+- 演出：`EventReplay.Script(record, entry.BoothOffers, ActionCount)` の行を、`EventReplay.DurationSeconds(EventReplay.EventCount(...))` 秒の間に `RevealedCount` の数だけログに足す。行の `Bubble` があれば来場者の上に吹き出しを出し、来場者（`visitor_a/b/c` の2コマ、0.25秒ごとに切り替え、画面の端から歩いてくる）を動かす。`Highlight` の行は文字の色を変える。演出の間は行動・全部接客・集計・買うのボタンを押せない。「飛ばす」で残りの行を一度に出して演出を終える（★12）。
+- 演出が終わった（または飛ばした）ら、その行動で見つけた売り物を `event-day-offers` に出す（`EventText.OfferLine`、まだ買っていないものに「買う」）。前の行動で見つけた売り物も、買っていなければ残す。
+- ログはこの回の全部の行動の行を残す（`entry.Actions` から作り直せる。アプリを開き直したときは演出なしで全部の行を出す）。
+- 「買う」：`event-buy-modal` に `EventText.ConfirmBuy(offer)`。`session.Events.CheckBuy` が `Ok` でなければ「はい」を押せなくして理由（`EventText.BuyFailure`）を出す。開いている間も毎フレーム `CheckBuy` を見直す（時間が進む間に所持金・ケージが変わりうる）。「はい」で `Buy` → 保存 → `ColonyChanged`（既存のショップの買い物と同じ）。
+- 「残りを全部接客にする」：`ConfirmDialog` で「残りの行動を全部接客にしますか？まだ買っていない売り物は買えなくなります」→ はいで `ServeAllRemaining` → 保存 → 全部の記録を演出なしでログに足して結果の面へ（spec §2.3）。
+- 「集計へ」：行動を使い切り、まだ買っていない売り物が残っているときだけ出す（★5）。押すと `session.Events.Finish` → 保存 → 結果の面。
+- 結果の面（`LastSummary`、★11）：売れた個体（`EventText.AnimalLine`）・売れ残り・買った個体の一覧、売上 `TotalSales`・仕入れ `PurchaseTotal`・出店料 `BoothFee`・差し引き `EventText.SignedYen(Net)`。「閉じる」で `DismissSummary` → 保存 → 次の回の準備の面。
+- 行動・売れた・買った・確定のたびに `ColonyChanged?.Invoke()` と保存（売れた個体はケージから消える）。
+
+**テスト（PlayMode）:** ①申し込んでデバッグで当日へ進めると当日の面が出る（`session.SkipToNextEventDay()` を直接呼んでよい）。②「接客する」→ 演出の間はボタンが押せない → 「飛ばす」でログが出て残りの行動が1減る。③価格1,000円で出した個体が売れたら、ケージから消え所持金が増える（売れなかったら次の行動へ。8回のうちにほぼ必ず売れる）。④「他のブースを見る」で売り物が出て、空きケージが無いと「はい」が押せず「ケージが足りません」。⑤「残りを全部接客にする」で結果の面になり、「閉じる」で準備の面（次の回）に戻る。
+
+**キャプチャ:** `CaptureEventDay`（演出の途中・売り物が出た状態・買う確認）と `CaptureEventResult` を足し、`sips -Z 800` で HQ に見せる。来場者の2コマの動きは、演出の途中を0.25秒ずらして2枚撮って比べる。
+
+**コミット:** `git commit -m "Add the event day and result screens"`
+
+---
+
+### Task 14: 通知・「出品中」の表示・デバッグ「次のイベントの当日へ」（programmer）
+
+**Files:**
+- Modify: `Assets/Scripts/UI/TerrariumView.cs`
+- Modify: `Assets/Scripts/UI/BreedingText.cs` か `Assets/Scripts/UI/CageStatusText.cs`（「出品中」の状態）
+- Modify: `Assets/UI/Terrarium.uxml`（デバッグのボタン）
+- Test: `Assets/Tests/PlayMode/TerrariumViewTests.cs`・`Assets/Tests/EditMode/BreedingTextTests.cs`（足す）
+
+**中身:**
+1. 通知（★9）：`HandleReport`（`TerrariumView.cs:529`）の `breedingMessages.AddRange(IncubatorText.Messages(...))`（`:576`）の後に `breedingMessages.AddRange(EventText.NoticesOf(report.Events));`。既存の `BreedingText.Summary`（最初の1件＋「（ほか○件）」）でまとめて `ShowFeedback`（`:2215`）に出る。`report.Events.HasEvents` なら `eventView?.Invalidate()`（出品が取り消された・当日になった）。
+2. 「出品中」（★10）：`BreedingText.Alerts`（`BreedingText.cs:170`）に、`shown != null && colony.Events.IsListed(shown.Id)` なら `EventText.ListedStatus`（「出品中」）を足す（「ペアリング中」の後）。ケージの一覧とケージの詳細の両方に出る。ペアリングの候補（`PairingView.cs:259` 付近の `blocked`）は `CheckCandidate` が `Listed` を返すので、理由「出品中です」が Task 8 の文でそのまま出る。直すところがないことを確かめる。
+3. 卸売り・トレイの「売る」：`TerrariumView.cs:2380` 付近の `Wholesale` の失敗は既存の `else` で `ShopText.FailureMessage(result)` を出すので「出品中の個体は売れません」が出る。売る前の確認ダイアログを開く前に、出品中なら確認を出さずにその文だけ出す（ペアリング中と同じ扱いがあればそれに合わせる。なければ足す）。
+4. デバッグ（★14）：`debug-simulate-12h-button`（`Terrarium.uxml:221`）の後に `debug-next-event-day-button`（「次のイベントの当日へ」）を足し、`HandleReport(session.SkipToNextEventDay())`（`OnDebugSimulate12HoursClicked`、`TerrariumView.cs:1992` と同じ形）。押したら保存。
+
+**テスト:** EditMode：`BreedingText.Alerts` に出品中の個体で「出品中」が入る。PlayMode：①出品中の個体のケージ詳細に「出品中」が出る。②出品中の個体をショップで卸売りしようとすると「出品中の個体は売れません」が出て個体が残る。③デバッグの「次のイベントの当日へ」で、申し込み済みなら「今日は…です。イベントタブで遊べます」が出る。④締め切りの3日前まで時計を進めると締め切りの通知が出る（`SimulateGameTime` で進める）。
+
+**コミット:** `git commit -m "Show event notices, the listed status and the debug skip"`
+
+---
+
