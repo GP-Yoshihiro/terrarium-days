@@ -2683,7 +2683,7 @@ namespace TerrariumDays.Tests
         {
             Assert.That(EventText.SignedYen(12000), Is.EqualTo("+12,000円"));
             Assert.That(EventText.SignedYen(0), Is.EqualTo("0円"));
-            Assert.That(EventText.SignedYen(-3000), Is.EqualTo("−3,000円"));
+            Assert.That(EventText.SignedYen(-3000), Is.EqualTo("-3,000円"));
         }
 
         [Test]
@@ -2864,7 +2864,7 @@ namespace TerrariumDays.UI
 
         public static string Yen(long yen) => yen.ToString("#,0", CultureInfo.InvariantCulture) + "円";
 
-        public static string SignedYen(long yen) => yen > 0 ? "+" + Yen(yen) : yen < 0 ? "−" + Yen(-yen) : Yen(0);
+        public static string SignedYen(long yen) => yen > 0 ? "+" + Yen(yen) : yen < 0 ? "-" + Yen(-yen) : Yen(0);
 
         public static string Clock(int minuteOfDay) => $"{minuteOfDay / 60}:{minuteOfDay % 60:00}";
 
@@ -3343,7 +3343,7 @@ git commit -m "Lock listed animals out of pairing and wholesale"
    - `noticeStage` は0〜2に丸める。
 
 **テスト（足すもの。既存のテストの書き方に合わせる）**
-- `ColonySaveServiceTests`：申し込み（固定前・出品2件）／当日（固定・行動2回・ブースの売り物1件と買った1件）／結果だけ（`LastSummary` と未読）の3つの往復で中身が同じ。スキーマ3のファイル（既存のテストのスキーマ3の JSON を使う）が `MigrateLegacy` を通らずに読めて `Events.Entry` が null・バックアップが作られない。異常系：番号−1、価格0の出品、重複、許容幅3、行動が10回、`kind`＝"???"、個体のないブースの売り物。
+- `ColonySaveServiceTests`（Review Focus 4 の名前で：`Schema3Save_LoadsWithNoEvent`・`EventMidDay_RoundTrips`・`EventListing_MissingAnimalIsDropped` を必ず含める）：申し込み（固定前・出品2件）／当日（固定・行動2回・ブースの売り物1件と買った1件）／結果だけ（`LastSummary` と未読）の3つの往復で中身が同じ。スキーマ3のファイル（既存のテストのスキーマ3の JSON を使う）が `MigrateLegacy` を通らずに読めて `Events.Entry` が null・バックアップが作られない。異常系：番号−1、価格0の出品、重複、許容幅3、行動が10回、`kind`＝"???"、個体のないブースの売り物。
 - `ColonySessionTests`：①申し込んでから `SkipToNextEventDay` → `report.Events.DayStartedNumber == 番号`・固定済み。②申し込まずに `SkipToNextEventDay` → 受付中の回の0:00の1秒後。③申し込み済みで開催日の終わりを過ぎてから `Load` → `report.Events.PendingNumber == 番号`。④保存して読み直したあと同じ選択で `PlayAction` すると読み直す前と同じ結果（Task 6 の再現性がセーブを通っても保たれる）。
 
 **確かめ方:** EditMode 全体を流す（624＋Task 1〜9 の分。減っていないこと）。PlayMode も1回流す（セッションの変更で既存の画面テストが落ちていないこと）。
@@ -3474,7 +3474,7 @@ git commit -m "Lock listed animals out of pairing and wholesale"
 **Files:**
 - Test: `Assets/Tests/PlayMode/TerrariumViewTests.cs`（足す）
 
-**中身:** 1つのテストで、新しい部屋 → イベントタブで2匹を価格1,000円で出品して申し込む → 保存して読み直す（`Entry` と出品が残る）→ デバッグ「次のイベントの当日へ」→ 通知が出る → イベントタブが当日の面 → 「他のブースを見る」を1回（演出を飛ばす）→ 売り物を1匹買う（空きケージがなければデバッグの「ケージを追加」を先に押す）→ 「残りを全部接客にする」→ 結果の面で売れた個体・買った個体・差し引きが `LastSummary` と合う → 「閉じる」→ 次の回の準備の面で「出品中」の表示がどの個体にも無い → 台帳（`ledger-panel`）に出店料・売れた・購入の行がある（★13 の文）。最後にもう一度保存して読み直し、`LastSummarySeen`＝true・`Entry`＝null のまま。
+**中身:** 1つのテスト `EventLoop_RegisterPlayBuyAndLedger`（Review Focus 5 の名前）で、新しい部屋 → イベントタブで2匹を価格1,000円で出品して申し込む → 保存して読み直す（`Entry` と出品が残る）→ デバッグ「次のイベントの当日へ」→ 通知が出る → イベントタブが当日の面 → 「他のブースを見る」を1回（演出を飛ばす）→ 売り物を1匹買う（空きケージがなければデバッグの「ケージを追加」を先に押す）→ 「残りを全部接客にする」→ 結果の面で売れた個体・買った個体・差し引きが `LastSummary` と合う → 「閉じる」→ 次の回の準備の面で「出品中」の表示がどの個体にも無い → 台帳（`ledger-panel`）に出店料・売れた・購入の行がある（★13 の文）。最後にもう一度保存して読み直し、`LastSummarySeen`＝true・`Entry`＝null のまま。
 
 あわせて、アプリを閉じている間に開催日の終わりを過ぎた場合：申し込んで、`SimulateGameTime` で開催日の翌日まで進めてから `Load` し直す → 「…の続きがあります（イベントタブ）」が出て、当日の面から続けられる。
 
