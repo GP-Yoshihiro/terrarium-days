@@ -87,6 +87,8 @@ namespace TerrariumDays.Core
         /// <summary>Seed for BreedingRandom, from the calendar epoch (so it needs no save field).</summary>
         public int BreedingSeed => BreedingRandom.SeedOf(CalendarEpochUtc);
         public ShopStock Shop { get; set; } = new ShopStock();
+        /// <summary>The event entry, the last result and the deadline notices (phase 6).</summary>
+        public EventState Events { get; set; } = new EventState();
 
         public int CageCapacity => RackCount * CagesPerRack;
 
