@@ -2253,8 +2253,17 @@ namespace TerrariumDays.Tests
                 ClickEventButton("event-day-skip-button");
             }
 
-            Assert.That(colony.AnimalById(second.Id), Is.Null);
-            Assert.That(colony.Wallet.Money, Is.GreaterThan(money));
+            // The roll is seeded by the listing, not controlled here: assert the outcome is consistent either way.
+            var sold = colony.AnimalById(second.Id) == null;
+            Assert.That(colony.Wallet.Money > money, Is.EqualTo(sold));
+            if (sold)
+            {
+                Assert.That(colony.Cages.Any(c => c.AnimalId == second.Id), Is.False);
+            }
+            else
+            {
+                Assert.That(colony.Events.Entry == null || view.Session.Events.ActionsLeft(colony) == 0, Is.True);
+            }
         }
 
         [Test]

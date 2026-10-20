@@ -2629,9 +2629,14 @@ namespace TerrariumDays.UI
             }
 
             var result = session.Events.Buy(session.Colony, offerId, GameNowUtc());
-            eventView?.CloseBuy();
-            if (result == EventBuyResult.Ok)
+            if (result != EventBuyResult.Ok)
             {
+                // The dialog stays open (it re-checks and shows the reason); terminal cases close it themselves.
+                eventView?.ShowMessage(EventText.BuyFailure(result));
+            }
+            else
+            {
+                eventView?.CloseBuy();
                 SaveCurrentState();
                 eventView?.Invalidate();
                 ColonyChanged?.Invoke();

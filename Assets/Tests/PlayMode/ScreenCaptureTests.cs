@@ -27,6 +27,32 @@ namespace TerrariumDays.Tests
 
         private RenderTexture target;
         private PanelSettings panelSettings;
+        private byte[] savedBytes;
+        private bool hadSave;
+
+        private static string SaveFilePath => Path.Combine(Application.persistentDataPath, "terrarium-save.json");
+
+        // Every capture plays on the real save file: back it up before the scene loads and put it back afterwards,
+        // even when the test fails; with no save before, the one the test created is deleted.
+        [SetUp]
+        public void BackUpSave()
+        {
+            hadSave = File.Exists(SaveFilePath);
+            savedBytes = hadSave ? File.ReadAllBytes(SaveFilePath) : null;
+        }
+
+        [TearDown]
+        public void RestoreSave()
+        {
+            if (hadSave)
+            {
+                File.WriteAllBytes(SaveFilePath, savedBytes);
+            }
+            else if (File.Exists(SaveFilePath))
+            {
+                File.Delete(SaveFilePath);
+            }
+        }
 
         [UnityTest]
         public IEnumerator CaptureTerrariumScreens()
@@ -823,9 +849,6 @@ namespace TerrariumDays.Tests
 
             var session = view.Session;
             var colony = session.Colony;
-
-            // The scene plays on the shared save file: put it back as it was when this capture ends.
-            var savedBytes = File.Exists(session.SavePath) ? File.ReadAllBytes(session.SavePath) : null;
             foreach (var old in colony.Animals.ToList())
             {
                 colony.RemoveAnimal(old);
@@ -858,7 +881,9 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "event-day-start");
 
             ClickNamed(document, "event-day-browse-button");
-            yield return new WaitForSeconds(4f);
+            yield return new WaitForSeconds(0.6f);
+            yield return Capture(outputDir, "event-day-bubble");
+            yield return new WaitForSeconds(3.4f);
             yield return Capture(outputDir, "event-day-replay-a");
             yield return new WaitForSeconds(0.25f);
             yield return Capture(outputDir, "event-day-replay-b");
@@ -877,15 +902,6 @@ namespace TerrariumDays.Tests
             ClickNamed(document, "confirm-yes-button");
             yield return new WaitForSeconds(0.5f);
             yield return Capture(outputDir, "event-day-result");
-
-            if (savedBytes != null)
-            {
-                File.WriteAllBytes(session.SavePath, savedBytes);
-            }
-            else
-            {
-                File.Delete(session.SavePath);
-            }
         }
 
         /// <summary>

@@ -209,6 +209,7 @@ namespace TerrariumDays.UI
                 else
                 {
                     replayRevealed = EventReplay.RevealedCount(replayLines.Count, replayElapsed, replayDuration);
+                    RebuildCases(replayEntry);
                     UpdateLog();
                     UpdateVisitor();
                 }
@@ -267,7 +268,7 @@ namespace TerrariumDays.UI
                 return;
             }
 
-            var signature = entry.Number + "|" + string.Join(",", entry.Listings.Select(l => l.AnimalId + (l.Sold ? "s" : "u") + l.Price));
+            var signature = entry.Number + "|" + string.Join(",", entry.Listings.Select(l => l.AnimalId + (ShownSold(l) ? "s" : "u") + l.Price));
             if (signature == casesSignature)
             {
                 return;
@@ -284,7 +285,7 @@ namespace TerrariumDays.UI
                 price.AddToClassList("event-case-price");
                 price.pickingMode = PickingMode.Ignore;
                 box.Add(price);
-                if (listing.Sold)
+                if (ShownSold(listing))
                 {
                     var tag = new VisualElement { name = $"event-sold-tag-{listing.AnimalId}" };
                     tag.AddToClassList("event-sold-tag");
@@ -294,6 +295,29 @@ namespace TerrariumDays.UI
 
                 cases.Add(box);
             }
+        }
+
+        /// <summary>A listing sold in the action being replayed looks unsold until its sale line is revealed.</summary>
+        private bool ShownSold(EventListing listing)
+        {
+            if (!listing.Sold)
+            {
+                return false;
+            }
+
+            if (!Playing || listing.SoldInAction != replayRecord.Index)
+            {
+                return true;
+            }
+
+            var sale = replayRecord.Sales.Find(x => x.AnimalId == listing.AnimalId);
+            if (sale == null)
+            {
+                return true;
+            }
+
+            var text = EventText.SaleLine(sale);
+            return replayLines.Take(replayRevealed).Any(l => l.Text == text);
         }
 
         private void RebuildOffers(List<EventBoothOffer> visible)
@@ -397,7 +421,7 @@ namespace TerrariumDays.UI
             else
             {
                 bubbleLabel.text = text;
-                bubble.style.left = Length.Percent(left);
+                bubble.style.left = Length.Percent(Mathf.Max(left, 1f));
                 bubble.style.display = DisplayStyle.Flex;
             }
         }
