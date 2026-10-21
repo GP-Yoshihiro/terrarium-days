@@ -42,10 +42,15 @@ namespace TerrariumDays.UI
 
         private VisualElement buyModal;
         private Label buyMessage;
-        private Label buyReason;
         private Button buyYes;
         private Button buyNo;
         private int buyOfferId;
+
+        private VisualElement blockedModal;
+        private Label blockedMessage;
+        private Button blockedShop;
+        private Button blockedClose;
+        private bool blockedOpen;
 
         private EventEntry replayEntry;
         private EventActionRecord replayRecord;
@@ -64,6 +69,12 @@ namespace TerrariumDays.UI
         public int RevealedLines => replayRevealed;
 
         public bool BuyModalOpen => buyOfferId > 0;
+
+        /// <summary>The "can't buy" dialog (reason, plus the shop button when no cage is free) is showing.</summary>
+        public bool BlockedModalOpen => blockedOpen;
+
+        /// <summary>The player asked to go and buy a cage; the owner switches to the shop.</summary>
+        public event Action ShopRequested;
 
         public event Action<EventActionKind> ActionRequested;
 
@@ -97,7 +108,10 @@ namespace TerrariumDays.UI
 
             buyModal = modalRoot.Q<VisualElement>("event-buy-modal");
             buyMessage = modalRoot.Q<Label>("event-buy-message");
-            buyReason = modalRoot.Q<Label>("event-buy-reason");
+            blockedModal = modalRoot.Q<VisualElement>("event-blocked-modal");
+            blockedMessage = modalRoot.Q<Label>("event-blocked-message");
+            blockedShop = modalRoot.Q<Button>("event-blocked-shop-button");
+            blockedClose = modalRoot.Q<Button>("event-blocked-close-button");
             buyYes = modalRoot.Q<Button>("event-buy-yes-button");
             buyNo = modalRoot.Q<Button>("event-buy-no-button");
 
@@ -130,6 +144,12 @@ namespace TerrariumDays.UI
             Wire(skipButton, Skip);
             Wire(resultClose, () => CloseRequested?.Invoke());
             Wire(buyNo, CloseBuy);
+            Wire(blockedClose, CloseBlocked);
+            Wire(blockedShop, () =>
+            {
+                CloseBlocked();
+                ShopRequested?.Invoke();
+            });
             Wire(buyYes, () =>
             {
                 if (buyOfferId > 0 && events != null && colony != null && events.CheckBuy(colony, buyOfferId) == EventBuyResult.Ok)
@@ -138,6 +158,7 @@ namespace TerrariumDays.UI
                 }
             });
             CloseBuy();
+            CloseBlocked();
         }
 
         private static void Wire(Button button, Action action)
@@ -494,6 +515,13 @@ namespace TerrariumDays.UI
                 return;
             }
 
+            var check = events != null && colony != null ? events.CheckBuy(colony, offerId) : EventBuyResult.NoEvent;
+            if (check != EventBuyResult.Ok)
+            {
+                ShowBlocked(check);
+                return;
+            }
+
             buyOfferId = offerId;
             buyMessage.text = EventText.ConfirmBuy(offer);
             buyModal.style.display = DisplayStyle.Flex;
@@ -506,6 +534,34 @@ namespace TerrariumDays.UI
             if (buyModal != null)
             {
                 buyModal.style.display = DisplayStyle.None;
+            }
+        }
+
+        /// <summary>Shows why a purchase cannot go ahead; a missing cage also offers the way to the shop.</summary>
+        public void ShowBlocked(EventBuyResult reason)
+        {
+            CloseBuy();
+            if (blockedModal == null)
+            {
+                return;
+            }
+
+            blockedOpen = true;
+            blockedMessage.text = EventText.BuyFailure(reason);
+            if (blockedShop != null)
+            {
+                blockedShop.style.display = reason == EventBuyResult.NoEmptyCage ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            blockedModal.style.display = DisplayStyle.Flex;
+        }
+
+        public void CloseBlocked()
+        {
+            blockedOpen = false;
+            if (blockedModal != null)
+            {
+                blockedModal.style.display = DisplayStyle.None;
             }
         }
 
@@ -524,8 +580,10 @@ namespace TerrariumDays.UI
                 return;
             }
 
-            buyReason.text = EventText.BuyFailure(check);
-            buyYes.SetEnabled(check == EventBuyResult.Ok);
+            if (check != EventBuyResult.Ok)
+            {
+                ShowBlocked(check);
+            }
         }
 
         private void RenderResult(EventSummary summary)

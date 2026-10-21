@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TerrariumDays.Core;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace TerrariumDays.UI
@@ -70,6 +71,18 @@ namespace TerrariumDays.UI
         public void Invalidate()
         {
             lastSignature = null;
+        }
+
+        /// <summary>Opens the supplies section at the top of its list, where the cages are.</summary>
+        public void ShowCages()
+        {
+            Section = ShopSection.Supplies;
+            Invalidate();
+            RenderInternal();
+            if (list != null)
+            {
+                list.scrollOffset = Vector2.zero;
+            }
         }
 
         public void Render(Colony renderColony, ShopService renderShopService, GameCalendar renderCalendar, DateTimeOffset renderNowUtc)

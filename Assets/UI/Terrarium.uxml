@@ -142,7 +142,7 @@
                         <ui:Label name="event-day-title" text="" class="event-title" />
                         <ui:Label name="event-day-left" text="" class="event-info" />
                         <ui:VisualElement name="event-day-stage" class="event-stage" />
-                        <ui:VisualElement name="event-day-offers" class="event-offers" />
+                        <ui:ScrollView name="event-day-offers" class="event-offers" />
                         <ui:VisualElement class="event-button-row">
                             <ui:Button name="event-day-serve-button" text="接客する" class="event-button" />
                             <ui:Button name="event-day-browse-button" text="他のブースを見る" class="event-button" />
@@ -195,10 +195,18 @@
         <ui:VisualElement name="event-buy-modal" class="milestone-modal-overlay" style="display: none;">
             <ui:VisualElement class="milestone-modal-card">
                 <ui:Label name="event-buy-message" text="" class="milestone-message-label" />
-                <ui:Label name="event-buy-reason" text="" class="event-buy-reason" />
                 <ui:VisualElement class="confirm-button-row">
-                    <ui:Button name="event-buy-yes-button" text="購入" class="confirm-yes-button event-button-disable" />
+                    <ui:Button name="event-buy-yes-button" text="購入" class="confirm-yes-button" />
                     <ui:Button name="event-buy-no-button" text="キャンセル" class="confirm-no-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="event-blocked-modal" class="milestone-modal-overlay" style="display: none;">
+            <ui:VisualElement class="milestone-modal-card">
+                <ui:Label name="event-blocked-message" text="" class="milestone-message-label" />
+                <ui:VisualElement class="confirm-button-row">
+                    <ui:Button name="event-blocked-shop-button" text="ケージを買いに行く" class="confirm-yes-button event-blocked-shop" style="display: none;" />
+                    <ui:Button name="event-blocked-close-button" text="閉じる" class="confirm-no-button" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

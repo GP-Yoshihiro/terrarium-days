@@ -281,7 +281,7 @@ namespace TerrariumDays.Tests
             daySurface.Add(new Label { name = "event-day-title" });
             daySurface.Add(new Label { name = "event-day-left" });
             daySurface.Add(new VisualElement { name = "event-day-stage" });
-            daySurface.Add(new VisualElement { name = "event-day-offers" });
+            daySurface.Add(new ScrollView { name = "event-day-offers" });
             foreach (var buttonName in new[] { "serve", "browse", "serve-all", "skip", "finish" })
             {
                 daySurface.Add(new Button { name = $"event-day-{buttonName}-button" });
@@ -301,10 +301,14 @@ namespace TerrariumDays.Tests
             eventsPanel.Add(resultSurface);
             var buyModal = new VisualElement { name = "event-buy-modal" };
             buyModal.Add(new Label { name = "event-buy-message" });
-            buyModal.Add(new Label { name = "event-buy-reason" });
             buyModal.Add(new Button { name = "event-buy-yes-button" });
             buyModal.Add(new Button { name = "event-buy-no-button" });
             root.Add(buyModal);
+            var blockedModal = new VisualElement { name = "event-blocked-modal" };
+            blockedModal.Add(new Label { name = "event-blocked-message" });
+            blockedModal.Add(new Button { name = "event-blocked-shop-button" });
+            blockedModal.Add(new Button { name = "event-blocked-close-button" });
+            root.Add(blockedModal);
 
             root.Add(breedingPanel);
             root.Add(incubatorPanel);
@@ -2330,27 +2334,111 @@ namespace TerrariumDays.Tests
             }
         }
 
-        [Test]
-        public void EventDay_Browse_ShowsOffers_AndAFullRoomDisablesTheBuyButton()
+        private EventBoothOffer OpenOffer()
         {
             OpenEventDay();
-            var colony = view.Session.Colony;
-            foreach (var cage in colony.Cages)
+            ClickEventButton("event-day-browse-button");
+            ClickEventButton("event-day-skip-button");
+            return view.Session.Colony.Events.Entry.BoothOffers[0];
+        }
+
+        private void FillEveryCage()
+        {
+            foreach (var cage in view.Session.Colony.Cages)
             {
                 if (cage.IsEmpty)
                 {
-                    colony.AddAnimal(new PetState { Name = "ふさぎ" }, cage);
+                    view.Session.Colony.AddAnimal(new PetState { Name = "ふさぎ" }, cage);
                 }
             }
+        }
 
-            ClickEventButton("event-day-browse-button");
-            ClickEventButton("event-day-skip-button");
+        private void ClickModalButton(string name) => FindClickAction(eventsPanel.parent.Q<Button>(name).clickable)();
 
-            var offer = colony.Events.Entry.BoothOffers[0];
+        private bool ModalShown(string name) => Shown(eventsPanel.parent.Q<VisualElement>(name));
+
+        [Test]
+        public void EventDay_Buy_WhenPossible_OpensTheConfirmModal()
+        {
+            var offer = OpenOffer();
+            view.OnDebugAddCageClicked();
+            view.Session.Colony.Wallet.Money = 1_000_000L;
             ClickEventButton($"event-offer-buy-{offer.OfferId}");
             StringAssert.Contains(offer.MorphLabel, eventsPanel.parent.Q<Label>("event-buy-message").text);
-            Assert.That(eventsPanel.parent.Q<Button>("event-buy-yes-button").enabledSelf, Is.False);
-            Assert.That(eventsPanel.parent.Q<Label>("event-buy-reason").text, Is.EqualTo("ケージが足りません"));
+            Assert.That(ModalShown("event-buy-modal"), Is.True);
+            Assert.That(ModalShown("event-blocked-modal"), Is.False);
+        }
+
+        [Test]
+        public void EventDay_Buy_WithoutAFreeCage_ShowsTheReasonDialogWithTheShopButton()
+        {
+            var offer = OpenOffer();
+            FillEveryCage();
+            view.Session.Colony.Wallet.Money = 1_000_000L;
+            ClickEventButton($"event-offer-buy-{offer.OfferId}");
+            Assert.That(ModalShown("event-buy-modal"), Is.False);
+            Assert.That(ModalShown("event-blocked-modal"), Is.True);
+            Assert.That(eventsPanel.parent.Q<Label>("event-blocked-message").text, Is.EqualTo("ケージが足りません"));
+            Assert.That(Shown(eventsPanel.parent.Q<Button>("event-blocked-shop-button")), Is.True);
+
+            ClickModalButton("event-blocked-shop-button");
+            Assert.That(ModalShown("event-blocked-modal"), Is.False);
+            var navigator = (ShellNavigator)typeof(TerrariumView).GetField("navigator", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+            Assert.That(navigator.Tab, Is.EqualTo(ShellTab.Shop));
+            Assert.That(ShopViewOf().Section, Is.EqualTo(ShopSection.Supplies));
+        }
+
+        [Test]
+        public void EventDay_Buy_WithoutMoney_ShowsTheReasonDialogWithoutTheShopButton()
+        {
+            var offer = OpenOffer();
+            view.OnDebugAddCageClicked();
+            view.Session.Colony.Wallet.Money = 0L;
+            ClickEventButton($"event-offer-buy-{offer.OfferId}");
+            Assert.That(ModalShown("event-buy-modal"), Is.False);
+            Assert.That(ModalShown("event-blocked-modal"), Is.True);
+            Assert.That(eventsPanel.parent.Q<Label>("event-blocked-message").text, Is.EqualTo("所持金が足りません"));
+            Assert.That(Shown(eventsPanel.parent.Q<Button>("event-blocked-shop-button")), Is.False);
+
+            ClickModalButton("event-blocked-close-button");
+            Assert.That(ModalShown("event-blocked-modal"), Is.False);
+        }
+
+        [Test]
+        public void EventDay_OpenConfirmModal_TurnsIntoTheReasonDialogWhenTheCagesRunOut()
+        {
+            var offer = OpenOffer();
+            view.OnDebugAddCageClicked();
+            view.Session.Colony.Wallet.Money = 1_000_000L;
+            ClickEventButton($"event-offer-buy-{offer.OfferId}");
+            Assert.That(ModalShown("event-buy-modal"), Is.True);
+
+            FillEveryCage();
+            EventViewOf().Tick(0f);
+            Assert.That(ModalShown("event-buy-modal"), Is.False);
+            Assert.That(ModalShown("event-blocked-modal"), Is.True);
+        }
+
+        [Test]
+        public void EventDay_CageBoughtInTheShop_MakesTheKeptOfferBuyable()
+        {
+            var offer = OpenOffer();
+            var colony = view.Session.Colony;
+            FillEveryCage();
+            colony.Wallet.Money = 1_000_000L;
+            Assert.That(view.Session.Events.CheckBuy(colony, offer.OfferId), Is.EqualTo(EventBuyResult.NoEmptyCage));
+            ClickEventButton($"event-offer-buy-{offer.OfferId}");
+            ClickModalButton("event-blocked-shop-button");
+
+            var bought = ShopServiceOf().BuyItem(colony, "cage_standard", ShopNow);
+            Assert.That(bought, Is.EqualTo(ShopResult.Ok));
+            Assert.That(view.Session.Events.CheckBuy(colony, offer.OfferId), Is.EqualTo(EventBuyResult.Ok));
+
+            RenderEvents();
+            Assert.That(colony.Events.Entry.BoothOffers.Contains(offer), Is.True);
+            Assert.That(EventElement<VisualElement>("event-day-offers").Q<VisualElement>($"event-offer-{offer.OfferId}"), Is.Not.Null);
+            ClickEventButton($"event-offer-buy-{offer.OfferId}");
+            Assert.That(ModalShown("event-buy-modal"), Is.True);
         }
 
         [Test]

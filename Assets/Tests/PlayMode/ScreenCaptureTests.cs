@@ -492,9 +492,19 @@ namespace TerrariumDays.Tests
 
             var session = view.Session;
             var colony = session.Colony;
+
+            // The scene's colony comes from a shared save: start from a clean slate so no leftover
+            // animals or an earlier capture's event change which rows the prep list shows.
+            foreach (var old in colony.Animals.ToList())
+            {
+                colony.RemoveAnimal(old);
+            }
+
+            colony.Events.Entry = null;
+            colony.Events.LastSummary = null;
             for (var i = 0; i < 4; i++)
             {
-                var cage = colony.AddCage(CageSize.Standard);
+                var cage = colony.FirstEmptyCage() ?? colony.AddCage(CageSize.Standard);
                 colony.AddAnimal(new PetState { Name = "ピコ" + i, WeightGrams = 80d + 20d * i, Stage = GrowthStage.Adult }, cage);
             }
 
@@ -893,10 +903,25 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "event-day-offers");
 
             var offer = colony.Events.Entry.BoothOffers.First(o => !o.Bought);
+            colony.AddCage(CageSize.Standard);
             ClickNamed(document, $"event-offer-buy-{offer.OfferId}");
             yield return new WaitForSeconds(0.3f);
             yield return Capture(outputDir, "event-day-buy");
             ClickNamed(document, "event-buy-no-button");
+
+            // No free cage: the reason dialog with the shop button (event-day-blocked.png).
+            foreach (var cage in colony.Cages.ToList())
+            {
+                if (cage.IsEmpty)
+                {
+                    colony.AddAnimal(new PetState { Name = "ふさぎ" }, cage);
+                }
+            }
+
+            ClickNamed(document, $"event-offer-buy-{offer.OfferId}");
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture(outputDir, "event-day-blocked");
+            ClickNamed(document, "event-blocked-close-button");
 
             ClickNamed(document, "event-day-serve-all-button");
             ClickNamed(document, "confirm-yes-button");
@@ -982,8 +1007,6 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "event-result");
 
             Text("event-buy-message", "ノーマルを12,000円で買いますか");
-            Text("event-buy-reason", "ケージが足りません");
-            root.Q<Button>("event-buy-yes-button").SetEnabled(false);
             root.Q("event-buy-modal").style.display = DisplayStyle.Flex;
             yield return Capture(outputDir, "event-buy-modal");
         }

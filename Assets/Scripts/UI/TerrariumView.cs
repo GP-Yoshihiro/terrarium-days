@@ -1004,6 +1004,7 @@ namespace TerrariumDays.UI
                 eventView.FinishRequested -= OnEventFinishRequested;
                 eventView.CloseRequested -= OnEventCloseRequested;
                 eventView.BuyConfirmed -= OnEventBuyConfirmed;
+                eventView.ShopRequested -= OnEventShopRequested;
             }
 
             confirmDialog?.Dispose();
@@ -2582,6 +2583,7 @@ namespace TerrariumDays.UI
             eventView.FinishRequested += OnEventFinishRequested;
             eventView.CloseRequested += OnEventCloseRequested;
             eventView.BuyConfirmed += OnEventBuyConfirmed;
+            eventView.ShopRequested += OnEventShopRequested;
         }
 
         private void OnEventActionRequested(EventActionKind kind)
@@ -2656,6 +2658,12 @@ namespace TerrariumDays.UI
             RefreshShell();
         }
 
+        private void OnEventShopRequested()
+        {
+            shopView?.ShowCages();
+            navigator?.ShowTab(ShellTab.Shop);
+        }
+
         private void OnEventBuyConfirmed(int offerId)
         {
             if (session == null)
@@ -2666,8 +2674,7 @@ namespace TerrariumDays.UI
             var result = session.Events.Buy(session.Colony, offerId, GameNowUtc());
             if (result != EventBuyResult.Ok)
             {
-                // The dialog stays open (it re-checks and shows the reason); terminal cases close it themselves.
-                eventView?.ShowMessage(EventText.BuyFailure(result));
+                eventView?.ShowBlocked(result);
             }
             else
             {
