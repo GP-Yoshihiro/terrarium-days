@@ -117,7 +117,7 @@ namespace TerrariumDays.Tests
         [Test]
         public void Confirmations()
         {
-            Assert.That(EventText.ConfirmRegister(0), Is.EqualTo(Spring + "に申し込みますか？（出店料 10,000円・取り消せません）"));
+            Assert.That(EventText.ConfirmRegister(0, 1), Is.EqualTo(Spring + "に申し込みますか？（出店料 10,000円・取り消せません）"));
             Assert.That(EventText.ConfirmRegister(0, 0), Does.StartWith("出品する動物が0匹です").And.EndsWith("取り消せません）"));
             Assert.That(EventText.ConfirmBuy(new EventBoothOffer { MorphLabel = "ハイポ?", Price = 8000 }), Is.EqualTo("ハイポ?を8,000円で買いますか？"));
         }

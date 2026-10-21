@@ -226,6 +226,7 @@ namespace TerrariumDays.Core
                 }
 
                 report.Withdrawn.Add(NameOf(colony, listing.AnimalId));
+                entry.Withdrawn.Add(WithdrawnLine(colony, listing));
                 entry.Listings.RemoveAt(i);
                 i--;
             }
@@ -242,6 +243,7 @@ namespace TerrariumDays.Core
                 if (EventRules.Check(colony, pet) != ListingProblem.None)
                 {
                     report.Withdrawn.Add(NameOf(colony, listing.AnimalId));
+                    entry.Withdrawn.Add(WithdrawnLine(colony, listing));
                     continue;
                 }
 
@@ -276,6 +278,18 @@ namespace TerrariumDays.Core
             state.NoticeStage = stage;
             report.DeadlineNoticeNumber = number;
             report.DeadlineDaysLeft = stage == 2 ? 1 : 3;
+        }
+
+        private static EventAnimalLine WithdrawnLine(Colony colony, EventListing listing)
+        {
+            var pet = colony.AnimalById(listing.AnimalId);
+            return new EventAnimalLine
+            {
+                AnimalId = listing.AnimalId,
+                Name = NameOf(colony, listing.AnimalId),
+                MorphLabel = pet != null ? EventRules.MorphLabel(pet) : string.Empty,
+                Amount = listing.Price,
+            };
         }
 
         private static string NameOf(Colony colony, int animalId)

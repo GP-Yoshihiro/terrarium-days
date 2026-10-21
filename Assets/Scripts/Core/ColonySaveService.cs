@@ -527,6 +527,11 @@ namespace TerrariumDays.Core
                 {
                     data.entry.purchases.Add(LineToSaveData(line));
                 }
+
+                foreach (var line in entry.Withdrawn)
+                {
+                    data.entry.withdrawn.Add(LineToSaveData(line));
+                }
             }
 
             var summary = events.LastSummary;
@@ -759,6 +764,7 @@ namespace TerrariumDays.Core
 
             entry.NextOfferId = Math.Max(1, Math.Max(d.nextOfferId, maxOfferId + 1));
             entry.Purchases = LinesFromSaveData(d.purchases);
+            entry.Withdrawn = LinesFromSaveData(d.withdrawn);
             return entry;
         }
 

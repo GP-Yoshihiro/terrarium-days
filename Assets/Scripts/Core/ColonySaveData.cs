@@ -228,6 +228,7 @@ namespace TerrariumDays.Core
         public List<EventActionSaveData> actions = new List<EventActionSaveData>();
         public List<EventBoothOfferSaveData> boothOffers = new List<EventBoothOfferSaveData>();
         public List<EventAnimalLineSaveData> purchases = new List<EventAnimalLineSaveData>();
+        public List<EventAnimalLineSaveData> withdrawn = new List<EventAnimalLineSaveData>();
     }
 
     [Serializable]

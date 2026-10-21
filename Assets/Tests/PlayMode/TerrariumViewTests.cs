@@ -2557,6 +2557,35 @@ namespace TerrariumDays.Tests
         private ColonySaveService EventSaveService() => new ColonySaveService(new CareTuning(), new EconomyTuning());
 
         [Test]
+        public void EventPrep_UntouchedDefaults_ConfirmWarnsOfZeroListings_AndRegistersNone()
+        {
+            OpenEventTab(out var number);
+            var colony = view.Session.Colony;
+            RenderEvents();
+
+            ClickEventButton("event-prep-register-button");
+            var message = confirmMessageLabel.text;
+            Assert.That(message, Is.EqualTo(EventText.ConfirmRegister(number, 0)));
+            StringAssert.StartsWith("出品する動物が0匹です", message);
+
+            ClickConfirmYes();
+            Assert.That(colony.Events.Entry, Is.Not.Null);
+            Assert.That(colony.Events.Entry.Listings.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void EventPrep_OneTickedAnimal_ConfirmNamesOneListing()
+        {
+            var second = OpenEventTab(out var number);
+            RenderEvents();
+            ClickEventButton($"event-check-{second.Id}");
+            ClickEventButton("event-prep-register-button");
+            Assert.That(confirmMessageLabel.text, Is.EqualTo(EventText.ConfirmRegister(number, 1)));
+            ClickConfirmYes();
+            Assert.That(view.Session.Colony.Events.Entry.Listings.Count, Is.EqualTo(1));
+        }
+
+        [Test]
         public void EventLoop_RegisterPlayBuyAndLedger()
         {
             var second = OpenEventTab(out var number);

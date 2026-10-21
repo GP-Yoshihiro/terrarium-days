@@ -68,6 +68,9 @@ namespace TerrariumDays.Core
         public List<EventBoothOffer> BoothOffers { get; set; } = new List<EventBoothOffer>();
         public List<EventAnimalLine> Purchases { get; set; } = new List<EventAnimalLine>();
 
+        /// <summary>Listings taken back (animal gone, weak, ...): they stay visible as unsold in the summary.</summary>
+        public List<EventAnimalLine> Withdrawn { get; set; } = new List<EventAnimalLine>();
+
         public EventListing ListingOf(int animalId) => Listings.Find(l => l.AnimalId == animalId);
     }
 

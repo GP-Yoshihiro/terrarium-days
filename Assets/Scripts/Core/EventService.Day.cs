@@ -237,6 +237,7 @@ namespace TerrariumDays.Core
                 });
             }
 
+            summary.Unsold.AddRange(entry.Withdrawn);
             summary.Bought.AddRange(entry.Purchases);
             colony.Events.LastSummary = summary;
             colony.Events.LastSummarySeen = false;

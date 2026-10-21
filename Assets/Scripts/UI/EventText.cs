@@ -95,7 +95,7 @@ namespace TerrariumDays.UI
             }
         }
 
-        public static string ConfirmRegister(int number, int listingCount = 1) =>
+        public static string ConfirmRegister(int number, int listingCount) =>
             (listingCount > 0 ? string.Empty : "出品する動物が0匹です。このままでは何も売れません。\n")
             + $"{EventSchedule.NameOf(number)}に申し込みますか？（出店料 {Yen(EventSchedule.BoothFee(EventSchedule.KindOf(number)))}・取り消せません）";
 
