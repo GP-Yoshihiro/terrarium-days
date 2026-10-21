@@ -1563,6 +1563,11 @@
     font-size: 18px;
 }
 
+.event-listing-check-on {
+    background-color: rgb(255, 166, 43);
+    color: rgb(255, 255, 255);
+}
+
 .event-listing-name {
     flex-grow: 1;
     flex-basis: 80%;

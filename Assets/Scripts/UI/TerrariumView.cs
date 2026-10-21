@@ -2689,7 +2689,7 @@ namespace TerrariumDays.UI
 
         private void OnEventRegisterRequested(int number, List<ListingRequest> requests)
         {
-            confirmDialog?.Show(EventText.ConfirmRegister(number), () => ConfirmEventRegister(number, requests));
+            confirmDialog?.Show(EventText.ConfirmRegister(number, requests.Count), () => ConfirmEventRegister(number, requests));
         }
 
         private void ConfirmEventRegister(int number, List<ListingRequest> requests)

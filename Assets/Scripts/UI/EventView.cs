@@ -310,6 +310,7 @@ namespace TerrariumDays.UI
                 var eligible = row.Problem == ListingProblem.None;
                 var on = eligible && pick.On;
                 row.Check.text = on ? "■" : "□";
+                row.Check.EnableInClassList("event-listing-check-on", on);
                 row.Check.SetEnabled(eligible && (on || checkedCount < max));
                 if (on)
                 {
