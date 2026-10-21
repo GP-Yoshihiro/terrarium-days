@@ -2434,7 +2434,10 @@ namespace TerrariumDays.Tests
             Assert.That(bought, Is.EqualTo(ShopResult.Ok));
             Assert.That(view.Session.Events.CheckBuy(colony, offer.OfferId), Is.EqualTo(EventBuyResult.Ok));
 
+            var navigator = (ShellNavigator)typeof(TerrariumView).GetField("navigator", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+            navigator.ShowTab(ShellTab.Events);
             RenderEvents();
+            Assert.That(navigator.Tab, Is.EqualTo(ShellTab.Events));
             Assert.That(colony.Events.Entry.BoothOffers.Contains(offer), Is.True);
             Assert.That(EventElement<VisualElement>("event-day-offers").Q<VisualElement>($"event-offer-{offer.OfferId}"), Is.Not.Null);
             ClickEventButton($"event-offer-buy-{offer.OfferId}");

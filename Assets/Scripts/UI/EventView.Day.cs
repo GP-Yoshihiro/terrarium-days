@@ -574,7 +574,7 @@ namespace TerrariumDays.UI
             }
 
             var check = events.CheckBuy(colony, buyOfferId);
-            if (check == EventBuyResult.NoEvent || check == EventBuyResult.NotFound || check == EventBuyResult.AlreadyBought)
+            if (check == EventBuyResult.NoEvent)
             {
                 CloseBuy();
                 return;
