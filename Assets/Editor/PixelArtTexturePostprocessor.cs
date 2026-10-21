@@ -17,7 +17,7 @@ namespace TerrariumDays.Editor
             "Assets/Resources/Event/",
         };
 
-        public override uint GetVersion() => 2;
+        public override uint GetVersion() => 3;
 
         private void OnPreprocessTexture()
         {
@@ -27,8 +27,9 @@ namespace TerrariumDays.Editor
             }
 
             var importer = (TextureImporter)assetImporter;
+            // Event visitor frames are code-loaded textures: keep them Default like the geckos (proven on device). The rest are Sprites for USS/9-slice.
             importer.textureType = assetPath.StartsWith("Assets/Resources/Candling/")
-                || assetPath.StartsWith("Assets/Resources/Event/")
+                || (assetPath.StartsWith("Assets/Resources/Event/") && !assetPath.StartsWith("Assets/Resources/Event/visitor_"))
                 ? TextureImporterType.Sprite
                 : TextureImporterType.Default;
             importer.filterMode = FilterMode.Point;

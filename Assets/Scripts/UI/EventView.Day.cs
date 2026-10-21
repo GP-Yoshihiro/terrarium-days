@@ -389,6 +389,43 @@ namespace TerrariumDays.UI
             log.Add(label);
         }
 
+        private static Dictionary<string, Texture2D> visitorFrames;
+
+        /// <summary>Loads every Event/visitor_* texture once, the same way geckos load (LoadAll on the folder, Default import); warns about any missing frame.</summary>
+        public static Dictionary<string, Texture2D> LoadVisitorFrames()
+        {
+            if (visitorFrames != null)
+            {
+                return visitorFrames;
+            }
+
+            var loaded = new Dictionary<string, Texture2D>();
+            foreach (var texture in Resources.LoadAll<Texture2D>("Event"))
+            {
+                loaded[texture.name] = texture;
+            }
+
+            foreach (var kind in new[] { 'a', 'b', 'c' })
+            {
+                for (var frame = 0; frame < 2; frame++)
+                {
+                    var name = $"visitor_{kind}_{frame}";
+                    if (!loaded.ContainsKey(name))
+                    {
+                        Debug.LogWarning($"EventView: Resources asset Event/{name} failed to load");
+                    }
+                }
+            }
+
+            visitorFrames = loaded;
+            return loaded;
+        }
+
+        private static Texture2D VisitorFrame(char kind, int frame)
+        {
+            return LoadVisitorFrames().TryGetValue($"visitor_{kind}_{frame}", out var texture) ? texture : null;
+        }
+
         private void UpdateVisitor()
         {
             if (visitor == null)
@@ -404,8 +441,7 @@ namespace TerrariumDays.UI
 
             var kind = (char)('a' + replayRecord.Index % 3);
             var frame = (int)(replayElapsed / FrameSeconds) % 2;
-            // The sheets are multi-sprite imports, so Resources.Load<Sprite> finds nothing: load the texture.
-            var picture = Resources.Load<Texture2D>($"Event/visitor_{kind}_{frame}");
+            var picture = VisitorFrame(kind, frame);
             visitor.style.backgroundImage = picture != null ? new StyleBackground(picture) : new StyleBackground(StyleKeyword.None);
             visitor.style.display = DisplayStyle.Flex;
             var left = Mathf.Lerp(-18f, 30f, Mathf.Clamp01((float)(replayElapsed / 2.5d)));
