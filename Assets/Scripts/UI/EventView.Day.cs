@@ -140,6 +140,10 @@ namespace TerrariumDays.UI
                 bubbleLabel = new Label { name = "event-bubble-label" };
                 bubbleLabel.AddToClassList("event-bubble-label");
                 bubble.Add(bubbleLabel);
+                var bubbleTail = new VisualElement { name = "event-bubble-tail" };
+                bubbleTail.AddToClassList("event-bubble-tail");
+                bubbleTail.pickingMode = PickingMode.Ignore;
+                bubble.Add(bubbleTail);
                 stage.Add(bubble);
                 HideVisitor();
             }

@@ -120,11 +120,8 @@ namespace TerrariumDays.UI
             row.AddToClassList("tray-row");
 
             var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
-            thumb.style.width = 72;
-            thumb.style.height = 44;
+            thumb.AddToClassList("cage-row-thumb");
             thumb.style.marginRight = 8;
-            // The thumbnail is a wide body crop; the default stretch squashed it sideways in a square box.
-            thumb.style.unityBackgroundScaleMode = ScaleMode.ScaleToFit;
             var thumbnail = MorphSprites.Thumbnail(pet);
             if (thumbnail != null)
             {

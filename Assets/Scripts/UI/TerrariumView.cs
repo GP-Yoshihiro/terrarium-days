@@ -879,6 +879,12 @@ namespace TerrariumDays.UI
                 petActor?.SetViewSize(terrariumProjection.ViewWidth, terrariumProjection.ViewHeight);
             }
 
+            // A fresh actor starts at baby size; give it the current stage/mood right away.
+            if (petActor != null && state != null)
+            {
+                petActor.SetCondition(PetMoodEvaluator.Evaluate(state, tuning, petBehaviourTuning), state.GrowthStage);
+            }
+
             PlaceDecor();
         }
 

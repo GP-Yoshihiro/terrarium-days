@@ -2307,6 +2307,7 @@ namespace TerrariumDays.Tests
             Assert.That(Shown(bubble), Is.True);
             Assert.That(bubble.ClassListContains("event-bubble--clerk"), Is.True);
             Assert.That(bubble.style.left.keyword, Is.EqualTo(StyleKeyword.Null), "the clerk anchor is USS-driven, not the customer's left");
+            Assert.That(bubble.Q<VisualElement>("event-bubble-tail"), Is.Not.Null);
         }
 
         [Test]
@@ -2895,7 +2896,20 @@ namespace TerrariumDays.Tests
 
             var row = incubatorPanel.Q<VisualElement>($"tray-row-{pet.Id}");
             var thumb = row.Children().First();
-            Assert.That(thumb.style.unityBackgroundScaleMode.value, Is.EqualTo(ScaleMode.ScaleToFit));
+            Assert.That(thumb.ClassListContains("cage-row-thumb"), Is.True, "the shared scale-to-fit thumbnail style");
+        }
+
+        [Test]
+        public void RebuildPetActor_GivesTheNewActorTheCurrentGrowthStageAtOnce()
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            var pet = (PetState)typeof(TerrariumView).GetField("state", flags).GetValue(view);
+            pet.Stage = GrowthStage.Adult;
+
+            typeof(TerrariumView).GetMethod("RebuildPetActor", flags).Invoke(view, null);
+
+            var actor = (PetActor)typeof(TerrariumView).GetField("petActor", flags).GetValue(view);
+            Assert.That(actor.BodyWidth, Is.EqualTo(new PetBehaviourTuning().AdultBodyWidth));
         }
 
         [Test]

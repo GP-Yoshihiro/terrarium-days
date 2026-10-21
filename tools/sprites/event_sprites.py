@@ -5,7 +5,7 @@ Same dark-brown outline (58,36,26), warm palette, light from the upper left (sha
 Files written to <output_root>/Event/: booth_bg (old single-booth backdrop, no longer used by the day scene),
 aisle_bg (the aisle seen from inside our booth), counter_fg (back of our counter, foreground strip),
 booth_case, sold_tag, visitor_{a,b,c}_{0,1} (walk frames, facing right), visitor_{a,b,c}_front (standing, faces us),
-bubble (9-slice, border 8 px at output scale), other_booth.
+bubble (9-slice, border 8 px at output scale), bubble_clerk (tail-less 9-slice, border 8 px) + bubble_tail_down (small down-pointing tail, drawn under it) for our clerk's lines, other_booth.
 
 usage: python3 tools/sprites/event_sprites.py [output_root]   (default: Assets/Resources)
 """
@@ -383,6 +383,28 @@ def bubble():
     return cv
 
 
+def bubble_clerk():
+    cv = Canvas(26, 22)
+    cv.rect(1, 1, 24, 20, WHITE)
+    for c in ((1, 1), (24, 1), (1, 20), (24, 20)):  # round the corners
+        cv.px[c[1]][c[0]] = None
+    cv.rect(2, 20, 23, 20, CLOTH_SHADE)
+    cv.rect(24, 2, 24, 19, CLOTH_SHADE)
+    cv.outline()
+    return cv
+
+
+def bubble_tail_down():
+    """The clerk bubble's tail: sits under the bubble's bottom edge and points down at the viewer."""
+    cv = Canvas(10, 6)
+    cv.rect(1, 0, 8, 0, WHITE)
+    cv.rect(2, 1, 7, 1, WHITE)
+    cv.rect(3, 2, 6, 2, WHITE)
+    cv.rect(4, 3, 5, 3, WHITE)
+    cv.outline()
+    return cv
+
+
 def other_booth():
     cv = Canvas(64, 48)
     cv.rect(0, 40, 63, 47, FLOOR)
@@ -421,6 +443,8 @@ def main():
     for kind in LOOKS:
         save(out, "visitor_%s_front" % kind, visitor_front(kind))
     save(out, "bubble", bubble())
+    save(out, "bubble_clerk", bubble_clerk())
+    save(out, "bubble_tail_down", bubble_tail_down())
     save(out, "other_booth", other_booth())
     print("wrote", out)
 

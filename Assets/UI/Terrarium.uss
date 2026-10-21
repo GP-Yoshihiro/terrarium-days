@@ -1690,12 +1690,31 @@
     -unity-slice-bottom: 8;
 }
 
-/* Our (the clerk's) line: bottom-centre of the stage just above the counter, tail pointing down at the viewer. */
+/* Our (the clerk's) line: bottom-left of the stage, clear of the stopped customer, with its own tail-less
+   picture and a separate tail below it pointing down at the viewer. */
 .event-bubble--clerk {
-    left: 50%;
-    bottom: 24%;
-    translate: -25% 0;
-    -unity-background-image-tint-color: rgb(255, 240, 214);
+    left: 6px;
+    bottom: 27%;
+    padding: 6px 10px;
+    background-image: url("/Assets/Resources/Event/bubble_clerk.png");
+    -unity-slice-left: 8;
+    -unity-slice-top: 8;
+    -unity-slice-right: 8;
+    -unity-slice-bottom: 8;
+}
+
+.event-bubble-tail {
+    display: none;
+    position: absolute;
+    left: 14px;
+    bottom: -10px;
+    width: 20px;
+    height: 12px;
+    background-image: url("/Assets/Resources/Event/bubble_tail_down.png");
+}
+
+.event-bubble--clerk .event-bubble-tail {
+    display: flex;
 }
 
 .event-bubble-label {
