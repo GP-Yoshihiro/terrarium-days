@@ -1482,7 +1482,7 @@
     flex-shrink: 0;
     margin: 6px 12px 0;
     border-radius: 10px;
-    background-image: url("/Assets/Resources/Event/booth_bg.png");
+    background-image: url("/Assets/Resources/Event/aisle_bg.png");
     -unity-background-scale-mode: scale-and-crop;
     overflow: hidden;
 }
@@ -1609,19 +1609,30 @@
     opacity: 0.45;
 }
 
+/* The back of our counter is the foreground; the cases stand on its board. */
+.event-counter {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 22%;
+    background-image: url("/Assets/Resources/Event/counter_fg.png");
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
 .event-cases {
     position: absolute;
+    left: 6px;
     right: 6px;
-    bottom: 6px;
-    width: 55%;
+    bottom: 12%;
     flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    flex-wrap: wrap-reverse;
+    justify-content: center;
 }
 
 .event-case {
-    width: 56px;
-    height: 45px;
+    width: 44px;
+    height: 35px;
     margin: 2px;
     background-image: url("/Assets/Resources/Event/booth_case.png");
     -unity-background-scale-mode: scale-to-fit;
@@ -1636,25 +1647,35 @@
 
 .event-sold-tag {
     position: absolute;
-    left: 4px;
-    top: 8px;
-    width: 48px;
-    height: 28px;
+    left: 2px;
+    top: 4px;
+    width: 40px;
+    height: 24px;
     background-image: url("/Assets/Resources/Event/sold_tag.png");
     -unity-background-scale-mode: scale-to-fit;
 }
 
-.event-visitor {
+/* Customer and near-row passersby share the near size; the far row is smaller and drawn behind. */
+.event-visitor,
+.event-passerby-near {
     position: absolute;
-    bottom: 8px;
-    width: 48px;
-    height: 80px;
+    top: 50%;
+    width: 13.5%;
+    height: 34%;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.event-passerby-far {
+    position: absolute;
+    top: 38%;
+    width: 9.5%;
+    height: 24%;
     -unity-background-scale-mode: scale-to-fit;
 }
 
 .event-bubble {
     position: absolute;
-    bottom: 92px;
+    bottom: 50%;
     min-width: 56px;
     padding: 6px 8px 8px 22px;
     background-image: url("/Assets/Resources/Event/bubble.png");

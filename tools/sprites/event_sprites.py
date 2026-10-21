@@ -2,7 +2,9 @@
 
 Drawn on a small logical canvas and upscaled 2x with nearest neighbour, like the gecko sprites.
 Same dark-brown outline (58,36,26), warm palette, light from the upper left (shade lower right).
-Files written to <output_root>/Event/: booth_bg, booth_case, sold_tag, visitor_{a,b,c}_{0,1},
+Files written to <output_root>/Event/: booth_bg (old single-booth backdrop, no longer used by the day scene),
+aisle_bg (the aisle seen from inside our booth), counter_fg (back of our counter, foreground strip),
+booth_case, sold_tag, visitor_{a,b,c}_{0,1} (walk frames, facing right), visitor_{a,b,c}_front (standing, faces us),
 bubble (9-slice, border 8 px at output scale), other_booth.
 
 usage: python3 tools/sprites/event_sprites.py [output_root]   (default: Assets/Resources)
@@ -247,6 +249,123 @@ def visitor(kind, frame):
     return cv
 
 
+def far_booth(cv, x0, awning, awning_shade):
+    """A booth across the aisle, seen from the front and drawn small (46 px wide)."""
+    x1 = x0 + 45
+    cv.rect(x0 + 1, 18, x0 + 2, 50, WOOD_SHADE)
+    cv.rect(x1 - 2, 18, x1 - 1, 50, WOOD_SHADE)
+    cv.rect(x0 + 3, 20, x1 - 3, 40, WALL)  # booth back wall
+    for i, x in enumerate(range(x0, x1 - 6, 6)):
+        c = awning if i % 2 == 0 else CLOTH
+        cv.rect(x, 14, x + 5, 19, c)
+        cv.rect(x, 19, x + 5, 19, awning_shade if i % 2 == 0 else CLOTH_SHADE)
+    cv.box(x0 + 14, 23, x0 + 31, 29, CLOTH, WHITE, CLOTH_SHADE)
+    cv.rect(x0 + 17, 25, x0 + 28, 26, YELLOW)
+    cv.rect(x0 + 3, 37, x1 - 3, 40, WOOD_LIGHT)  # table
+    cv.rect(x0 + 3, 41, x1 - 3, 50, CLOTH)
+    cv.rect(x0 + 3, 50, x1 - 3, 50, CLOTH_SHADE)
+    for x in range(x0 + 7, x1 - 3, 8):
+        cv.rect(x, 42, x, 49, CLOTH_SHADE)
+    for x in (x0 + 8, x0 + 28):  # two small cases on the table
+        cv.box(x, 32, x + 9, 37, GLASS, GLASS_LIGHT, GLASS_SHADE)
+    for y in (14, 19):
+        cv.rect(x0, y, x0, y, OUTLINE)
+
+
+def aisle_bg():
+    """The aisle as seen from behind our own counter: the valance of our booth on top, booths across the aisle, floor."""
+    cv = Canvas(160, 108)
+    cv.rect(0, 0, 159, 107, WALL_SHADE)  # hall wall
+    cv.rect(0, 0, 159, 57, WALL_SHADE)
+    cv.rect(0, 10, 159, 13, WALL)
+    # floor: bands get lighter and wider towards the viewer
+    cv.rect(0, 58, 159, 107, FLOOR)
+    cv.rect(0, 58, 159, 59, FLOOR_SHADE)
+    for y in (66, 76, 88, 102):
+        cv.rect(0, y, 159, y, FLOOR_SHADE)
+    for y0, y1, step in ((60, 66, 12), (67, 76, 16), (77, 88, 22), (89, 102, 30)):
+        off = 0
+        for y in range(y0, y1 + 1):
+            for x in range(off, 160, step):
+                cv.put(x, y, FLOOR_SHADE)
+        # tile joints stay vertical, spacing grows per band
+    # three booths across the aisle
+    far_booth(cv, 6, GREEN, GREEN_SHADE)
+    far_booth(cv, 57, BLUE, BLUE_SHADE)
+    far_booth(cv, 108, YELLOW, YELLOW_SHADE)
+    cv.rect(0, 51, 159, 57, WALL_SHADE)
+    for x in (6, 57, 108):
+        cv.rect(x + 3, 50, x + 42, 51, FLOOR_SHADE)
+    # our booth: valance and poles in front
+    for i, x in enumerate(range(0, 160, 8)):
+        c = RED if i % 2 == 0 else CLOTH
+        cv.rect(x, 0, x + 7, 7, c)
+        cv.rect(x, 7, x + 7, 7, RED_SHADE if i % 2 == 0 else CLOTH_SHADE)
+        cv.rect(x + 2, 8, x + 5, 9, c)
+    cv.rect(0, 0, 159, 0, RED_LIGHT)
+    cv.rect(0, 10, 159, 10, OUTLINE)
+    cv.rect(2, 10, 5, 107, WOOD)
+    cv.rect(5, 10, 5, 107, WOOD_SHADE)
+    cv.rect(154, 10, 157, 107, WOOD)
+    cv.rect(157, 10, 157, 107, WOOD_SHADE)
+    cv.rect(1, 10, 1, 107, OUTLINE)
+    cv.rect(6, 10, 6, 107, OUTLINE)
+    cv.rect(153, 10, 153, 107, OUTLINE)
+    cv.rect(158, 10, 158, 107, OUTLINE)
+    # nobori flags hanging from the valance, seen from behind
+    banner(cv, 12, 12, 9, 20, BLUE, BLUE_SHADE)
+    banner(cv, 139, 12, 9, 20, GREEN, GREEN_SHADE)
+    return cv
+
+
+def counter_fg():
+    """Back of our display counter: board on top, plank panel below. Stretched over the bottom of the stage."""
+    cv = Canvas(160, 24)
+    cv.rect(0, 0, 159, 0, OUTLINE)
+    cv.rect(0, 1, 159, 2, WOOD_LIGHT)
+    cv.rect(0, 3, 159, 5, WOOD)
+    cv.rect(0, 6, 159, 6, OUTLINE)
+    cv.rect(0, 7, 159, 23, WOOD_SHADE)
+    for x in range(0, 160, 20):  # planks
+        cv.rect(x + 1, 8, x + 18, 23, WOOD)
+        cv.rect(x + 1, 8, x + 1, 23, WOOD_LIGHT)
+        cv.rect(x + 18, 8, x + 18, 23, WOOD_SHADE)
+        cv.rect(x + 19, 7, x + 19, 23, OUTLINE)
+    cv.rect(0, 23, 159, 23, OUTLINE)
+    return cv
+
+
+def visitor_front(kind):
+    """Standing, facing us (24x40, feet on y=37); same look as the walking frames."""
+    L = LOOKS[kind]
+    cv = Canvas(24, 40)
+    cx = 11
+    shade_leg = tuple(max(0, v - 28) for v in L["legs"])
+    cv.rect(cx - 3, 28, cx - 1, 36, L["legs"])
+    cv.rect(cx + 1, 28, cx + 3, 36, shade_leg)
+    cv.rect(cx - 3, 36, cx - 1, 37, EYE)
+    cv.rect(cx + 1, 36, cx + 3, 37, EYE)
+    cv.rect(cx - 5, 17, cx + 4, 28, L["top"])
+    cv.rect(cx + 3, 17, cx + 4, 28, L["top_shade"])
+    cv.rect(cx - 7, 18, cx - 6, 27, SKIN_SHADE)  # arms hang at the sides
+    cv.rect(cx + 5, 18, cx + 6, 27, SKIN_SHADE)
+    cv.rect(cx - 7, 26, cx - 6, 27, SKIN)
+    cv.rect(cx + 5, 26, cx + 6, 27, SKIN)
+    cv.rect(cx - 5, 6, cx + 4, 15, SKIN)
+    cv.rect(cx + 4, 7, cx + 4, 15, SKIN_SHADE)
+    cv.rect(cx - 5, 5, cx + 4, 8, L["hair"])
+    cv.rect(cx - 6, 6, cx - 5, 11, L["hair"])
+    cv.rect(cx + 5, 6, cx + 5, 11, L["hair"])
+    if L["hat"]:
+        cv.rect(cx - 5, 2, cx + 4, 4, L["hat"])
+        cv.rect(cx - 6, 5, cx + 5, 5, L["hat"])
+    cv.rect(cx - 3, 10, cx - 3, 11, EYE)
+    cv.rect(cx + 2, 10, cx + 2, 11, EYE)
+    cv.rect(cx - 1, 13, cx, 13, SKIN_SHADE)
+    cv.outline()
+    return cv
+
+
 def bubble():
     cv = Canvas(24, 20)
     cv.rect(0, 0, 23, 15, WHITE)
@@ -297,6 +416,10 @@ def main():
     for kind in LOOKS:
         for f in (0, 1):
             save(out, "visitor_%s_%d" % (kind, f), visitor(kind, f))
+    save(out, "aisle_bg", aisle_bg())
+    save(out, "counter_fg", counter_fg())
+    for kind in LOOKS:
+        save(out, "visitor_%s_front" % kind, visitor_front(kind))
     save(out, "bubble", bubble())
     save(out, "other_booth", other_booth())
     print("wrote", out)

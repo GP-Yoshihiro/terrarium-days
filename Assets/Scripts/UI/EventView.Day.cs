@@ -117,15 +117,22 @@ namespace TerrariumDays.UI
 
             if (stage != null)
             {
-                cases = new VisualElement { name = "event-cases" };
-                cases.AddToClassList("event-cases");
-                cases.pickingMode = PickingMode.Ignore;
-                stage.Add(cases);
-
+                // Back to front: far crowd, near crowd, the customer, our counter with its cases, then the bubble.
+                BuildCrowd();
                 visitor = new VisualElement { name = "event-visitor" };
                 visitor.AddToClassList("event-visitor");
                 visitor.pickingMode = PickingMode.Ignore;
                 stage.Add(visitor);
+
+                var counter = new VisualElement { name = "event-counter" };
+                counter.AddToClassList("event-counter");
+                counter.pickingMode = PickingMode.Ignore;
+                stage.Add(counter);
+
+                cases = new VisualElement { name = "event-cases" };
+                cases.AddToClassList("event-cases");
+                cases.pickingMode = PickingMode.Ignore;
+                stage.Add(cases);
 
                 bubble = new VisualElement { name = "event-bubble" };
                 bubble.AddToClassList("event-bubble");
@@ -180,6 +187,7 @@ namespace TerrariumDays.UI
                 return;
             }
 
+            customerLeaving = false;
             replayEntry = entry;
             replayRecord = record;
             var count = EventSchedule.ActionCount(EventSchedule.KindOf(entry.Number));
@@ -204,14 +212,20 @@ namespace TerrariumDays.UI
             RefreshDay();
         }
 
-        private void EndReplay()
+        private void EndReplay(bool walkOff = false)
         {
+            var leave = walkOff && Playing && visitor != null && visitor.style.display == DisplayStyle.Flex;
             replayRecord = null;
             replayEntry = null;
             replayLines = null;
             replayRevealed = 0;
             replayElapsed = 0d;
             HideVisitor();
+            if (leave)
+            {
+                StartCustomerLeaving();
+            }
+
             daySignature = null;
             logSignature = null;
         }
@@ -224,7 +238,7 @@ namespace TerrariumDays.UI
                 replayElapsed += deltaSeconds;
                 if (replayElapsed >= replayDuration)
                 {
-                    EndReplay();
+                    EndReplay(true);
                     RefreshDay();
                 }
                 else
@@ -236,6 +250,7 @@ namespace TerrariumDays.UI
                 }
             }
 
+            AdvanceCrowd(deltaSeconds);
             UpdateBuyModal();
         }
 
@@ -412,6 +427,18 @@ namespace TerrariumDays.UI
 
         private static Dictionary<string, Texture2D> visitorFrames;
 
+        /// <summary>Frame names by kind (a, b, c) x pose (walk 0, walk 1, front): index kind * 3 + pose.</summary>
+        private static readonly string[] VisitorFrameNames =
+        {
+            "visitor_a_0", "visitor_a_1", "visitor_a_front",
+            "visitor_b_0", "visitor_b_1", "visitor_b_front",
+            "visitor_c_0", "visitor_c_1", "visitor_c_front",
+        };
+
+        private const int FrontPose = 2;
+
+        private Texture2D[] frameTable;
+
         /// <summary>Loads every Event/visitor_* texture once, the same way geckos load (LoadAll on the folder, Default import); warns about any missing frame.</summary>
         public static Dictionary<string, Texture2D> LoadVisitorFrames()
         {
@@ -427,16 +454,12 @@ namespace TerrariumDays.UI
             }
 
             var complete = true;
-            foreach (var kind in new[] { 'a', 'b', 'c' })
+            foreach (var name in VisitorFrameNames)
             {
-                for (var frame = 0; frame < 2; frame++)
+                if (!loaded.ContainsKey(name))
                 {
-                    var name = $"visitor_{kind}_{frame}";
-                    if (!loaded.ContainsKey(name))
-                    {
-                        Debug.LogWarning($"EventView: Resources asset Event/{name} failed to load");
-                        complete = false;
-                    }
+                    Debug.LogWarning($"EventView: Resources asset Event/{name} failed to load");
+                    complete = false;
                 }
             }
 
@@ -448,9 +471,27 @@ namespace TerrariumDays.UI
             return loaded;
         }
 
-        private static Texture2D VisitorFrame(char kind, int frame)
+        /// <summary>The frame textures as an array so per-frame lookups allocate nothing; built once the cache is complete.</summary>
+        private Texture2D VisitorFrame(int kind, int pose)
         {
-            return LoadVisitorFrames().TryGetValue($"visitor_{kind}_{frame}", out var texture) ? texture : null;
+            if (frameTable == null)
+            {
+                var frames = LoadVisitorFrames();
+                var table = new Texture2D[VisitorFrameNames.Length];
+                for (var i = 0; i < table.Length; i++)
+                {
+                    frames.TryGetValue(VisitorFrameNames[i], out table[i]);
+                }
+
+                if (visitorFrames == null)
+                {
+                    return table[kind * 3 + pose];
+                }
+
+                frameTable = table;
+            }
+
+            return frameTable[kind * 3 + pose];
         }
 
         private void UpdateVisitor()
@@ -462,17 +503,21 @@ namespace TerrariumDays.UI
 
             if (!Playing)
             {
-                HideVisitor();
+                if (!customerLeaving)
+                {
+                    HideVisitor();
+                }
+
                 return;
             }
 
-            var kind = (char)('a' + replayRecord.Index % 3);
-            var frame = (int)(replayElapsed / FrameSeconds) % 2;
-            var picture = VisitorFrame(kind, frame);
-            visitor.style.backgroundImage = picture != null ? new StyleBackground(picture) : new StyleBackground(StyleKeyword.None);
-            visitor.style.display = DisplayStyle.Flex;
-            var left = Mathf.Lerp(-18f, 30f, Mathf.Clamp01((float)(replayElapsed / 2.5d)));
-            visitor.style.left = Length.Percent(left);
+            customerKind = replayRecord.Index % 3;
+            customerDir = replayRecord.Index % 2 == 0 ? 1 : -1;
+            var startLeft = customerDir > 0 ? CrowdMinLeft : CrowdMaxLeft;
+            var arrive = Mathf.Clamp01((float)(replayElapsed / CustomerArriveSeconds));
+            var walking = arrive < 1f;
+            var left = Mathf.Lerp(startLeft, CustomerStopLeft, arrive);
+            ShowCustomer(left, walking ? (int)(replayElapsed / FrameSeconds) % 2 : FrontPose, walking);
 
             var shown = Math.Min(replayRevealed, replayLines.Count);
             var text = shown > 0 ? replayLines[shown - 1].Bubble : null;
@@ -484,9 +529,19 @@ namespace TerrariumDays.UI
             else
             {
                 bubbleLabel.text = text;
-                bubble.style.left = Length.Percent(Mathf.Max(left, 1f));
+                bubble.style.left = Length.Percent(Mathf.Max(left + 3f, 1f));
                 bubble.style.display = DisplayStyle.Flex;
             }
+        }
+
+        private void ShowCustomer(float left, int pose, bool walking)
+        {
+            var picture = VisitorFrame(customerKind, pose);
+            visitor.style.backgroundImage = picture != null ? new StyleBackground(picture) : new StyleBackground(StyleKeyword.None);
+            visitor.style.scale = new StyleScale(new Scale(new Vector3(walking && customerDir < 0 ? -1f : 1f, 1f, 1f)));
+            visitor.style.display = DisplayStyle.Flex;
+            visitor.style.left = Length.Percent(left);
+            CustomerLeft = left;
         }
 
         private void HideVisitor()

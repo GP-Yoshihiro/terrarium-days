@@ -11,11 +11,14 @@ namespace TerrariumDays.Tests
         [TestCase('b', 1)]
         [TestCase('c', 0)]
         [TestCase('c', 1)]
-        public void VisitorFrameLoadsThroughTheViewPath(char kind, int frame)
+        [TestCase('a', 'f')]
+        [TestCase('b', 'f')]
+        [TestCase('c', 'f')]
+        public void VisitorFrameLoadsThroughTheViewPath(char kind, object frame)
         {
             var frames = EventView.LoadVisitorFrames();
 
-            Assert.IsTrue(frames.TryGetValue($"visitor_{kind}_{frame}", out var texture), "visitor frame missing");
+            Assert.IsTrue(frames.TryGetValue($"visitor_{kind}_{(frame is char ? "front" : frame.ToString())}", out var texture), "visitor frame missing");
             Assert.IsNotNull(texture);
             Assert.AreEqual(48, texture.width);
             Assert.AreEqual(80, texture.height);

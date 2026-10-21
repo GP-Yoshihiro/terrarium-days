@@ -129,6 +129,7 @@ namespace TerrariumDays.UI
 
             var showResult = !Playing && colony.Events.LastSummary != null && !colony.Events.LastSummarySeen;
             var showDay = !showResult && (Playing || (entry != null && EventSchedule.HasStarted(calendar, entry.Number, nowUtc)));
+            dayShown = showDay;
             SetDisplay(result, showResult);
             SetDisplay(day, showDay);
             SetDisplay(prep, !showResult && !showDay);

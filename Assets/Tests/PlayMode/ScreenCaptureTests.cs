@@ -893,7 +893,9 @@ namespace TerrariumDays.Tests
             ClickNamed(document, "event-day-browse-button");
             yield return new WaitForSeconds(0.6f);
             yield return Capture(outputDir, "event-day-bubble");
-            yield return new WaitForSeconds(3.4f);
+            yield return new WaitForSeconds(2.7f);
+            yield return Capture(outputDir, "event-day-stopped");
+            yield return new WaitForSeconds(0.7f);
             yield return Capture(outputDir, "event-day-replay-a");
             yield return new WaitForSeconds(0.25f);
             yield return Capture(outputDir, "event-day-replay-b");

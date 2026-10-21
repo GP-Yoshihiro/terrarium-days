@@ -2287,6 +2287,61 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void EventDay_CrowdWalksInTwoRows_OnTheDayScreen_AndKeepsMoving()
+        {
+            OpenEventDay();
+            var eventView = EventViewOf();
+
+            Assert.That(eventView.VisibleCrowdCount, Is.GreaterThan(1));
+            Assert.That(eventView.VisibleCrowdRows(true), Is.GreaterThan(0));
+            Assert.That(eventView.VisibleCrowdRows(false), Is.GreaterThan(0));
+            var before = EventElement<VisualElement>("event-passerby-near-0").style.left.value.value;
+
+            eventView.Tick(0.2f);
+
+            Assert.That(EventElement<VisualElement>("event-passerby-near-0").style.left.value.value, Is.Not.EqualTo(before));
+            Assert.That(eventView.VisibleCrowdCount, Is.GreaterThan(1));
+        }
+
+        [Test]
+        public void EventDay_TheCustomerStopsAtTheCounterWhileTheLinesPlay_ThenWalksOff()
+        {
+            OpenEventDay();
+            var eventView = EventViewOf();
+            ClickEventButton("event-day-serve-button");
+            var customer = EventElement<VisualElement>("event-visitor");
+
+            eventView.Tick(0.5f);
+            var walking = eventView.CustomerLeft;
+            Assert.That(walking, Is.Not.EqualTo(EventView.CustomerStopPercent).Within(0.01f));
+            for (var i = 0; i < 12; i++)
+            {
+                eventView.Tick(0.25f);
+            }
+
+            Assert.That(eventView.Playing, Is.True);
+            Assert.That(eventView.CustomerLeft, Is.EqualTo(EventView.CustomerStopPercent).Within(0.01f));
+            var stopped = customer.style.left.value.value;
+            eventView.Tick(0.5f);
+            Assert.That(customer.style.left.value.value, Is.EqualTo(stopped));
+            Assert.That(Shown(customer), Is.True);
+
+            for (var i = 0; i < 80 && eventView.Playing; i++)
+            {
+                eventView.Tick(0.25f);
+            }
+
+            Assert.That(eventView.Playing, Is.False);
+            Assert.That(Shown(customer), Is.True, "the customer walks off after the replay");
+            for (var i = 0; i < 40; i++)
+            {
+                eventView.Tick(0.25f);
+            }
+
+            Assert.That(Shown(customer), Is.False);
+        }
+
+        [Test]
         public void EventDay_ServeLocksTheButtonsUntilSkipped_AndUsesOneAction()
         {
             OpenEventDay();
