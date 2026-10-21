@@ -330,20 +330,56 @@ namespace TerrariumDays.UI
             eggDetail.style.visibility = egg != null ? Visibility.Visible : Visibility.Hidden;
         }
 
-        // Loaded as Texture2D: the candling PNGs are imported with sprite mode Multiple and no
-        // slices, so Resources.Load<Sprite> finds nothing (Task 13 import setting).
+        private static Dictionary<string, Texture2D> candlingTextures;
+
+        /// <summary>Loads every Candling/ texture once, like geckos (LoadAll on the folder, Default import); warns about any missing stage.</summary>
+        public static Dictionary<string, Texture2D> LoadCandlingTextures()
+        {
+            if (candlingTextures != null)
+            {
+                return candlingTextures;
+            }
+
+            var loaded = new Dictionary<string, Texture2D>();
+            foreach (var texture in Resources.LoadAll<Texture2D>("Candling"))
+            {
+                loaded[texture.name] = texture;
+            }
+
+            var complete = true;
+            foreach (CandlingStage stage in Enum.GetValues(typeof(CandlingStage)))
+            {
+                var name = "candling_" + FileStage(stage);
+                if (!loaded.ContainsKey(name))
+                {
+                    Debug.LogWarning($"IncubatorView: Resources asset Candling/{name} failed to load");
+                    complete = false;
+                }
+            }
+
+            if (complete)
+            {
+                candlingTextures = loaded;
+            }
+
+            return loaded;
+        }
+
         private Texture2D PictureFor(CandlingStage stage)
         {
             if (!pictures.TryGetValue(stage, out var picture))
             {
-                picture = Resources.Load<Texture2D>("Candling/candling_" + FileStage(stage));
-                pictures[stage] = picture;
+                LoadCandlingTextures().TryGetValue("candling_" + FileStage(stage), out picture);
+                if (picture != null)
+                {
+                    pictures[stage] = picture;
+                }
             }
 
             return picture;
         }
 
-        private static string FileStage(CandlingStage stage) =>
+        public static string FileStage(CandlingStage stage) =>
             stage == CandlingStage.AboutToHatch ? "hatching" : stage.ToString().ToLowerInvariant();
     }
 }

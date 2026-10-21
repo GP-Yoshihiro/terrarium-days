@@ -405,6 +405,7 @@ namespace TerrariumDays.UI
                 loaded[texture.name] = texture;
             }
 
+            var complete = true;
             foreach (var kind in new[] { 'a', 'b', 'c' })
             {
                 for (var frame = 0; frame < 2; frame++)
@@ -413,11 +414,16 @@ namespace TerrariumDays.UI
                     if (!loaded.ContainsKey(name))
                     {
                         Debug.LogWarning($"EventView: Resources asset Event/{name} failed to load");
+                        complete = false;
                     }
                 }
             }
 
-            visitorFrames = loaded;
+            if (complete)
+            {
+                visitorFrames = loaded;
+            }
+
             return loaded;
         }
 
