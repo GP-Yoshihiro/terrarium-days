@@ -1690,6 +1690,14 @@
     -unity-slice-bottom: 8;
 }
 
+/* Our (the clerk's) line: bottom-centre of the stage just above the counter, tail pointing down at the viewer. */
+.event-bubble--clerk {
+    left: 50%;
+    bottom: 24%;
+    translate: -25% 0;
+    -unity-background-image-tint-color: rgb(255, 240, 214);
+}
+
 .event-bubble-label {
     font-size: 12px;
     color: rgb(90, 62, 40);

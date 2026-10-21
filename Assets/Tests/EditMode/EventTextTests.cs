@@ -196,5 +196,15 @@ namespace TerrariumDays.Tests
             Assert.That(EventReplay.RevealedCount(4, 99d, 12d), Is.EqualTo(4));
             Assert.That(EventReplay.RevealedCount(0, 5d, 12d), Is.EqualTo(0));
         }
+
+        [Test]
+        public void EachBubbleLineMapsToItsSpeaker_OurGreetingAndBrowsingAreTheClerksOthersTheCustomers()
+        {
+            Assert.That(EventReplay.SpeakerOf(EventReplay.ServeBubble), Is.EqualTo(ReplaySpeaker.Clerk));
+            Assert.That(EventReplay.SpeakerOf(EventReplay.BrowseBubble), Is.EqualTo(ReplaySpeaker.Clerk));
+            Assert.That(EventReplay.SpeakerOf(EventReplay.SaleBubble), Is.EqualTo(ReplaySpeaker.Customer));
+            Assert.That(EventReplay.SpeakerOf(EventReplay.RareBubble), Is.EqualTo(ReplaySpeaker.Customer));
+            Assert.That(new ReplayLine { Bubble = EventReplay.ServeBubble }.Speaker, Is.EqualTo(ReplaySpeaker.Clerk));
+        }
     }
 }

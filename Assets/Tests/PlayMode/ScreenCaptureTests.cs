@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -555,6 +556,8 @@ namespace TerrariumDays.Tests
             session.Incubation.AddDebugEggs(session.Colony, session.GameNowUtc, 2);
             hatchery.Hatch(session.Colony, session.Colony.Eggs[0], session.GameNowUtc, 28d);
             var expired = hatchery.Hatch(session.Colony, session.Colony.Eggs[0], session.GameNowUtc, 28d);
+            // The second tray card shows a juvenile so both young stages' thumbnails can be compared (device check 3).
+            session.Colony.TrayAnimals()[0].Stage = GrowthStage.Juvenile;
             expired.CareGraceUntilUtc = session.GameNowUtc - System.TimeSpan.FromHours(1);
             foreach (var cage in session.Colony.Cages.FindAll(c => c.IsEmpty))
             {
@@ -899,6 +902,16 @@ namespace TerrariumDays.Tests
             yield return Capture(outputDir, "event-day-replay-a");
             yield return new WaitForSeconds(0.25f);
             yield return Capture(outputDir, "event-day-replay-b");
+
+            // Force one clerk line and one customer line so both bubble anchors are captured
+            // (event-day-bubble-clerk.png / event-day-bubble-customer.png).
+            var eventView = (EventView)typeof(TerrariumView).GetField("eventView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+            foreach (var (bubble, file) in new[] { (EventReplay.ServeBubble, "event-day-bubble-clerk"), (EventReplay.SaleBubble, "event-day-bubble-customer") })
+            {
+                typeof(EventView).GetField("replayLines", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .SetValue(eventView, new List<ReplayLine> { new ReplayLine { Bubble = bubble } });
+                yield return Capture(outputDir, file);
+            }
 
             ClickNamed(document, "event-day-skip-button");
             yield return new WaitForSeconds(0.5f);

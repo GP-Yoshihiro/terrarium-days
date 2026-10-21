@@ -149,6 +149,19 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void SetCondition_KeepsTheFramesAspectRatioAtEveryGrowthStage([Values] GrowthStage stage)
+        {
+            var element = new VisualElement();
+            var actor = CreateActor(element);
+            var frame = PetSpriteLibrary.LoadFromResources().Frame(PetClip.Idle, 0);
+
+            actor.SetCondition(PetMood.Normal, stage);
+
+            var ratio = element.style.width.value.value / element.style.height.value.value;
+            Assert.That(ratio, Is.EqualTo(frame.width / (float)frame.height).Within(0.01f * frame.width / frame.height));
+        }
+
+        [Test]
         public void SetCondition_Sluggish_DimsTheSprite()
         {
             var element = new VisualElement();

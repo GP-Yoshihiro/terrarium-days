@@ -5,6 +5,13 @@ using TerrariumDays.Core;
 
 namespace TerrariumDays.UI
 {
+    /// <summary>Who says a bubble line: our clerk (the player) or the customer.</summary>
+    public enum ReplaySpeaker
+    {
+        Customer,
+        Clerk,
+    }
+
     /// <summary>One line of the replay log. Offer lines carry the offer to buy (OfferId &gt; 0).</summary>
     public sealed class ReplayLine
     {
@@ -13,6 +20,9 @@ namespace TerrariumDays.UI
 
         /// <summary>The visitor's speech bubble, or null.</summary>
         public string Bubble { get; set; }
+
+        /// <summary>Who says <see cref="Bubble"/>; decides where the bubble is drawn.</summary>
+        public ReplaySpeaker Speaker => EventReplay.SpeakerOf(Bubble);
 
         public bool Highlight { get; set; }
         public int OfferId { get; set; }
@@ -31,6 +41,15 @@ namespace TerrariumDays.UI
         public const string BrowseBubble = "どんな子がいるかな";
         public const string SaleBubble = "この子にします！";
         public const string RareBubble = "掘り出し物！";
+
+        /// <summary>
+        /// The player is the clerk, so the greeting and the player's own browsing thought are
+        /// ours (drawn at the counter); the sale and rare-find lines are the customer's.
+        /// </summary>
+        public static ReplaySpeaker SpeakerOf(string bubble)
+        {
+            return bubble == ServeBubble || bubble == BrowseBubble ? ReplaySpeaker.Clerk : ReplaySpeaker.Customer;
+        }
 
         public static double DurationSeconds(int events) => Math.Min(MaxSeconds, BaseSeconds + SecondsPerEvent * Math.Max(0, events));
 

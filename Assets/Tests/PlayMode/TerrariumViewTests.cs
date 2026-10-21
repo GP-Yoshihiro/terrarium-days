@@ -2286,6 +2286,41 @@ namespace TerrariumDays.Tests
             StringAssert.Contains("残りの行動", EventElement<Label>("event-day-left").text);
         }
 
+        private void ShowReplayLine(string bubble)
+        {
+            var eventView = EventViewOf();
+            ClickEventButton("event-day-serve-button");
+            eventView.Tick(0.1f);
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            typeof(EventView).GetField("replayLines", flags).SetValue(eventView, new List<ReplayLine> { new ReplayLine { Bubble = bubble } });
+            typeof(EventView).GetField("replayRevealed", flags).SetValue(eventView, 1);
+            typeof(EventView).GetMethod("UpdateVisitor", flags).Invoke(eventView, null);
+        }
+
+        [Test]
+        public void EventDay_AClerkLine_IsDrawnInTheClerkAnchor_NotOverTheCustomer()
+        {
+            OpenEventDay();
+            ShowReplayLine(EventReplay.ServeBubble);
+
+            var bubble = EventElement<VisualElement>("event-bubble");
+            Assert.That(Shown(bubble), Is.True);
+            Assert.That(bubble.ClassListContains("event-bubble--clerk"), Is.True);
+            Assert.That(bubble.style.left.keyword, Is.EqualTo(StyleKeyword.Null), "the clerk anchor is USS-driven, not the customer's left");
+        }
+
+        [Test]
+        public void EventDay_ASaleLine_IsDrawnOverTheCustomer()
+        {
+            OpenEventDay();
+            ShowReplayLine(EventReplay.SaleBubble);
+
+            var bubble = EventElement<VisualElement>("event-bubble");
+            Assert.That(Shown(bubble), Is.True);
+            Assert.That(bubble.ClassListContains("event-bubble--clerk"), Is.False);
+            Assert.That(bubble.style.left.value.value, Is.EqualTo(Mathf.Max(EventViewOf().CustomerLeft + 3f, 1f)).Within(0.01f));
+        }
+
         [Test]
         public void EventDay_CrowdWalksInTwoRows_OnTheDayScreen_AndKeepsMoving()
         {
@@ -2821,6 +2856,17 @@ namespace TerrariumDays.Tests
             Assert.That(colony.TrayAnimals(), Is.Empty);
             Assert.That(incubatorPanel.Q<VisualElement>($"tray-row-{pet.Id}"), Is.Null);
             Assert.That(feedbackLabel.text, Is.EqualTo($"{pet.Name}をケージ{cage.Id}へ移しました"));
+        }
+
+        [Test]
+        public void HatchTray_ThumbnailIsScaledToFit_SoTheHatchlingIsNotSquashed()
+        {
+            OpenIncubatorTab();
+            var pet = HatchIntoTray();
+
+            var row = incubatorPanel.Q<VisualElement>($"tray-row-{pet.Id}");
+            var thumb = row.Children().First();
+            Assert.That(thumb.style.unityBackgroundScaleMode.value, Is.EqualTo(ScaleMode.ScaleToFit));
         }
 
         [Test]

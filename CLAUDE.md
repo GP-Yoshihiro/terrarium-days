@@ -62,7 +62,7 @@ iOS build notes:
 
 ## Common commands (macOS)
 - Verify Unity tests: `scripts/run-unity-tests.sh` (or `scripts/run-unity-tests.sh EditMode`); results in `Logs/*-results.xml`
-- Test counts at the end of phase 6: EditMode 745 passed, PlayMode 124 passed / 17 skipped (do not reduce)
+- Test counts at the end of phase 6: EditMode 752 passed, PlayMode 127 passed / 17 skipped (after device-fix round 3) (do not reduce)
 - Summarise results/logs (totals + failures only — use this instead of reading XML/logs): `scripts/test-summary.py`
 - iOS build → Xcode build: `scripts/build-ios.sh`
 - iOS build → install and launch on the connected iPhone: `scripts/build-ios.sh --run`

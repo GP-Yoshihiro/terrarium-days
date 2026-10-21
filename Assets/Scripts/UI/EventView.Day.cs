@@ -520,7 +520,8 @@ namespace TerrariumDays.UI
             ShowCustomer(left, walking ? (int)(replayElapsed / FrameSeconds) % 2 : FrontPose, walking);
 
             var shown = Math.Min(replayRevealed, replayLines.Count);
-            var text = shown > 0 ? replayLines[shown - 1].Bubble : null;
+            var line = shown > 0 ? replayLines[shown - 1] : null;
+            var text = line?.Bubble;
 
             if (string.IsNullOrEmpty(text))
             {
@@ -529,7 +530,19 @@ namespace TerrariumDays.UI
             else
             {
                 bubbleLabel.text = text;
-                bubble.style.left = Length.Percent(Mathf.Max(left + 3f, 1f));
+                // Our (clerk) lines sit at the bottom-centre of the stage above the counter, like our own
+                // voice from behind the viewer; the customer's lines follow the stopped customer.
+                var clerk = line.Speaker == ReplaySpeaker.Clerk;
+                bubble.EnableInClassList("event-bubble--clerk", clerk);
+                if (clerk)
+                {
+                    bubble.style.left = StyleKeyword.Null;
+                }
+                else
+                {
+                    bubble.style.left = Length.Percent(Mathf.Max(left + 3f, 1f));
+                }
+
                 bubble.style.display = DisplayStyle.Flex;
             }
         }
