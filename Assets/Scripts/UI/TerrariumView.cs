@@ -2489,7 +2489,7 @@ namespace TerrariumDays.UI
                 ColonyChanged?.Invoke();
                 shopView?.Invalidate();
             }
-            else if (result == ShopResult.NotEnoughMoney)
+            else if (result == ShopResult.NotEnoughMoney || result == ShopResult.NoEmptyCage)
             {
                 ShowShopFailureDialog(result);
             }

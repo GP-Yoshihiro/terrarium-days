@@ -72,6 +72,8 @@ namespace TerrariumDays.Tests
         private Label confirmMessageLabel;
         private Button confirmYesButton;
         private Button confirmNoButton;
+        private VisualElement shopFailureModal;
+        private Label shopFailureMessage;
         private Label cageListEmptyLabel;
         private VisualElement breedingPanel;
         private VisualElement incubatorPanel;
@@ -208,6 +210,11 @@ namespace TerrariumDays.Tests
             confirmModal.Add(confirmYesButton);
             confirmModal.Add(confirmNoButton);
 
+            shopFailureModal = new VisualElement { name = "shop-failure-modal" };
+            shopFailureModal.style.display = DisplayStyle.None;
+            shopFailureMessage = new Label { name = "shop-failure-message" };
+            shopFailureModal.Add(shopFailureMessage);
+
             cageListEmptyLabel = new Label { name = "cage-list-empty-label" };
 
             breedingPanel = new VisualElement { name = "breeding-panel" };
@@ -247,6 +254,7 @@ namespace TerrariumDays.Tests
             root.Add(shopPanel);
             root.Add(ledgerPanel);
             root.Add(confirmModal);
+            root.Add(shopFailureModal);
             familyTreeModal = new VisualElement { name = "family-tree-modal" };
             familyTreeModal.style.display = DisplayStyle.None;
             familyTreeModal.Add(new Label { name = "family-tree-title" });
@@ -1144,7 +1152,8 @@ namespace TerrariumDays.Tests
 
             Assert.That(view.Session.Colony.Animals.Count, Is.EqualTo(animalsBefore));
             Assert.That(view.Session.Colony.Wallet.Money, Is.EqualTo(moneyBefore));
-            Assert.That(shopMessageLabel.text, Is.EqualTo(ShopText.FailureMessage(ShopResult.NoEmptyCage)));
+            Assert.That(shopFailureModal.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(shopFailureMessage.text, Is.EqualTo(ShopText.FailureMessage(ShopResult.NoEmptyCage)));
         }
 
         [Test]
@@ -1187,6 +1196,24 @@ namespace TerrariumDays.Tests
             var emptyCageSlots = rackList.Query<Label>(className: "rack-name").ToList()
                 .Count(l => l.text == "空きケージ");
             Assert.That(emptyCageSlots, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ShopBuySupply_InsufficientMoney_ShowsNotEnoughMoneyDialogAndChangesNothing()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, ShopNow, new TimeService(() => ShopNow));
+            view.Session.Colony.Wallet.Money = 0;
+            var cagesBefore = view.Session.Colony.Cages.Count;
+
+            view.OnShopItemBuyRequested("cage_standard");
+            ClickConfirmYes();
+
+            Assert.That(confirmModal.style.display.value, Is.EqualTo(DisplayStyle.None));
+            Assert.That(shopFailureModal.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(shopFailureMessage.text, Is.EqualTo("お金が足りません！"));
+            Assert.That(view.Session.Colony.Cages.Count, Is.EqualTo(cagesBefore));
+            Assert.That(view.Session.Colony.Wallet.Money, Is.Zero);
         }
 
         [Test]
