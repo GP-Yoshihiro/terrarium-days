@@ -33,15 +33,22 @@
                             <ui:Label name="cage-title-label" text="ケージ1" class="cage-title-label" />
                             <ui:Button name="next-cage-button" text="▶" class="cage-nav-button" />
                         </ui:VisualElement>
-                        <ui:Label name="growth-stage-label" text="ベビー 3.0g" class="growth-stage-label" />
-                        <ui:VisualElement name="profile-chips" class="profile-chips" />
-                        <ui:VisualElement name="breeding-row" class="cage-breeding-row">
-                            <ui:Label name="breeding-status-label" text="" class="breeding-status-label" />
-                            <ui:Button name="nest-box-button" text="産卵床を置く" class="nest-box-button" />
-                        </ui:VisualElement>
-                        <ui:Button name="cage-move-eggs-button" text="孵卵器へ移す（全部）" class="nest-box-button" style="align-self: center; margin-left: 0; margin-top: 12px;" />
-                        <ui:VisualElement name="growth-gauge-track" class="gauge-track">
-                            <ui:VisualElement name="growth-gauge-fill" class="gauge-fill" />
+                        <ui:Button name="cage-info-toggle-button" text="個体情報を表示" class="cage-info-toggle-button" />
+                        <ui:VisualElement name="cage-info-content" class="cage-info-content" style="display: none;">
+                            <ui:VisualElement class="cage-pet-name-row">
+                                <ui:Label name="pet-name-label" text="レオパ1" class="pet-name-label" />
+                                <ui:Button name="rename-pet-button" text="名前をつける" class="rename-pet-button" />
+                            </ui:VisualElement>
+                            <ui:Label name="growth-stage-label" text="ベビー 3.0g" class="growth-stage-label" />
+                            <ui:VisualElement name="profile-chips" class="profile-chips" />
+                            <ui:VisualElement name="breeding-row" class="cage-breeding-row">
+                                <ui:Label name="breeding-status-label" text="" class="breeding-status-label" />
+                                <ui:Button name="nest-box-button" text="産卵床を置く" class="nest-box-button" />
+                            </ui:VisualElement>
+                            <ui:Button name="cage-move-eggs-button" text="孵卵器へ移す（全部）" class="nest-box-button" style="align-self: center; margin-left: 0; margin-top: 12px;" />
+                            <ui:VisualElement name="growth-gauge-track" class="gauge-track">
+                                <ui:VisualElement name="growth-gauge-fill" class="gauge-fill" />
+                            </ui:VisualElement>
                         </ui:VisualElement>
                         <ui:Button name="debug-button" text="デバッグ" class="debug-button" />
                     </ui:VisualElement>
@@ -207,6 +214,23 @@
                 <ui:VisualElement class="confirm-button-row">
                     <ui:Button name="event-blocked-shop-button" text="ケージを買いに行く" class="confirm-yes-button event-blocked-shop" style="display: none;" />
                     <ui:Button name="event-blocked-close-button" text="閉じる" class="confirm-no-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="shop-failure-modal" class="milestone-modal-overlay" style="display: none;">
+            <ui:VisualElement class="milestone-modal-card">
+                <ui:Label name="shop-failure-message" text="" class="milestone-message-label" />
+                <ui:Button name="shop-failure-close-button" text="閉じる" class="milestone-continue-button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="rename-pet-modal" class="milestone-modal-overlay" style="display: none;">
+            <ui:VisualElement class="milestone-modal-card rename-pet-modal-card">
+                <ui:Label text="個体の名前" class="milestone-stage-label" />
+                <ui:TextField name="rename-pet-field" label="名前" class="rename-pet-field" />
+                <ui:Label name="rename-pet-error" text="" class="rename-pet-error" style="display: none;" />
+                <ui:VisualElement class="confirm-button-row">
+                    <ui:Button name="rename-pet-save-button" text="決定" class="confirm-yes-button" />
+                    <ui:Button name="rename-pet-cancel-button" text="キャンセル" class="confirm-no-button" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

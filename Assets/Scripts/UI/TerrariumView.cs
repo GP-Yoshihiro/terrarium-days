@@ -50,6 +50,12 @@ namespace TerrariumDays.UI
         public event Action ColonyChanged;
 
         private Label growthStageLabel;
+        private Label petNameLabel;
+        private Button renamePetButton;
+        private Button cageInfoToggleButton;
+        private VisualElement cageInfoContent;
+        private VisualElement statusSection;
+        private bool cageInfoExpanded;
         private VisualElement profileChips;
         private string lastProfileChipsSignature;
         private VisualElement growthGaugeFill;
@@ -74,6 +80,14 @@ namespace TerrariumDays.UI
         private Coroutine feedbackHideCoroutine;
 
         private VisualElement milestoneModal;
+        private VisualElement shopFailureModal;
+        private Label shopFailureMessage;
+        private Button shopFailureCloseButton;
+        private VisualElement renamePetModal;
+        private TextField renamePetField;
+        private Label renamePetError;
+        private Button renamePetSaveButton;
+        private Button renamePetCancelButton;
         private Label milestoneStageLabel;
         private Label milestoneMessageLabel;
         private Button milestoneContinueButton;
@@ -224,6 +238,11 @@ namespace TerrariumDays.UI
             homeButton.clicked += OnHomeButtonClicked;
             prevCageButton.clicked += OnPrevCageButtonClicked;
             nextCageButton.clicked += OnNextCageButtonClicked;
+            cageInfoToggleButton.clicked += OnCageInfoToggleClicked;
+            renamePetButton.clicked += OnRenamePetClicked;
+            shopFailureCloseButton.clicked += CloseShopFailureDialog;
+            renamePetSaveButton.clicked += ConfirmPetRename;
+            renamePetCancelButton.clicked += ClosePetRenameDialog;
             feedAllButton.clicked += OnFeedAllClicked;
             waterAllButton.clicked += OnWaterAllClicked;
             cleanAllButton.clicked += OnCleanAllClicked;
@@ -1223,9 +1242,108 @@ namespace TerrariumDays.UI
             session?.Save();
         }
 
+        private void OnCageInfoToggleClicked()
+        {
+            SetCageInfoExpanded(!cageInfoExpanded);
+        }
+
+        private void SetCageInfoExpanded(bool expanded)
+        {
+            cageInfoExpanded = expanded;
+            if (cageInfoContent != null)
+            {
+                cageInfoContent.style.display = expanded ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            if (statusSection != null)
+            {
+                statusSection.style.display = expanded ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            if (cageInfoToggleButton != null)
+            {
+                cageInfoToggleButton.text = expanded ? "個体情報を隠す" : "個体情報を表示";
+            }
+        }
+
+        private void OnRenamePetClicked()
+        {
+            var pet = session?.Colony.ResidentShown(currentCage);
+            if (pet == null || renamePetModal == null || renamePetField == null)
+            {
+                return;
+            }
+
+            renamePetField.value = pet.Name;
+            if (renamePetError != null)
+            {
+                renamePetError.text = string.Empty;
+                renamePetError.style.display = DisplayStyle.None;
+            }
+
+            renamePetModal.style.display = DisplayStyle.Flex;
+            renamePetField.Focus();
+        }
+
+        private void ConfirmPetRename()
+        {
+            var pet = session?.Colony.ResidentShown(currentCage);
+            var name = renamePetField?.value?.Trim();
+            if (pet == null || string.IsNullOrEmpty(name))
+            {
+                if (renamePetError != null)
+                {
+                    renamePetError.text = "名前を入力してください";
+                    renamePetError.style.display = DisplayStyle.Flex;
+                }
+
+                return;
+            }
+
+            pet.Name = name;
+            ClosePetRenameDialog();
+            SaveCurrentState();
+            ColonyChanged?.Invoke();
+            RefreshShell();
+        }
+
+        private void ClosePetRenameDialog()
+        {
+            if (renamePetModal != null)
+            {
+                renamePetModal.style.display = DisplayStyle.None;
+            }
+        }
+
+        private void CloseShopFailureDialog()
+        {
+            if (shopFailureModal != null)
+            {
+                shopFailureModal.style.display = DisplayStyle.None;
+            }
+        }
+
+        private void ShowShopFailureDialog(ShopResult result)
+        {
+            if (shopFailureModal == null || shopFailureMessage == null)
+            {
+                ShowShopMessage(ShopText.FailureMessage(result));
+                return;
+            }
+
+            shopFailureMessage.text = result == ShopResult.NotEnoughMoney ? "お金が足りません！" : ShopText.FailureMessage(result);
+            shopFailureModal.style.display = DisplayStyle.Flex;
+        }
+
         public void BindElements(VisualElement root)
         {
             growthStageLabel = root.Q<Label>("growth-stage-label");
+            petNameLabel = root.Q<Label>("pet-name-label");
+            renamePetButton = root.Q<Button>("rename-pet-button");
+            cageInfoToggleButton = root.Q<Button>("cage-info-toggle-button");
+            cageInfoContent = root.Q<VisualElement>("cage-info-content");
+            statusSection = root.Q<VisualElement>("status-section");
+            SetCageInfoExpanded(false);
             profileChips = root.Q<VisualElement>("profile-chips");
             lastProfileChipsSignature = null;
             growthGaugeFill = root.Q<VisualElement>("growth-gauge-fill");
@@ -1249,6 +1367,19 @@ namespace TerrariumDays.UI
             pairButton = root.Q<Button>("pair-button");
 
             milestoneModal = root.Q<VisualElement>("milestone-modal");
+            shopFailureModal = root.Q<VisualElement>("shop-failure-modal");
+            shopFailureMessage = root.Q<Label>("shop-failure-message");
+            shopFailureCloseButton = root.Q<Button>("shop-failure-close-button");
+            renamePetModal = root.Q<VisualElement>("rename-pet-modal");
+            renamePetField = root.Q<TextField>("rename-pet-field");
+            if (renamePetField != null)
+            {
+                renamePetField.maxLength = 16;
+            }
+
+            renamePetError = root.Q<Label>("rename-pet-error");
+            renamePetSaveButton = root.Q<Button>("rename-pet-save-button");
+            renamePetCancelButton = root.Q<Button>("rename-pet-cancel-button");
             milestoneStageLabel = root.Q<Label>("milestone-stage-label");
             milestoneMessageLabel = root.Q<Label>("milestone-message-label");
             milestoneContinueButton = root.Q<Button>("milestone-continue-button");
@@ -1499,7 +1630,7 @@ namespace TerrariumDays.UI
 
             if (cageTitleLabel != null && currentCage != null)
             {
-                cageTitleLabel.text = CageStatusText.TitleFor(currentCage, state);
+                cageTitleLabel.text = $"ケージ{currentCage.Id}";
             }
 
             // Rebuilding a list re-creates every row's Button, which can swallow a tap the
@@ -2358,6 +2489,10 @@ namespace TerrariumDays.UI
                 ColonyChanged?.Invoke();
                 shopView?.Invalidate();
             }
+            else if (result == ShopResult.NotEnoughMoney)
+            {
+                ShowShopFailureDialog(result);
+            }
             else
             {
                 ShowShopMessage(ShopText.FailureMessage(result));
@@ -2393,6 +2528,10 @@ namespace TerrariumDays.UI
                 SaveCurrentState();
                 ColonyChanged?.Invoke();
                 shopView?.Invalidate();
+            }
+            else if (result == ShopResult.NotEnoughMoney)
+            {
+                ShowShopFailureDialog(result);
             }
             else
             {
@@ -2813,6 +2952,11 @@ namespace TerrariumDays.UI
 
         public void Render(PetState petState, CareTuning careTuning)
         {
+            if (petNameLabel != null)
+            {
+                petNameLabel.text = petState.Name;
+            }
+
             growthStageLabel.text = $"{GrowthModel.StageLabel(petState.Stage)} {petState.WeightGrams:0.0}g";
             RenderProfileChips(petState);
 

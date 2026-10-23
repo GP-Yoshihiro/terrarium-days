@@ -12,6 +12,55 @@
     justify-content: center;
 }
 
+.cage-info-toggle-button {
+    align-self: center;
+    min-height: 30px;
+    margin: 4px 0;
+    font-size: 13px;
+}
+
+.cage-info-content {
+    width: 100%;
+    align-items: center;
+}
+
+.cage-pet-name-row {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.pet-name-label {
+    max-width: 68%;
+    font-size: 18px;
+    -unity-font-style: bold;
+    color: rgb(90, 62, 40);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rename-pet-button {
+    min-height: 28px;
+    margin-left: 8px;
+    font-size: 12px;
+}
+
+.rename-pet-modal-card {
+    align-items: stretch;
+}
+
+.rename-pet-field {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.rename-pet-error {
+    color: rgb(198, 40, 40);
+    margin-bottom: 8px;
+}
+
 .growth-stage-label {
     font-size: 26px;
     -unity-font-style: bold;
@@ -655,6 +704,11 @@
     width: 132px;
     height: 56px;
     -unity-background-scale-mode: scale-to-fit;
+}
+
+.hatch-tray-thumb {
+    width: 96px;
+    height: 41px;
 }
 
 /* The weakness mark (§5.5) on the cage-list row's thumbnail. */

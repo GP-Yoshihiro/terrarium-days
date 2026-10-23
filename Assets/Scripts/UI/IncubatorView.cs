@@ -121,6 +121,7 @@ namespace TerrariumDays.UI
 
             var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
             thumb.AddToClassList("cage-row-thumb");
+            thumb.AddToClassList("hatch-tray-thumb");
             thumb.style.marginRight = 8;
             var thumbnail = MorphSprites.Thumbnail(pet);
             if (thumbnail != null)
