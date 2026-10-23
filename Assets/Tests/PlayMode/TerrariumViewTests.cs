@@ -2972,6 +2972,35 @@ namespace TerrariumDays.Tests
         }
 
         [Test]
+        public void RepeatedNavigationAcrossAllTabs_ClosesFamilyTreeWithoutUnexpectedLogs()
+        {
+            var path = CreateTempSavePath();
+            view.LoadColony(path, LedgerNow, new TimeService(() => LedgerNow));
+            var second = view.Session.Colony.AddAnimal(new PetState { Name = "ふたり目" }, view.Session.Colony.AddCage(CageSize.Standard));
+            typeof(TerrariumView).GetField("cageListView", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(view, new CageListView(new ScrollView()));
+            var onTabChanged = (Action<ShellTab>)Delegate.CreateDelegate(typeof(Action<ShellTab>), view,
+                typeof(TerrariumView).GetMethod("OnTabChanged", BindingFlags.NonPublic | BindingFlags.Instance));
+            NavigatorOf().TabChanged += onTabChanged;
+
+            for (var round = 0; round < 3; round++)
+            {
+                foreach (ShellTab tab in Enum.GetValues(typeof(ShellTab)))
+                {
+                    view.OnLedgerAnimalTapped(second.Id);
+                    Assert.That(familyTreeModal.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+
+                    NavigatorOf().ShowTab(tab);
+
+                    Assert.That(familyTreeModal.style.display.value, Is.EqualTo(DisplayStyle.None));
+                    Assert.That(NavigatorOf().Tab, Is.EqualTo(tab));
+                }
+            }
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
         public void HatchTray_WithNoEmptyCage_DisablesMoveAndSaysSo()
         {
             OpenIncubatorTab();
